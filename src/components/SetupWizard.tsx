@@ -7,17 +7,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertTriangle, Eye, EyeOff, CheckCircle, ArrowRight, ArrowLeft, Rocket } from 'lucide-react';
 import { useAppState } from '@/hooks/useAppState';
 import { toast } from '@/hooks/use-toast';
+import SecurityWarningDialog from './SecurityWarningDialog';
 
 const SetupWizard = () => {
   const { currentStep, setCurrentStep, saveApiKeys, saveUserSettings, isLoading } = useAppState();
   const [showPasswords, setShowPasswords] = useState(false);
+  const [showSecurityWarning, setShowSecurityWarning] = useState(false);
+  const [securityAcknowledged, setSecurityAcknowledged] = useState(false);
   const [formData, setFormData] = useState({
     kucoinApiKey: '',
     kucoinApiSecret: '',
     kucoinApiPassphrase: '',
     openRouterApiKey: '',
-    securityPassword: '',
-    securityPasswordConfirm: '',
     tradingStrategy: 'balanced' as const,
     selectedAiModelId: 'anthropic/claude-3.5-sonnet'
   });
@@ -26,7 +27,6 @@ const SetupWizard = () => {
     'Willkommen',
     'KuCoin API',
     'OpenRouter API', 
-    'Sicherheitspasswort',
     'Strategieauswahl',
     'Abschluss'
   ];
@@ -38,9 +38,6 @@ const SetupWizard = () => {
       case 2:
         return formData.openRouterApiKey;
       case 3:
-        return formData.securityPassword.length >= 8 && 
-               formData.securityPassword === formData.securityPasswordConfirm;
-      case 4:
         return formData.tradingStrategy && formData.selectedAiModelId;
       default:
         return true;
@@ -57,26 +54,38 @@ const SetupWizard = () => {
       return;
     }
 
-    if (currentStep === 4) {
-      // Final step: save everything
-      const apiKeys = {
-        kucoinApiKey: formData.kucoinApiKey,
-        kucoinApiSecret: formData.kucoinApiSecret,
-        kucoinApiPassphrase: formData.kucoinApiPassphrase,
-        openRouterApiKey: formData.openRouterApiKey
-      };
-
-      const success = await saveApiKeys(apiKeys, formData.securityPassword);
-      if (success) {
-        saveUserSettings({
-          tradingStrategy: formData.tradingStrategy,
-          selectedAiModelId: formData.selectedAiModelId
-        });
-        setCurrentStep(5);
-      }
+    if (currentStep === 3) {
+      // Final step: show security warning before saving
+      setShowSecurityWarning(true);
     } else {
       setCurrentStep(currentStep + 1);
     }
+  };
+
+  const handleSecurityAccept = async () => {
+    setShowSecurityWarning(false);
+    
+    // Save API keys and settings
+    const apiKeys = {
+      kucoinApiKey: formData.kucoinApiKey,
+      kucoinApiSecret: formData.kucoinApiSecret,
+      kucoinApiPassphrase: formData.kucoinApiPassphrase,
+      openRouterApiKey: formData.openRouterApiKey
+    };
+
+    const success = await saveApiKeys(apiKeys);
+    if (success) {
+      saveUserSettings({
+        tradingStrategy: formData.tradingStrategy,
+        selectedAiModelId: formData.selectedAiModelId
+      });
+      setCurrentStep(4);
+    }
+  };
+
+  const handleSecurityReject = () => {
+    setShowSecurityWarning(false);
+    setSecurityAcknowledged(false);
   };
 
   const renderStepContent = () => {
@@ -95,9 +104,9 @@ const SetupWizard = () => {
                 </div>
                 <ul className="text-amber-200 text-sm space-y-1">
                   <li>• Dies ist ein MVP für Paper-Trading (Simulation)</li>
-                  <li>• Ihre API-Schlüssel werden lokal verschlüsselt gespeichert</li>
+                  <li>• Ihre API-Schlüssel werden unverschlüsselt lokal gespeichert</li>
                   <li>• Kein echter Handel - nur Signaltesting</li>
-                  <li>• Verwenden Sie starke, einzigartige Passwörter</li>
+                  <li>• Verwenden Sie nur Test-API-Schlüssel mit minimalen Berechtigungen</li>
                 </ul>
               </div>
               
@@ -211,69 +220,6 @@ const SetupWizard = () => {
         return (
           <Card className="max-w-2xl mx-auto bg-slate-800 border-slate-700">
             <CardHeader>
-              <CardTitle className="text-white">Sicherheitspasswort erstellen</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="bg-red-900/30 border border-red-600 rounded-lg p-4 mb-4">
-                <div className="flex items-center space-x-2 mb-2">
-                  <AlertTriangle className="h-5 w-5 text-red-400" />
-                  <h3 className="font-semibold text-red-400">Wichtiger Hinweis</h3>
-                </div>
-                <p className="text-red-200 text-sm">
-                  Dieses Passwort ist <strong>nicht wiederherstellbar</strong>. 
-                  Merken Sie es sich gut oder bewahren Sie es sicher auf!
-                </p>
-              </div>
-              
-              <div>
-                <Label htmlFor="securityPassword" className="text-slate-300">Sicherheitspasswort</Label>
-                <Input
-                  id="securityPassword"
-                  type="password"
-                  value={formData.securityPassword}
-                  onChange={(e) => setFormData(prev => ({ ...prev, securityPassword: e.target.value }))}
-                  className="bg-slate-700 border-slate-600 text-white"
-                  placeholder="Mindestens 8 Zeichen"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="securityPasswordConfirm" className="text-slate-300">Passwort bestätigen</Label>
-                <Input
-                  id="securityPasswordConfirm"
-                  type="password"
-                  value={formData.securityPasswordConfirm}
-                  onChange={(e) => setFormData(prev => ({ ...prev, securityPasswordConfirm: e.target.value }))}
-                  className="bg-slate-700 border-slate-600 text-white"
-                  placeholder="Passwort wiederholen"
-                />
-              </div>
-              
-              {formData.securityPassword && (
-                <div className="text-sm">
-                  <div className={`flex items-center space-x-2 ${
-                    formData.securityPassword.length >= 8 ? 'text-green-400' : 'text-red-400'
-                  }`}>
-                    <CheckCircle className="h-4 w-4" />
-                    <span>Mindestens 8 Zeichen</span>
-                  </div>
-                  <div className={`flex items-center space-x-2 ${
-                    formData.securityPassword === formData.securityPasswordConfirm && formData.securityPasswordConfirm
-                      ? 'text-green-400' : 'text-red-400'
-                  }`}>
-                    <CheckCircle className="h-4 w-4" />
-                    <span>Passwörter stimmen überein</span>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        );
-
-      case 4:
-        return (
-          <Card className="max-w-2xl mx-auto bg-slate-800 border-slate-700">
-            <CardHeader>
               <CardTitle className="text-white">Handelsstrategie auswählen</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -311,7 +257,7 @@ const SetupWizard = () => {
           </Card>
         );
 
-      case 5:
+      case 4:
         return (
           <Card className="max-w-2xl mx-auto bg-slate-800 border-slate-700">
             <CardHeader>
@@ -325,8 +271,7 @@ const SetupWizard = () => {
               <div>
                 <h3 className="text-xl font-semibold text-white mb-2">Willkommen!</h3>
                 <p className="text-slate-300 mb-4">
-                  Ihre API-Schlüssel wurden mit Ihrem Sicherheitspasswort verschlüsselt und 
-                  sicher im lokalen Speicher Ihres Browsers abgelegt.
+                  Ihre API-Schlüssel wurden im lokalen Speicher Ihres Browsers abgelegt.
                 </p>
                 <p className="text-slate-400 text-sm">
                   Sie können jetzt mit dem Paper-Trading beginnen. Die App lädt zunächst 
@@ -385,7 +330,7 @@ const SetupWizard = () => {
       {renderStepContent()}
 
       {/* Navigation buttons */}
-      {currentStep > 0 && currentStep < 5 && (
+      {currentStep > 0 && currentStep < 4 && (
         <div className="flex justify-center space-x-4">
           <Button 
             variant="outline" 
@@ -400,11 +345,20 @@ const SetupWizard = () => {
             disabled={!validateCurrentStep() || isLoading}
             className="bg-blue-600 hover:bg-blue-700"
           >
-            {currentStep === 4 ? 'Abschließen' : 'Weiter'}
+            {currentStep === 3 ? 'Abschließen' : 'Weiter'}
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
       )}
+
+      {/* Security Warning Dialog */}
+      <SecurityWarningDialog
+        isOpen={showSecurityWarning}
+        onAccept={handleSecurityAccept}
+        onReject={handleSecurityReject}
+        acknowledged={securityAcknowledged}
+        onAcknowledgedChange={setSecurityAcknowledged}
+      />
     </div>
   );
 };

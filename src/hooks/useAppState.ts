@@ -1,7 +1,7 @@
 
 import { useSetupManager } from './useSetupManager';
 import { useSettingsManager } from './useSettingsManager';
-import { useAuthManager } from './useAuthManager';
+import { useApiKeyManager } from './useApiKeyManager';
 import { useAppReset } from './useAppReset';
 
 export const useAppState = () => {
@@ -19,19 +19,25 @@ export const useAppState = () => {
   } = useSettingsManager();
 
   const {
-    isUnlocked,
-    isFirstTimeAfterSetup,
-    decryptedApiKeys,
+    apiKeys,
     isLoading,
     saveApiKeys,
-    unlockApp,
-    lockApp,
-    completeFirstTimeSetup
-  } = useAuthManager();
+    loadApiKeys,
+    clearApiKeys
+  } = useApiKeyManager();
 
   const {
     resetApp
   } = useAppReset();
+
+  // Logout function that clears all API keys
+  const logoutAndClearData = () => {
+    clearApiKeys();
+    // Optionally trigger a setup status check to redirect to setup
+    setTimeout(() => {
+      checkSetupStatus();
+    }, 100);
+  };
 
   return {
     // Setup state
@@ -45,15 +51,13 @@ export const useAppState = () => {
     loadUserSettings,
     saveUserSettings,
     
-    // Auth state
-    isUnlocked,
-    isFirstTimeAfterSetup,
-    decryptedApiKeys,
+    // API Keys state (simplified from auth)
+    apiKeys,
     isLoading,
     saveApiKeys,
-    unlockApp,
-    lockApp,
-    completeFirstTimeSetup,
+    loadApiKeys,
+    clearApiKeys,
+    logoutAndClearData,
     
     // Reset functionality
     resetApp

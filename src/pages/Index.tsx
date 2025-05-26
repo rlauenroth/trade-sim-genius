@@ -1,84 +1,32 @@
 
 import React, { useState, useEffect } from 'react';
-import { Lock, Unlock, TrendingUp, Bot, AlertCircle, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { TrendingUp, Bot, Loader2 } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import SetupWizard from '@/components/SetupWizard';
-import UnlockScreen from '@/components/UnlockScreen';
 import TradingDashboard from '@/components/TradingDashboard';
 import { useAppState } from '@/hooks/useAppState';
 
 const Index = () => {
   const { 
     isSetupComplete, 
-    isUnlocked, 
-    currentStep,
     isLoading,
     checkSetupStatus,
-    loadUserSettings 
+    loadApiKeys
   } = useAppState();
-
-  const [forceRerender, setForceRerender] = useState(0);
 
   useEffect(() => {
     console.log('Index component mounted, checking setup status...');
     checkSetupStatus();
-  }, [checkSetupStatus]);
+    loadApiKeys();
+  }, [checkSetupStatus, loadApiKeys]);
 
-  // Monitor all state changes for debugging
+  // Monitor state changes for debugging
   useEffect(() => {
     console.log('=== INDEX STATE CHANGE ===', { 
       isSetupComplete, 
-      isUnlocked, 
-      isLoading,
-      forceRerender
+      isLoading
     });
-  }, [isSetupComplete, isUnlocked, isLoading, forceRerender]);
-
-  // Force rerender when unlock state changes
-  useEffect(() => {
-    if (isUnlocked) {
-      console.log('Index: isUnlocked is true, forcing rerender to show dashboard...');
-      setForceRerender(prev => prev + 1);
-    }
-  }, [isUnlocked]);
-
-  // Listen for custom navigation events
-  useEffect(() => {
-    const handleForceNavigationCheck = () => {
-      console.log('Index: Force navigation check triggered');
-      setForceRerender(prev => prev + 1);
-      
-      // Double-check the state and force render
-      setTimeout(() => {
-        setForceRerender(prev => prev + 1);
-      }, 100);
-    };
-
-    const handleForceAppRerender = () => {
-      console.log('Index: Force app rerender triggered');
-      setForceRerender(prev => prev + 1);
-    };
-
-    window.addEventListener('forceNavigationCheck', handleForceNavigationCheck);
-    window.addEventListener('forceAppRerender', handleForceAppRerender);
-
-    return () => {
-      window.removeEventListener('forceNavigationCheck', handleForceNavigationCheck);
-      window.removeEventListener('forceAppRerender', handleForceAppRerender);
-    };
-  }, []);
-
-  // Additional effect to ensure proper navigation after unlock
-  useEffect(() => {
-    if (isUnlocked && isSetupComplete && !isLoading) {
-      console.log('Index: All conditions met for dashboard, should show dashboard now');
-      // Force one final rerender to ensure we show the dashboard
-      setTimeout(() => {
-        setForceRerender(prev => prev + 1);
-      }, 50);
-    }
-  }, [isUnlocked, isSetupComplete, isLoading]);
+  }, [isSetupComplete, isLoading]);
 
   // Show loading spinner while loading
   if (isLoading) {
@@ -92,7 +40,7 @@ const Index = () => {
                 <div className="text-center space-y-4">
                   <Loader2 className="h-8 w-8 animate-spin text-blue-400 mx-auto" />
                   <div className="text-white font-medium">
-                    App wird entsperrt...
+                    App wird geladen...
                   </div>
                   <div className="text-slate-400 text-sm">
                     Bitte warten Sie einen Moment.
@@ -129,31 +77,8 @@ const Index = () => {
     );
   }
 
-  // Show unlock screen if app is locked
-  if (!isUnlocked) {
-    console.log('Index: Showing unlock screen');
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-center mb-8">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-blue-600 rounded-xl">
-                <Lock className="h-8 w-8 text-white" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-white">KI Trading Assistant</h1>
-                <p className="text-slate-400">App entsperren</p>
-              </div>
-            </div>
-          </div>
-          <UnlockScreen />
-        </div>
-      </div>
-    );
-  }
-
   // Show main trading dashboard
-  console.log('Index: Showing trading dashboard (unlocked and setup complete)');
+  console.log('Index: Showing trading dashboard (setup complete)');
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <TradingDashboard />

@@ -8,12 +8,17 @@ export const useSetupManager = () => {
 
   const checkSetupStatus = useCallback(() => {
     console.log('Checking setup status...');
-    const hasEncryptedKeys = storageUtils.getItem(STORAGE_KEYS.API_KEYS);
-    const hasSalt = storageUtils.getItem(STORAGE_KEYS.SECURITY_SALT);
+    const hasApiKeys = storageUtils.getApiKeys();
     const hasSettings = storageUtils.getItem(STORAGE_KEYS.USER_SETTINGS);
+    const hasAcknowledgedRisk = storageUtils.hasAcknowledgedRisk();
     
-    const setupComplete = !!(hasEncryptedKeys && hasSalt && hasSettings);
-    console.log('Setup status:', { hasEncryptedKeys: !!hasEncryptedKeys, hasSalt: !!hasSalt, hasSettings: !!hasSettings, setupComplete });
+    const setupComplete = !!(hasApiKeys && hasSettings && hasAcknowledgedRisk);
+    console.log('Setup status:', { 
+      hasApiKeys: !!hasApiKeys, 
+      hasSettings: !!hasSettings, 
+      hasAcknowledgedRisk,
+      setupComplete 
+    });
     
     setIsSetupComplete(setupComplete);
   }, []);

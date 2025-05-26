@@ -1,10 +1,10 @@
 
-import { UserSettings } from '@/types/appState';
+import { UserSettings, ApiKeys } from '@/types/appState';
 
 export const STORAGE_KEYS = {
   API_KEYS: 'kiTradingApp_apiKeys',
-  SECURITY_SALT: 'kiTradingApp_securitySalt',
   USER_SETTINGS: 'kiTradingApp_userSettings',
+  USER_ACKNOWLEDGED_RISK: 'kiTradingApp_userAcknowledgedRisk',
   SIMULATION_STATE: 'kiTradingApp_simulationState',
   ACTIVITY_LOG: 'kiTradingApp_activityLog'
 } as const;
@@ -56,6 +56,36 @@ export const storageUtils = {
       console.error('Error saving user settings:', error);
       return false;
     }
+  },
+
+  getApiKeys: (): ApiKeys | null => {
+    const stored = storageUtils.getItem(STORAGE_KEYS.API_KEYS);
+    if (!stored) return null;
+    
+    try {
+      return JSON.parse(stored);
+    } catch (error) {
+      console.error('Error parsing API keys:', error);
+      return null;
+    }
+  },
+
+  saveApiKeys: (apiKeys: ApiKeys): boolean => {
+    try {
+      return storageUtils.setItem(STORAGE_KEYS.API_KEYS, JSON.stringify(apiKeys));
+    } catch (error) {
+      console.error('Error saving API keys:', error);
+      return false;
+    }
+  },
+
+  clearApiKeys: (): void => {
+    storageUtils.removeItem(STORAGE_KEYS.API_KEYS);
+    storageUtils.removeItem(STORAGE_KEYS.USER_ACKNOWLEDGED_RISK);
+  },
+
+  hasAcknowledgedRisk: (): boolean => {
+    return storageUtils.getItem(STORAGE_KEYS.USER_ACKNOWLEDGED_RISK) === 'true';
   },
 
   clearAllData: (): void => {
