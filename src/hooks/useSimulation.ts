@@ -265,6 +265,13 @@ export const useSimulation = () => {
   const acceptSignal = useCallback((signal: Signal) => {
     if (!simulationState || !signal) return;
 
+    // Only create positions for tradeable signals
+    if (signal.signalType !== 'BUY' && signal.signalType !== 'SELL') {
+      addLogEntry('INFO', `Signal ${signal.signalType} für ${signal.assetPair} ist nicht handelbar`);
+      setCurrentSignal(null);
+      return;
+    }
+
     addLogEntry('TRADE', `Signal angenommen: ${signal.signalType} ${signal.assetPair}`);
     
     // Mock trade execution
@@ -275,7 +282,7 @@ export const useSimulation = () => {
     const newPosition: Position = {
       id: `pos_${Date.now()}`,
       assetPair: signal.assetPair,
-      type: signal.signalType,
+      type: signal.signalType, // Now this is guaranteed to be 'BUY' | 'SELL'
       entryPrice: mockCurrentPrice,
       quantity,
       takeProfit: signal.takeProfitPrice,
