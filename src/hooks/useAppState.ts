@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { encryptData, decryptData, generateSalt } from '@/utils/encryption';
@@ -45,6 +44,7 @@ export const useAppState = () => {
       if (storedSettings) {
         const parsed = JSON.parse(storedSettings);
         setUserSettings(prev => ({ ...prev, ...parsed }));
+        console.log('User settings loaded successfully:', parsed);
       }
     } catch (error) {
       console.error('Error loading user settings:', error);
@@ -102,9 +102,24 @@ export const useAppState = () => {
       const decryptedData = await decryptData(encryptedKeys, password, salt);
       const apiKeys = JSON.parse(decryptedData);
       
+      console.log('App successfully unlocked, setting states...');
       setDecryptedApiKeys(apiKeys);
       setIsUnlocked(true);
       setIsFirstTimeAfterSetup(false);
+      
+      // Force immediate load of user settings
+      setTimeout(() => {
+        const storedSettings = localStorage.getItem('kiTradingApp_userSettings');
+        if (storedSettings) {
+          try {
+            const parsed = JSON.parse(storedSettings);
+            setUserSettings(prev => ({ ...prev, ...parsed }));
+            console.log('User settings loaded after unlock:', parsed);
+          } catch (error) {
+            console.error('Error loading settings after unlock:', error);
+          }
+        }
+      }, 100);
       
       toast({
         title: "App entsperrt",

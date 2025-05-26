@@ -18,14 +18,23 @@ const Index = () => {
   } = useAppState();
 
   useEffect(() => {
+    console.log('Index component mounted, checking setup status...');
     checkSetupStatus();
+  }, [checkSetupStatus]);
+
+  useEffect(() => {
+    console.log('App state changed:', { isSetupComplete, isUnlocked });
     if (isSetupComplete && isUnlocked) {
+      console.log('Loading user settings...');
       loadUserSettings();
     }
-  }, [isSetupComplete, isUnlocked]);
+  }, [isSetupComplete, isUnlocked, loadUserSettings]);
+
+  console.log('Current app state:', { isSetupComplete, isUnlocked });
 
   // Show setup wizard if first time user
   if (!isSetupComplete) {
+    console.log('Showing setup wizard');
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         <div className="container mx-auto px-4 py-8">
@@ -48,6 +57,7 @@ const Index = () => {
 
   // Show unlock screen if app is locked
   if (!isUnlocked) {
+    console.log('Showing unlock screen');
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         <div className="container mx-auto px-4 py-8">
@@ -69,6 +79,7 @@ const Index = () => {
   }
 
   // Show main trading dashboard
+  console.log('Showing trading dashboard');
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <TradingDashboard />
