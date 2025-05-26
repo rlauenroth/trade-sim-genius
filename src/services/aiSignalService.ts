@@ -1,5 +1,6 @@
-// AI Signal Generation Service
-import { sendAIRequest, createScreeningPrompt, createAnalysisPrompt } from '@/utils/openRouterApi';
+
+// AI Signal Generation Service with Demo Mode Support
+import { sendAIRequest, createScreeningPrompt, createAnalysisPrompt, testApiKey, OpenRouterError } from '@/utils/openRouterApi';
 import { getMarketTickers, getHistoricalCandles, getCurrentPrice } from '@/utils/kucoinApi';
 import { calculateAllIndicators } from '@/utils/technicalIndicators';
 
@@ -26,18 +27,87 @@ interface GeneratedSignal {
   confidenceScore?: number;
   reasoning?: string;
   suggestedPositionSizePercent?: number;
+  isDemoMode?: boolean;
 }
 
 export class AISignalService {
   private params: SignalGenerationParams;
+  private isDemoMode: boolean = false;
   
   constructor(params: SignalGenerationParams) {
     this.params = params;
   }
-  
-  // Stage 1: Market Screening
+
+  // Check if we should use demo mode
+  async shouldUseDemoMode(): Promise<boolean> {
+    if (!this.params.openRouterApiKey || this.params.openRouterApiKey.trim() === '') {
+      console.log('🔄 No OpenRouter API key provided, using demo mode');
+      return true;
+    }
+
+    const isValidKey = await testApiKey(this.params.openRouterApiKey);
+    if (!isValidKey) {
+      console.log('🔄 Invalid OpenRouter API key, switching to demo mode');
+      return true;
+    }
+
+    return false;
+  }
+
+  // Generate demo signals without API calls
+  generateDemoSignals(): GeneratedSignal[] {
+    const demoSignals: GeneratedSignal[] = [
+      {
+        assetPair: 'BTC-USDT',
+        signalType: 'BUY',
+        entryPriceSuggestion: 'MARKET',
+        takeProfitPrice: 62000,
+        stopLossPrice: 59500,
+        confidenceScore: 0.75,
+        reasoning: 'Demo-Signal: RSI zeigt überverkauft, MACD bullisches Momentum, Preis prallt von Support ab',
+        suggestedPositionSizePercent: 5,
+        isDemoMode: true
+      },
+      {
+        assetPair: 'ETH-USDT',
+        signalType: 'BUY',
+        entryPriceSuggestion: 'MARKET',
+        takeProfitPrice: 3200,
+        stopLossPrice: 2950,
+        confidenceScore: 0.68,
+        reasoning: 'Demo-Signal: Durchbruch über Widerstand bei 3050, hohe Volumen-Bestätigung',
+        suggestedPositionSizePercent: 3,
+        isDemoMode: true
+      },
+      {
+        assetPair: 'SOL-USDT',
+        signalType: 'BUY',
+        entryPriceSuggestion: 'MARKET',
+        takeProfitPrice: 160,
+        stopLossPrice: 145,
+        confidenceScore: 0.72,
+        reasoning: 'Demo-Signal: Starke Aufwärtsbewegung, hohe Aktivität im Solana-Ökosystem',
+        suggestedPositionSizePercent: 4,
+        isDemoMode: true
+      }
+    ];
+
+    // Return random signal
+    const randomSignal = demoSignals[Math.floor(Math.random() * demoSignals.length)];
+    return [randomSignal];
+  }
+
+  // Stage 1: Market Screening with demo mode support
   async performMarketScreening(): Promise<string[]> {
     console.log('🔍 Starting market screening...');
+    
+    // Check if we should use demo mode
+    this.isDemoMode = await this.shouldUseDemoMode();
+    
+    if (this.isDemoMode) {
+      console.log('📊 Market screening in demo mode');
+      return ['BTC-USDT', 'ETH-USDT', 'SOL-USDT'];
+    }
     
     try {
       // Get market data from KuCoin
@@ -46,9 +116,9 @@ export class AISignalService {
       // Filter for USDT pairs and sort by volume
       const usdtPairs = tickers
         .filter(ticker => ticker.symbol.endsWith('-USDT'))
-        .filter(ticker => parseFloat(ticker.volValue) > 100000) // Minimum volume filter
+        .filter(ticker => parseFloat(ticker.volValue) > 100000)
         .sort((a, b) => parseFloat(b.volValue) - parseFloat(a.volValue))
-        .slice(0, 50); // Top 50 by volume
+        .slice(0, 50);
       
       // Prepare data for AI screening
       const marketData = usdtPairs.map(ticker => ({
@@ -72,19 +142,34 @@ export class AISignalService {
       
     } catch (error) {
       console.error('❌ Market screening failed:', error);
+      if (error instanceof OpenRouterError && error.status === 401) {
+        console.log('🔄 Switching to demo mode due to authentication error');
+        this.isDemoMode = true;
+        return ['BTC-USDT', 'ETH-USDT', 'SOL-USDT'];
+      }
       // Fallback to popular pairs
       return ['BTC-USDT', 'ETH-USDT', 'SOL-USDT'];
     }
   }
   
-  // Stage 2: Detailed Analysis & Signal Generation
+  // Stage 2: Detailed Analysis & Signal Generation with demo mode
   async generateDetailedSignal(assetPair: string): Promise<GeneratedSignal | null> {
     console.log(`🤖 Generating detailed signal for ${assetPair}...`);
+    
+    if (this.isDemoMode) {
+      console.log(`📊 Generating demo signal for ${assetPair}`);
+      const demoSignals = this.generateDemoSignals();
+      if (demoSignals.length > 0) {
+        const signal = { ...demoSignals[0], assetPair };
+        return signal;
+      }
+      return null;
+    }
     
     try {
       // Get historical data
       const endTime = Math.floor(Date.now() / 1000);
-      const startTime = endTime - (24 * 60 * 60); // Last 24 hours
+      const startTime = endTime - (24 * 60 * 60);
       
       const candles = await getHistoricalCandles(
         this.params.kucoinCredentials,
@@ -118,9 +203,9 @@ export class AISignalService {
       const marketData = {
         asset_pair: assetPair,
         current_price: currentPrice,
-        recent_candles: candleData.slice(-20), // Last 20 candles
-        price_trend_1h: this.calculatePriceTrend(candleData.slice(-12)), // Last hour (5min * 12)
-        price_trend_4h: this.calculatePriceTrend(candleData.slice(-48)), // Last 4 hours
+        recent_candles: candleData.slice(-20),
+        price_trend_1h: this.calculatePriceTrend(candleData.slice(-12)),
+        price_trend_4h: this.calculatePriceTrend(candleData.slice(-48)),
         volume_average: candleData.slice(-20).reduce((sum, c) => sum + c.volume, 0) / 20
       };
       
@@ -153,11 +238,20 @@ export class AISignalService {
         stopLossPrice: signal.stop_loss_price || 0,
         confidenceScore: signal.confidence_score,
         reasoning: signal.reasoning,
-        suggestedPositionSizePercent: signal.suggested_position_size_percent
+        suggestedPositionSizePercent: signal.suggested_position_size_percent,
+        isDemoMode: false
       };
       
     } catch (error) {
       console.error(`❌ Signal generation failed for ${assetPair}:`, error);
+      if (error instanceof OpenRouterError && error.status === 401) {
+        console.log('🔄 Switching to demo mode due to authentication error');
+        this.isDemoMode = true;
+        const demoSignals = this.generateDemoSignals();
+        if (demoSignals.length > 0) {
+          return { ...demoSignals[0], assetPair };
+        }
+      }
       return null;
     }
   }
@@ -169,6 +263,11 @@ export class AISignalService {
     // Stage 1: Market Screening
     const selectedPairs = await this.performMarketScreening();
     
+    if (this.isDemoMode) {
+      console.log('📊 Running in demo mode, generating demo signals');
+      return this.generateDemoSignals();
+    }
+    
     // Stage 2: Generate detailed signals
     const signals: GeneratedSignal[] = [];
     
@@ -177,13 +276,13 @@ export class AISignalService {
       if (signal) {
         signals.push(signal);
         
-        // Only return the first tradeable signal to avoid overwhelming the user
+        // Only return the first tradeable signal
         if (signal.signalType === 'BUY' || signal.signalType === 'SELL') {
           break;
         }
       }
       
-      // Small delay between requests to respect rate limits
+      // Small delay between requests
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
     

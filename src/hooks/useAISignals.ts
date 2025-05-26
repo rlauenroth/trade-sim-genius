@@ -5,11 +5,12 @@ import { AISignalService } from '@/services/aiSignalService';
 
 export const useAISignals = () => {
   const [currentSignal, setCurrentSignal] = useState<Signal | null>(null);
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
   const generateMockSignal = useCallback((isActive: boolean, addLogEntry: (type: any, message: string) => void) => {
     if (!isActive) return;
 
-    addLogEntry('AI', 'Generiere Mock-Signal für Demo...');
+    addLogEntry('AI', 'Generiere Demo-Signal...');
     
     setTimeout(() => {
       const mockSignals: Signal[] = [
@@ -47,8 +48,10 @@ export const useAISignals = () => {
 
       const signal = mockSignals[Math.floor(Math.random() * mockSignals.length)];
       setCurrentSignal(signal);
+      setIsDemoMode(true);
       
-      addLogEntry('AI', `Mock-Signal für ${signal.assetPair}: ${signal.signalType} (Konfidenz: ${Math.round((signal.confidenceScore || 0) * 100)}%)`);
+      addLogEntry('AI', `Demo-Signal für ${signal.assetPair}: ${signal.signalType} (Konfidenz: ${Math.round((signal.confidenceScore || 0) * 100)}%)`);
+      addLogEntry('INFO', 'Läuft im Demo-Modus - keine echten KI-Analysen');
     }, 2000);
   }, []);
 
@@ -66,42 +69,51 @@ export const useAISignals = () => {
       // Get API keys from localStorage
       const storedKeys = JSON.parse(localStorage.getItem('kiTradingApp_apiKeys') || '{}');
       
-      if (!storedKeys.openRouterApiKey) {
-        addLogEntry('WARNING', 'OpenRouter API-Schlüssel fehlt, verwende Mock-Signale...');
-        setTimeout(() => generateMockSignalFallback(), 3000);
-        return;
-      }
-      
       const aiService = new AISignalService({
         kucoinCredentials: {
           kucoinApiKey: storedKeys.kucoinApiKey || 'demo_key',
           kucoinApiSecret: storedKeys.kucoinApiSecret || 'demo_secret',
           kucoinApiPassphrase: storedKeys.kucoinApiPassphrase || 'demo_passphrase'
         },
-        openRouterApiKey: storedKeys.openRouterApiKey,
+        openRouterApiKey: storedKeys.openRouterApiKey || '',
         strategy: 'balanced',
         simulatedPortfolioValue: simulationState?.currentPortfolioValue || 10000,
         availableUSDT: simulationState?.paperAssets.find((asset: any) => asset.symbol === 'USDT')?.quantity || 10000
       });
+      
+      // Check if we'll be using demo mode
+      const willUseDemoMode = await aiService.shouldUseDemoMode();
+      setIsDemoMode(willUseDemoMode);
+      
+      if (willUseDemoMode) {
+        addLogEntry('INFO', 'OpenRouter API-Schlüssel ungültig oder nicht vorhanden');
+        addLogEntry('INFO', 'Läuft im Demo-Modus mit simulierten KI-Signalen');
+      } else {
+        addLogEntry('INFO', 'Verwende echte KI-Analyse über OpenRouter API');
+      }
       
       const signals = await aiService.generateSignals();
       
       if (signals.length > 0) {
         const signal = signals[0];
         setCurrentSignal(signal);
-        addLogEntry('AI', `KI-Signal generiert: ${signal.signalType} ${signal.assetPair}`);
+        
+        const modeText = signal.isDemoMode ? 'Demo-Signal' : 'KI-Signal';
+        addLogEntry('AI', `${modeText} generiert: ${signal.signalType} ${signal.assetPair}`);
         
         if (signal.reasoning) {
-          addLogEntry('AI', `KI-Begründung: ${signal.reasoning}`);
+          const reasoningPrefix = signal.isDemoMode ? 'Demo-Begründung' : 'KI-Begründung';
+          addLogEntry('AI', `${reasoningPrefix}: ${signal.reasoning}`);
         }
       } else {
-        addLogEntry('AI', 'Keine handelswerten Signale gefunden. Verwende Mock-Signal...');
-        setTimeout(() => generateMockSignalFallback(), 10000);
+        addLogEntry('AI', 'Keine handelswerten Signale gefunden. Verwende Fallback...');
+        setTimeout(() => generateMockSignalFallback(), 5000);
       }
       
     } catch (error) {
       console.error('AI signal generation error:', error);
-      addLogEntry('INFO', 'KI-Service Fehler (wahrscheinlich API-Schlüssel), verwende Mock-Signale...');
+      addLogEntry('INFO', 'KI-Service Fehler, verwende Demo-Signale...');
+      setIsDemoMode(true);
       
       // Fallback to mock signals
       setTimeout(() => {
@@ -114,6 +126,7 @@ export const useAISignals = () => {
     currentSignal,
     setCurrentSignal,
     generateMockSignal,
-    startAISignalGeneration
+    startAISignalGeneration,
+    isDemoMode
   };
 };

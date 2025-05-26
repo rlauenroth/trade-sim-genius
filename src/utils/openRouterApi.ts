@@ -24,7 +24,34 @@ interface OpenRouterResponse {
   }[];
 }
 
-// Send request to OpenRouter AI
+export class OpenRouterError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+    this.name = 'OpenRouterError';
+  }
+}
+
+// Test API key validity
+export async function testApiKey(apiKey: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${OPENROUTER_BASE_URL}/models`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': window.location.origin,
+        'X-Title': 'KI Trading Assistant'
+      }
+    });
+    
+    return response.ok;
+  } catch (error) {
+    console.error('API key test failed:', error);
+    return false;
+  }
+}
+
+// Send request to OpenRouter AI with improved error handling
 export async function sendAIRequest(
   apiKey: string,
   request: OpenRouterRequest
@@ -41,7 +68,13 @@ export async function sendAIRequest(
   });
   
   if (!response.ok) {
-    throw new Error(`OpenRouter API error: ${response.status} ${response.statusText}`);
+    if (response.status === 401) {
+      throw new OpenRouterError(401, 'Invalid or expired API key');
+    } else if (response.status === 429) {
+      throw new OpenRouterError(429, 'Rate limit exceeded');
+    } else {
+      throw new OpenRouterError(response.status, `OpenRouter API error: ${response.status} ${response.statusText}`);
+    }
   }
   
   const data: OpenRouterResponse = await response.json();
@@ -89,7 +122,6 @@ Antwort-Format:
   };
 }
 
-// Generate detailed analysis prompt
 export function createAnalysisPrompt(
   strategy: string,
   assetPair: string,

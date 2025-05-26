@@ -1,39 +1,52 @@
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { ApiKeys } from '@/types/appState';
 import { storageUtils, STORAGE_KEYS } from '@/utils/appStorage';
+import { testApiKey } from '@/utils/openRouterApi';
 
 export const useApiKeyManager = () => {
   const [apiKeys, setApiKeys] = useState<ApiKeys | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isValidatingApiKey, setIsValidatingApiKey] = useState(false);
 
-  // Auto-update OpenRouter key on mount
-  useEffect(() => {
-    const updateOpenRouterKey = () => {
-      const newKey = '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';
-      const existingKeys = storageUtils.getApiKeys();
-      
-      if (existingKeys && existingKeys.openRouterApiKey !== newKey) {
-        console.log('Updating OpenRouter API key automatically...');
-        const updatedKeys = {
-          ...existingKeys,
-          openRouterApiKey: newKey
-        };
-        
-        if (storageUtils.saveApiKeys(updatedKeys)) {
-          setApiKeys(updatedKeys);
-          console.log('OpenRouter API key updated successfully');
-        }
-      }
-    };
+  const validateApiKey = useCallback(async (openRouterApiKey: string): Promise<boolean> => {
+    if (!openRouterApiKey || openRouterApiKey.trim() === '') {
+      return false;
+    }
     
-    updateOpenRouterKey();
+    setIsValidatingApiKey(true);
+    try {
+      const isValid = await testApiKey(openRouterApiKey);
+      setIsValidatingApiKey(false);
+      return isValid;
+    } catch (error) {
+      console.error('Error validating API key:', error);
+      setIsValidatingApiKey(false);
+      return false;
+    }
   }, []);
 
-  const saveApiKeys = useCallback((newApiKeys: ApiKeys) => {
+  const saveApiKeys = useCallback(async (newApiKeys: ApiKeys) => {
     setIsLoading(true);
     try {
+      // Validate OpenRouter API key if provided
+      if (newApiKeys.openRouterApiKey && newApiKeys.openRouterApiKey.trim() !== '') {
+        const isValidKey = await validateApiKey(newApiKeys.openRouterApiKey);
+        if (!isValidKey) {
+          toast({
+            title: "Warnung",
+            description: "OpenRouter API-Schlüssel scheint ungültig zu sein. Die App läuft im Demo-Modus.",
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Erfolgreich",
+            description: "OpenRouter API-Schlüssel erfolgreich validiert.",
+          });
+        }
+      }
+      
       if (storageUtils.saveApiKeys(newApiKeys)) {
         setApiKeys(newApiKeys);
         
@@ -60,7 +73,7 @@ export const useApiKeyManager = () => {
       });
       return false;
     }
-  }, []);
+  }, [validateApiKey]);
 
   const loadApiKeys = useCallback(() => {
     setIsLoading(true);
@@ -100,8 +113,10 @@ export const useApiKeyManager = () => {
   return {
     apiKeys,
     isLoading,
+    isValidatingApiKey,
     saveApiKeys,
     loadApiKeys,
-    clearApiKeys
+    clearApiKeys,
+    validateApiKey
   };
 };
