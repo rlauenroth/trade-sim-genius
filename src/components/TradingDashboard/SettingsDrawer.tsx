@@ -27,8 +27,7 @@ const SettingsDrawer = ({ isOpen, onClose }: SettingsDrawerProps) => {
   const { isTestingProxy, proxyStatus, testConnection } = useProxyConnection();
 
   const copyProxyUrl = () => {
-    const fullUrl = `${window.location.origin}${KUCOIN_PROXY_BASE}`;
-    navigator.clipboard.writeText(fullUrl);
+    navigator.clipboard.writeText(KUCOIN_PROXY_BASE);
     toast({
       title: "URL kopiert",
       description: "Proxy-URL wurde in die Zwischenablage kopiert.",
@@ -91,7 +90,7 @@ const SettingsDrawer = ({ isOpen, onClose }: SettingsDrawerProps) => {
                 <Label className="text-slate-300">Proxy-URL</Label>
                 <div className="flex items-center space-x-2 mt-1">
                   <Input
-                    value={`${window.location.origin}${KUCOIN_PROXY_BASE}`}
+                    value={KUCOIN_PROXY_BASE}
                     readOnly
                     className="bg-slate-800 border-slate-600 text-slate-200 text-sm"
                   />
