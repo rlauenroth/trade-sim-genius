@@ -55,9 +55,9 @@ export const useAISignals = () => {
       
       const mockCredentials = {
         kucoin: {
-          apiKey: 'mock_key',
-          apiSecret: 'mock_secret',
-          passphrase: 'mock_passphrase'
+          kucoinApiKey: 'mock_key',
+          kucoinApiSecret: 'mock_secret',
+          kucoinApiPassphrase: 'mock_passphrase'
         },
         openRouter: 'mock_openrouter_key'
       };
