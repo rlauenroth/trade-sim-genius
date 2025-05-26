@@ -6,7 +6,8 @@ export async function signKuCoinRequest(
   body: unknown,
   secret: string
 ): Promise<string> {
-  const what = timestamp + method + requestPath + (body ? JSON.stringify(body) : '');
+  // Include query string in path for signature calculation
+  const what = timestamp + method.toUpperCase() + requestPath + (body ? JSON.stringify(body) : '');
   
   const key = await crypto.subtle.importKey(
     'raw',

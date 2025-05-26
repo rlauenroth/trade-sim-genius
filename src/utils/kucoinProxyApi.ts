@@ -1,7 +1,15 @@
 
 import { KUCOIN_PROXY_BASE, getStoredKeys } from '@/config';
 import { signKuCoinRequest } from './kucoinSigner';
-import { RateLimitError, ProxyError, ApiError } from './errors';
+import { 
+  RateLimitError, 
+  ProxyError, 
+  ApiError, 
+  TimestampError, 
+  SignatureError, 
+  IPWhitelistError, 
+  MissingHeaderError 
+} from './errors';
 import { networkStatusService } from '@/services/networkStatusService';
 
 // Global activity logger - will be set by the component that uses this
@@ -13,6 +21,37 @@ let globalActivityLogger: {
 
 export function setActivityLogger(logger: typeof globalActivityLogger) {
   globalActivityLogger = logger;
+}
+
+// Enhanced error parsing for KuCoin responses
+async function parseKuCoinError(response: Response, requestPath: string, payload?: string): Promise<never> {
+  let kucoinData: any = null;
+  
+  try {
+    kucoinData = await response.json();
+  } catch {
+    // Failed to parse JSON, use generic error
+  }
+
+  const errorCode = kucoinData?.code;
+  const localTime = Date.now();
+  
+  // Map specific KuCoin error codes
+  switch (errorCode) {
+    case '400001':
+      throw new MissingHeaderError(response, kucoinData);
+    case '400002':
+      // Try to get server time for drift calculation
+      const serverTimeHeader = response.headers.get('KC-API-TIME');
+      const serverTime = serverTimeHeader ? parseInt(serverTimeHeader) : null;
+      throw new TimestampError(response, kucoinData, localTime, serverTime || undefined);
+    case '400005':
+      throw new SignatureError(response, kucoinData, payload);
+    case '400006':
+      throw new IPWhitelistError(response, kucoinData);
+    default:
+      throw new ApiError(response, kucoinData);
+  }
 }
 
 export async function kucoinFetch(
@@ -39,12 +78,17 @@ export async function kucoinFetch(
 
   const url = `${KUCOIN_PROXY_BASE}${normalizedPath}${qs ? (normalizedPath.includes('?') ? '&' : '?') + qs : ''}`;
 
+  // Create the signature path (includes query string)
+  const signaturePath = normalizedPath + (qs ? (normalizedPath.includes('?') ? '&' : '?') + qs : '');
   const timestamp = Date.now().toString();
-  const requestPath = normalizedPath;
-  const signature = await signKuCoinRequest(timestamp, method, requestPath, body, keys.secret);
+  
+  // Create payload for signature (for debugging)
+  const signaturePayload = timestamp + method.toUpperCase() + signaturePath + (body ? JSON.stringify(body) : '');
+  
+  const signature = await signKuCoinRequest(timestamp, method, signaturePath, body, keys.secret);
 
   try {
-    console.log(`🔗 KuCoin API Request: ${method} ${requestPath}`);
+    console.log(`🔗 KuCoin API Request: ${method} ${signaturePath}`);
     
     const res = await fetch(url, {
       method,
@@ -61,31 +105,34 @@ export async function kucoinFetch(
 
     if (res.status === 429) {
       const error = new RateLimitError(res);
-      globalActivityLogger?.addKucoinErrorLog(requestPath, error);
-      networkStatusService.recordError(error, requestPath);
+      globalActivityLogger?.addKucoinErrorLog(signaturePath, error);
+      networkStatusService.recordError(error, signaturePath);
       throw error;
     }
     
     if (!res.ok) {
-      const error = new ApiError(res);
-      globalActivityLogger?.addKucoinErrorLog(requestPath, error);
-      networkStatusService.recordError(error, requestPath);
-      throw error;
+      await parseKuCoinError(res, signaturePath, signaturePayload);
     }
 
     const result = await res.json();
     
+    // Check for KuCoin API-level errors (even with 200 status)
+    if (result.code && result.code !== '200000') {
+      const mockResponse = new Response(JSON.stringify(result), { status: 400 });
+      await parseKuCoinError(mockResponse, signaturePath, signaturePayload);
+    }
+    
     // Log successful call
-    console.log(`✅ KuCoin API Success: ${method} ${requestPath}`);
-    globalActivityLogger?.addKucoinSuccessLog(requestPath, `${method} ${requestPath}`);
-    networkStatusService.recordSuccessfulCall(requestPath);
+    console.log(`✅ KuCoin API Success: ${method} ${signaturePath}`);
+    globalActivityLogger?.addKucoinSuccessLog(signaturePath, `${method} ${signaturePath}`);
+    networkStatusService.recordSuccessfulCall(signaturePath);
     
     return result;
   } catch (error) {
     if (error instanceof TypeError && error.message.includes('fetch')) {
       const proxyError = new ProxyError('Proxy not reachable - network error');
-      globalActivityLogger?.addKucoinErrorLog(requestPath, proxyError);
-      networkStatusService.recordError(proxyError, requestPath);
+      globalActivityLogger?.addKucoinErrorLog(signaturePath, proxyError);
+      networkStatusService.recordError(proxyError, signaturePath);
       throw proxyError;
     }
     throw error;

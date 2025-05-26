@@ -1,12 +1,24 @@
 
 import { useState, useCallback } from 'react';
-import { RateLimitError, ProxyError, ApiError } from '@/utils/errors';
+import { 
+  RateLimitError, 
+  ProxyError, 
+  ApiError, 
+  TimestampError, 
+  SignatureError, 
+  IPWhitelistError, 
+  MissingHeaderError 
+} from '@/utils/errors';
 import { networkStatusService } from '@/services/networkStatusService';
 import { toast } from '@/hooks/use-toast';
 
 interface UseProxyApiOptions {
   onRateLimit?: (retryAfter: number) => void;
   onProxyError?: () => void;
+  onTimestampError?: (timeDrift: number) => void;
+  onSignatureError?: (payload?: string) => void;
+  onIPWhitelistError?: () => void;
+  onMissingHeaderError?: () => void;
 }
 
 export const useProxyApi = (options: UseProxyApiOptions = {}) => {
@@ -38,6 +50,42 @@ export const useProxyApi = (options: UseProxyApiOptions = {}) => {
           description: `Nächster Versuch in ${err.retryAfter} Sekunden`,
           variant: "destructive"
         });
+      } else if (err instanceof TimestampError) {
+        setError('Zeitstempel-Synchronisation erforderlich');
+        options.onTimestampError?.(err.timeDrift);
+        
+        toast({
+          title: "Zeitstempel-Fehler",
+          description: "Lokale Uhrzeit weicht zu stark ab",
+          variant: "destructive"
+        });
+      } else if (err instanceof SignatureError) {
+        setError('Signatur-Validierung fehlgeschlagen');
+        options.onSignatureError?.(err.payload);
+        
+        toast({
+          title: "Signatur-Fehler", 
+          description: "API-Signatur ungültig",
+          variant: "destructive"
+        });
+      } else if (err instanceof IPWhitelistError) {
+        setError('IP nicht in Whitelist');
+        options.onIPWhitelistError?.();
+        
+        toast({
+          title: "IP-Whitelist Fehler",
+          description: "Proxy-IP muss freigegeben werden",
+          variant: "destructive"
+        });
+      } else if (err instanceof MissingHeaderError) {
+        setError('API-Header fehlen');
+        options.onMissingHeaderError?.();
+        
+        toast({
+          title: "Header-Fehler",
+          description: "Session neu laden erforderlich",
+          variant: "destructive"
+        });
       } else if (err instanceof ProxyError) {
         setError('Proxy nicht erreichbar');
         options.onProxyError?.();
@@ -52,7 +100,7 @@ export const useProxyApi = (options: UseProxyApiOptions = {}) => {
         
         toast({
           title: "API-Fehler",
-          description: `Fehler ${err.status}: ${err.message}`,
+          description: err.kucoinMessage || `Fehler ${err.status}: ${err.message}`,
           variant: "destructive"
         });
       } else {
