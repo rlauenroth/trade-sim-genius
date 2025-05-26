@@ -80,7 +80,7 @@ export async function getMarketTickers() {
 }
 
 export async function getCurrentPrice(symbol: string): Promise<number> {
-  const response = await kucoinFetch(`api/v1/market/ticker`, { symbol });
+  const response = await kucoinFetch('api/v1/market/ticker', 'GET', { symbol });
   
   if (response.code === '200000' && response.data?.price) {
     return parseFloat(response.data.price);

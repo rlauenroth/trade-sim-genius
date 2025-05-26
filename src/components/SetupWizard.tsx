@@ -1,16 +1,19 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertTriangle, Eye, EyeOff, CheckCircle, ArrowRight, ArrowLeft, Rocket } from 'lucide-react';
+import { AlertTriangle, Eye, EyeOff, CheckCircle, ArrowRight, ArrowLeft, Rocket, Wifi, WifiOff } from 'lucide-react';
 import { useAppState } from '@/hooks/useAppState';
+import { useProxyConnection } from '@/hooks/useProxyConnection';
 import { toast } from '@/hooks/use-toast';
 import SecurityWarningDialog from './SecurityWarningDialog';
 
 const SetupWizard = () => {
   const { currentStep, setCurrentStep, saveApiKeys, saveUserSettings, isLoading } = useAppState();
+  const { isTestingProxy, proxyStatus, testConnection } = useProxyConnection();
   const [showPasswords, setShowPasswords] = useState(false);
   const [showSecurityWarning, setShowSecurityWarning] = useState(false);
   const [securityAcknowledged, setSecurityAcknowledged] = useState(false);
@@ -65,7 +68,11 @@ const SetupWizard = () => {
   const handleSecurityAccept = async () => {
     setShowSecurityWarning(false);
     
-    // Save API keys and settings
+    // Test proxy connection before saving
+    console.log('Testing proxy connection before saving...');
+    await testConnection();
+    
+    // Save API keys and settings regardless of proxy status (allow offline setup)
     const apiKeys = {
       kucoinApiKey: formData.kucoinApiKey,
       kucoinApiSecret: formData.kucoinApiSecret,
@@ -108,6 +115,51 @@ const SetupWizard = () => {
                   <li>• Kein echter Handel - nur Signaltesting</li>
                   <li>• Verwenden Sie nur Test-API-Schlüssel mit minimalen Berechtigungen</li>
                 </ul>
+              </div>
+              
+              {/* Proxy Status Indicator */}
+              <div className="bg-blue-900/30 border border-blue-600 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-blue-400">Netzwerk-Status</h3>
+                  <Button
+                    onClick={testConnection}
+                    disabled={isTestingProxy}
+                    variant="outline"
+                    size="sm"
+                    className="border-blue-600 text-blue-300"
+                  >
+                    {isTestingProxy ? (
+                      <>
+                        <WifiOff className="mr-2 h-4 w-4 animate-pulse" />
+                        Teste...
+                      </>
+                    ) : (
+                      <>
+                        <Wifi className="mr-2 h-4 w-4" />
+                        Proxy testen
+                      </>
+                    )}
+                  </Button>
+                </div>
+                <div className="text-blue-200 text-sm">
+                  {proxyStatus === 'connected' && (
+                    <div className="flex items-center text-green-300">
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      KuCoin-Proxy ist erreichbar
+                    </div>
+                  )}
+                  {proxyStatus === 'failed' && (
+                    <div className="flex items-center text-red-300">
+                      <WifiOff className="mr-2 h-4 w-4" />
+                      Proxy nicht erreichbar - App läuft im Demo-Modus
+                    </div>
+                  )}
+                  {proxyStatus === 'unknown' && (
+                    <div className="text-blue-200">
+                      Proxy-Status noch nicht getestet
+                    </div>
+                  )}
+                </div>
               </div>
               
               <div className="text-center">
@@ -278,10 +330,30 @@ const SetupWizard = () => {
                   Ihre aktuellen Portfolio-Daten von KuCoin.
                 </p>
               </div>
-              
-              <div className="bg-green-900/30 border border-green-600 rounded-lg p-4">
-                <p className="text-green-200 text-sm">
-                  Alle Trades werden simuliert - kein echtes Geld ist gefährdet.
+
+              {/* Network Status Summary */}
+              <div className={`border rounded-lg p-4 ${
+                proxyStatus === 'connected' 
+                  ? 'bg-green-900/30 border-green-600' 
+                  : 'bg-blue-900/30 border-blue-600'
+              }`}>
+                <div className="flex items-center justify-center space-x-2 mb-2">
+                  {proxyStatus === 'connected' ? (
+                    <>
+                      <Wifi className="h-5 w-5 text-green-400" />
+                      <span className="text-green-200 font-medium">Live-Modus aktiviert</span>
+                    </>
+                  ) : (
+                    <>
+                      <WifiOff className="h-5 w-5 text-blue-400" />
+                      <span className="text-blue-200 font-medium">Demo-Modus aktiviert</span>
+                    </>
+                  )}
+                </div>
+                <p className="text-sm text-slate-300">
+                  {proxyStatus === 'connected' 
+                    ? 'Alle Trades werden simuliert mit echten Marktdaten.'
+                    : 'Alle Trades werden simuliert mit Demo-Daten.'}
                 </p>
               </div>
 

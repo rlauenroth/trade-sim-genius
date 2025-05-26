@@ -20,8 +20,9 @@ export const usePortfolioData = () => {
   const [portfolioData, setPortfolioData] = useState<PortfolioData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
-  const loadPortfolioData = useCallback(async (credentials: any) => {
+  const loadPortfolioData = useCallback(async (credentials: any, isRetry = false) => {
     if (!credentials) {
       setError('Keine API-Zugangsdaten verfügbar');
       return;
@@ -29,6 +30,12 @@ export const usePortfolioData = () => {
 
     setIsLoading(true);
     setError(null);
+
+    if (isRetry) {
+      setRetryCount(prev => prev + 1);
+    } else {
+      setRetryCount(0);
+    }
 
     try {
       console.log('Lade Portfolio-Daten von KuCoin...');
@@ -83,6 +90,7 @@ export const usePortfolioData = () => {
       };
 
       setPortfolioData(portfolioData);
+      setRetryCount(0); // Reset retry count on success
       
       toast({
         title: "Portfolio erfolgreich geladen",
@@ -101,6 +109,8 @@ export const usePortfolioData = () => {
           errorMessage = 'Ungültige API-Schlüssel. Bitte überprüfen Sie Ihre KuCoin API-Zugangsdaten.';
         } else if (error.message.includes('Network') || error.message.includes('fetch')) {
           errorMessage = 'Netzwerkfehler. Bitte überprüfen Sie Ihre Internetverbindung.';
+        } else if (error.message.includes('Rate limit')) {
+          errorMessage = 'Rate Limit erreicht. Bitte warten Sie einen Moment und versuchen Sie es erneut.';
         } else {
           errorMessage = `API-Fehler: ${error.message}`;
         }
@@ -108,19 +118,28 @@ export const usePortfolioData = () => {
       
       setError(errorMessage);
       
-      toast({
-        title: "Portfolio-Ladefehler",
-        description: errorMessage,
-        variant: "destructive"
-      });
+      // Only show toast on first failure or manual retry, not on automatic retries
+      if (!isRetry || retryCount === 0) {
+        toast({
+          title: "Portfolio-Ladefehler",
+          description: errorMessage,
+          variant: "destructive"
+        });
+      }
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [retryCount]);
+
+  const retryLoadPortfolioData = useCallback(async (credentials: any) => {
+    console.log(`Portfolio-Daten werden erneut geladen (Versuch ${retryCount + 1})...`);
+    await loadPortfolioData(credentials, true);
+  }, [loadPortfolioData, retryCount]);
 
   const clearPortfolioData = useCallback(() => {
     setPortfolioData(null);
     setError(null);
+    setRetryCount(0);
   }, []);
 
   const refreshPortfolioData = useCallback(async (credentials: any) => {
@@ -132,7 +151,9 @@ export const usePortfolioData = () => {
     portfolioData,
     isLoading,
     error,
+    retryCount,
     loadPortfolioData,
+    retryLoadPortfolioData,
     clearPortfolioData,
     refreshPortfolioData
   };

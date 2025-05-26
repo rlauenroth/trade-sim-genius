@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useAppState } from '@/hooks/useAppState';
 import { useSimulation } from '@/hooks/useSimulation';
 import { usePortfolioData } from '@/hooks/usePortfolioData';
@@ -16,8 +16,11 @@ import ActivityLog from './TradingDashboard/ActivityLog';
 import FirstTimeUserInfo from './TradingDashboard/FirstTimeUserInfo';
 import PortfolioLoadingCard from './TradingDashboard/PortfolioLoadingCard';
 import LiveStatusIndicator from './TradingDashboard/LiveStatusIndicator';
+import SettingsDrawer from './TradingDashboard/SettingsDrawer';
 
 const TradingDashboard = () => {
+  const [showSettings, setShowSettings] = useState(false);
+  
   const { 
     userSettings, 
     logoutAndClearData, 
@@ -26,7 +29,13 @@ const TradingDashboard = () => {
     apiKeys 
   } = useAppState();
   
-  const { portfolioData, isLoading: portfolioLoading, loadPortfolioData } = usePortfolioData();
+  const { 
+    portfolioData, 
+    isLoading: portfolioLoading, 
+    error: portfolioError,
+    loadPortfolioData, 
+    retryLoadPortfolioData 
+  } = usePortfolioData();
   
   const { 
     simulationState, 
@@ -63,7 +72,23 @@ const TradingDashboard = () => {
   if (isFirstTimeAfterSetup && portfolioLoading) {
     return (
       <div className="container mx-auto px-4 py-6">
-        <PortfolioLoadingCard isLoading={true} />
+        <PortfolioLoadingCard 
+          isLoading={true} 
+          onRetry={() => retryLoadPortfolioData(apiKeys)}
+        />
+      </div>
+    );
+  }
+
+  // Show error state with retry option
+  if (isFirstTimeAfterSetup && portfolioError) {
+    return (
+      <div className="container mx-auto px-4 py-6">
+        <PortfolioLoadingCard 
+          isLoading={false}
+          error={portfolioError}
+          onRetry={() => retryLoadPortfolioData(apiKeys)}
+        />
       </div>
     );
   }
@@ -74,13 +99,14 @@ const TradingDashboard = () => {
         isSimulationActive={isSimulationActive}
         isPaused={simulationState?.isPaused}
         onLogout={logoutAndClearData}
+        onOpenSettings={() => setShowSettings(true)}
       />
 
       {/* Show first-time user info if applicable */}
       {isFirstTimeAfterSetup && portfolioData && !isSimulationActive && (
         <FirstTimeUserInfo 
           onStartSimulation={handleStartSimulation}
-          onOpenSettings={handleOpenSettings}
+          onOpenSettings={() => setShowSettings(true)}
           strategy={userSettings.tradingStrategy}
           aiModel={userSettings.selectedAiModelId}
         />
@@ -137,6 +163,12 @@ const TradingDashboard = () => {
 
       <ActivityLog 
         activityLog={activityLog}
+      />
+
+      {/* Settings Drawer */}
+      <SettingsDrawer 
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
       />
     </div>
   );
