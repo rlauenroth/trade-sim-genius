@@ -24,6 +24,30 @@ export const cleanupCorruptedStorage = () => {
   });
 };
 
+// Migration function for old API key format
+const migrateApiKeys = (stored: any): ApiKeys | null => {
+  if (!stored) return null;
+  
+  // If already in new format
+  if (stored.kucoin && stored.openRouter !== undefined) {
+    return stored;
+  }
+  
+  // If in old flat format, migrate
+  if (stored.kucoinApiKey || stored.openRouterApiKey) {
+    return {
+      kucoin: {
+        key: stored.kucoinApiKey || '',
+        secret: stored.kucoinApiSecret || '',
+        passphrase: stored.kucoinApiPassphrase || ''
+      },
+      openRouter: stored.openRouterApiKey || ''
+    };
+  }
+  
+  return null;
+};
+
 export const storageUtils = {
   getItem: (key: string): string | null => {
     try {
@@ -57,7 +81,16 @@ export const storageUtils = {
     if (!stored) return null;
     
     try {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      // Ensure all required fields are present
+      return {
+        tradingStrategy: parsed.tradingStrategy || 'balanced',
+        selectedAiModelId: parsed.selectedAiModelId || 'anthropic/claude-3.5-sonnet',
+        proxyUrl: parsed.proxyUrl || '/images/kucoin-proxy.php?path=',
+        theme: parsed.theme || 'dark',
+        language: parsed.language || 'de',
+        createdAt: parsed.createdAt || Date.now()
+      };
     } catch (error) {
       console.error('Error parsing user settings:', error);
       storageUtils.removeItem(STORAGE_KEYS.USER_SETTINGS);
@@ -79,7 +112,8 @@ export const storageUtils = {
     if (!stored) return null;
     
     try {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      return migrateApiKeys(parsed);
     } catch (error) {
       console.error('Error parsing API keys:', error);
       storageUtils.removeItem(STORAGE_KEYS.API_KEYS);

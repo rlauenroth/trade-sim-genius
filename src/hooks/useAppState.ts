@@ -3,6 +3,7 @@ import { useSetupManager } from './useSetupManager';
 import { useSettingsManager } from './useSettingsManager';
 import { useApiKeyManager } from './useApiKeyManager';
 import { useAppReset } from './useAppReset';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { useState, useCallback } from 'react';
 
 export const useAppState = () => {
@@ -21,12 +22,13 @@ export const useAppState = () => {
     saveUserSettings
   } = useSettingsManager();
 
+  // Use the new Zustand store for API keys
+  const { apiKeys, clearApiKeys } = useSettingsStore();
+
   const {
-    apiKeys,
     isLoading,
     saveApiKeys,
-    loadApiKeys,
-    clearApiKeys
+    loadApiKeys
   } = useApiKeyManager();
 
   const {
@@ -67,8 +69,8 @@ export const useAppState = () => {
     loadUserSettings,
     saveUserSettings,
     
-    // API Keys state (no longer encrypted)
-    apiKeys, // renamed from decryptedApiKeys
+    // API Keys state (now from Zustand store)
+    apiKeys,
     isLoading,
     saveApiKeys,
     loadApiKeys,

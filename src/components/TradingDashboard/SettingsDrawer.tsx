@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Drawer,
   DrawerContent,
@@ -13,9 +13,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Settings, Wifi, Copy, X } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Settings, Wifi, Copy, X, Key, Bot, Shield, Palette } from 'lucide-react';
 import { KUCOIN_PROXY_BASE } from '@/config';
 import { useProxyConnection } from '@/hooks/useProxyConnection';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { modelOptions } from '@/config/modelOptions';
+import { ApiKeys, UserSettings } from '@/types/appState';
 import { toast } from '@/hooks/use-toast';
 
 interface SettingsDrawerProps {
@@ -25,6 +30,43 @@ interface SettingsDrawerProps {
 
 const SettingsDrawer = ({ isOpen, onClose }: SettingsDrawerProps) => {
   const { isTestingProxy, proxyStatus, testConnection } = useProxyConnection();
+  const { 
+    apiKeys, 
+    userSettings, 
+    saveApiKeys, 
+    saveSettings, 
+    clearApiKeys,
+    validateApiKeys,
+    validateSettings 
+  } = useSettingsStore();
+
+  // Local form state
+  const [formData, setFormData] = useState({
+    apiKeys: apiKeys || {
+      kucoin: { key: '', secret: '', passphrase: '' },
+      openRouter: ''
+    },
+    settings: userSettings
+  });
+
+  const [validationErrors, setValidationErrors] = useState<{
+    apiKeys: string[];
+    settings: string[];
+  }>({
+    apiKeys: [],
+    settings: []
+  });
+
+  // Update form when store changes
+  useEffect(() => {
+    setFormData({
+      apiKeys: apiKeys || {
+        kucoin: { key: '', secret: '', passphrase: '' },
+        openRouter: ''
+      },
+      settings: userSettings
+    });
+  }, [apiKeys, userSettings]);
 
   const copyProxyUrl = () => {
     navigator.clipboard.writeText(KUCOIN_PROXY_BASE);
@@ -45,9 +87,83 @@ const SettingsDrawer = ({ isOpen, onClose }: SettingsDrawerProps) => {
     }
   };
 
+  const handleApiKeysChange = (field: string, value: string) => {
+    if (field.startsWith('kucoin.')) {
+      const kucoinField = field.split('.')[1];
+      setFormData(prev => ({
+        ...prev,
+        apiKeys: {
+          ...prev.apiKeys,
+          kucoin: {
+            ...prev.apiKeys.kucoin,
+            [kucoinField]: value
+          }
+        }
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        apiKeys: {
+          ...prev.apiKeys,
+          [field]: value
+        }
+      }));
+    }
+  };
+
+  const handleSettingsChange = (field: keyof UserSettings, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        [field]: value
+      }
+    }));
+  };
+
+  const handleSave = async () => {
+    // Validate both API keys and settings
+    const apiKeyErrors = validateApiKeys(formData.apiKeys);
+    const settingsErrors = validateSettings(formData.settings);
+    
+    setValidationErrors({
+      apiKeys: apiKeyErrors,
+      settings: settingsErrors
+    });
+
+    if (apiKeyErrors.length > 0 || settingsErrors.length > 0) {
+      return;
+    }
+
+    // Save API keys if they have values
+    const hasApiKeys = formData.apiKeys.kucoin.key || formData.apiKeys.openRouter;
+    if (hasApiKeys) {
+      const apiKeysSaved = await saveApiKeys(formData.apiKeys);
+      if (!apiKeysSaved) return;
+    }
+
+    // Save settings
+    const settingsSaved = await saveSettings(formData.settings);
+    if (!settingsSaved) return;
+
+    // Close drawer on success
+    onClose();
+  };
+
+  const handleClearApiKeys = () => {
+    clearApiKeys();
+    setFormData(prev => ({
+      ...prev,
+      apiKeys: {
+        kucoin: { key: '', secret: '', passphrase: '' },
+        openRouter: ''
+      }
+    }));
+  };
+
   return (
     <Drawer open={isOpen} onOpenChange={onClose}>
-      <DrawerContent className="bg-slate-800 border-slate-700">
+      <DrawerContent className="bg-slate-800 border-slate-700 max-h-[90vh]">
         <DrawerHeader>
           <DrawerTitle className="text-white flex items-center space-x-2">
             <Settings className="h-5 w-5" />
@@ -60,7 +176,159 @@ const SettingsDrawer = ({ isOpen, onClose }: SettingsDrawerProps) => {
           </DrawerClose>
         </DrawerHeader>
 
-        <div className="px-4 pb-4 space-y-6">
+        <div className="px-4 pb-4 space-y-6 overflow-y-auto">
+          {/* API Keys Section */}
+          <Card className="bg-slate-700 border-slate-600">
+            <CardHeader>
+              <CardTitle className="text-white text-lg flex items-center space-x-2">
+                <Key className="h-5 w-5" />
+                <span>API-Schlüssel</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* KuCoin API Keys */}
+              <div className="space-y-3">
+                <Label className="text-slate-300 font-medium">KuCoin API</Label>
+                <div>
+                  <Label className="text-slate-400 text-sm">API Key</Label>
+                  <Input
+                    value={formData.apiKeys.kucoin.key}
+                    onChange={(e) => handleApiKeysChange('kucoin.key', e.target.value)}
+                    placeholder="KuCoin API Key eingeben..."
+                    className="bg-slate-800 border-slate-600 text-slate-200"
+                    type="password"
+                  />
+                </div>
+                <div>
+                  <Label className="text-slate-400 text-sm">API Secret</Label>
+                  <Input
+                    value={formData.apiKeys.kucoin.secret}
+                    onChange={(e) => handleApiKeysChange('kucoin.secret', e.target.value)}
+                    placeholder="KuCoin API Secret eingeben..."
+                    className="bg-slate-800 border-slate-600 text-slate-200"
+                    type="password"
+                  />
+                </div>
+                <div>
+                  <Label className="text-slate-400 text-sm">Passphrase</Label>
+                  <Input
+                    value={formData.apiKeys.kucoin.passphrase}
+                    onChange={(e) => handleApiKeysChange('kucoin.passphrase', e.target.value)}
+                    placeholder="KuCoin Passphrase eingeben..."
+                    className="bg-slate-800 border-slate-600 text-slate-200"
+                    type="password"
+                  />
+                </div>
+              </div>
+
+              {/* OpenRouter API Key */}
+              <div>
+                <Label className="text-slate-300 font-medium">OpenRouter API</Label>
+                <Input
+                  value={formData.apiKeys.openRouter}
+                  onChange={(e) => handleApiKeysChange('openRouter', e.target.value)}
+                  placeholder="OpenRouter API Key eingeben..."
+                  className="bg-slate-800 border-slate-600 text-slate-200 mt-1"
+                  type="password"
+                />
+              </div>
+
+              {validationErrors.apiKeys.length > 0 && (
+                <div className="bg-red-900/50 border border-red-600 p-3 rounded">
+                  <div className="text-red-200 text-sm space-y-1">
+                    {validationErrors.apiKeys.map((error, index) => (
+                      <div key={index}>• {error}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex space-x-2">
+                <Button
+                  onClick={handleClearApiKeys}
+                  variant="outline"
+                  size="sm"
+                  className="border-slate-600 text-slate-300"
+                >
+                  Alle löschen
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Trading Strategy Section */}
+          <Card className="bg-slate-700 border-slate-600">
+            <CardHeader>
+              <CardTitle className="text-white text-lg flex items-center space-x-2">
+                <Bot className="h-5 w-5" />
+                <span>Trading-Strategie</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RadioGroup
+                value={formData.settings.tradingStrategy}
+                onValueChange={(value) => handleSettingsChange('tradingStrategy', value as any)}
+                className="space-y-3"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="conservative" id="conservative" />
+                  <Label htmlFor="conservative" className="text-slate-300">
+                    Konservativ - Sicherheit steht im Vordergrund
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="balanced" id="balanced" />
+                  <Label htmlFor="balanced" className="text-slate-300">
+                    Ausgewogen - Balance zwischen Risiko und Ertrag
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="aggressive" id="aggressive" />
+                  <Label htmlFor="aggressive" className="text-slate-300">
+                    Aggressiv - Höhere Rendite bei mehr Risiko
+                  </Label>
+                </div>
+              </RadioGroup>
+            </CardContent>
+          </Card>
+
+          {/* AI Model Section */}
+          <Card className="bg-slate-700 border-slate-600">
+            <CardHeader>
+              <CardTitle className="text-white text-lg flex items-center space-x-2">
+                <Bot className="h-5 w-5" />
+                <span>KI-Modell</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Select
+                value={formData.settings.selectedAiModelId}
+                onValueChange={(value) => handleSettingsChange('selectedAiModelId', value)}
+              >
+                <SelectTrigger className="bg-slate-800 border-slate-600 text-slate-200">
+                  <SelectValue placeholder="Modell auswählen..." />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-800 border-slate-600">
+                  {modelOptions.map((model) => (
+                    <SelectItem key={model.id} value={model.id} className="text-slate-200">
+                      <div className="flex flex-col">
+                        <div className="flex items-center space-x-2">
+                          <span>{model.name}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {model.provider}
+                          </Badge>
+                        </div>
+                        <div className="text-xs text-slate-400">
+                          {model.priceHint} • {model.description}
+                        </div>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
+
           {/* Network & Proxy Section */}
           <Card className="bg-slate-700 border-slate-600">
             <CardHeader>
@@ -90,8 +358,8 @@ const SettingsDrawer = ({ isOpen, onClose }: SettingsDrawerProps) => {
                 <Label className="text-slate-300">Proxy-URL</Label>
                 <div className="flex items-center space-x-2 mt-1">
                   <Input
-                    value={KUCOIN_PROXY_BASE}
-                    readOnly
+                    value={formData.settings.proxyUrl}
+                    onChange={(e) => handleSettingsChange('proxyUrl', e.target.value)}
                     className="bg-slate-800 border-slate-600 text-slate-200 text-sm"
                   />
                   <Button
@@ -107,36 +375,72 @@ const SettingsDrawer = ({ isOpen, onClose }: SettingsDrawerProps) => {
                   Alle KuCoin-API-Aufrufe werden über diesen Proxy geleitet.
                 </div>
               </div>
-
-              <div className="bg-slate-800 p-3 rounded border border-slate-600">
-                <div className="text-sm text-slate-300 font-medium mb-2">Netzwerk-Informationen</div>
-                <div className="space-y-1 text-xs text-slate-400">
-                  <div>• CORS-Probleme werden durch PHP-Proxy umgangen</div>
-                  <div>• Automatische Rate-Limit-Behandlung</div>
-                  <div>• Fallback auf Mock-Daten bei Verbindungsproblemen</div>
-                </div>
-              </div>
             </CardContent>
           </Card>
 
-          {/* API Keys Section */}
+          {/* Theme Section */}
           <Card className="bg-slate-700 border-slate-600">
             <CardHeader>
-              <CardTitle className="text-white text-lg">API-Schlüssel</CardTitle>
+              <CardTitle className="text-white text-lg flex items-center space-x-2">
+                <Palette className="h-5 w-5" />
+                <span>Design & Sprache</span>
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-sm text-slate-400">
-                API-Schlüssel werden verschlüsselt im Browser-Speicher verwaltet.
-                Änderungen erfordern eine Neuanmeldung.
+            <CardContent className="space-y-4">
+              <div>
+                <Label className="text-slate-300">Design</Label>
+                <Select
+                  value={formData.settings.theme}
+                  onValueChange={(value) => handleSettingsChange('theme', value as any)}
+                >
+                  <SelectTrigger className="bg-slate-800 border-slate-600 text-slate-200 mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 border-slate-600">
+                    <SelectItem value="dark" className="text-slate-200">Dunkel</SelectItem>
+                    <SelectItem value="light" className="text-slate-200">Hell</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-slate-300">Sprache</Label>
+                <Select
+                  value={formData.settings.language}
+                  onValueChange={(value) => handleSettingsChange('language', value as any)}
+                >
+                  <SelectTrigger className="bg-slate-800 border-slate-600 text-slate-200 mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 border-slate-600">
+                    <SelectItem value="de" className="text-slate-200">Deutsch</SelectItem>
+                    <SelectItem value="en" className="text-slate-200">English</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>
+
+          {validationErrors.settings.length > 0 && (
+            <div className="bg-red-900/50 border border-red-600 p-3 rounded">
+              <div className="text-red-200 text-sm space-y-1">
+                {validationErrors.settings.map((error, index) => (
+                  <div key={index}>• {error}</div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <DrawerFooter>
-          <Button onClick={onClose} className="w-full">
-            Schließen
-          </Button>
+          <div className="flex space-x-2">
+            <Button onClick={onClose} variant="outline" className="flex-1">
+              Abbrechen
+            </Button>
+            <Button onClick={handleSave} className="flex-1">
+              Speichern & Schließen
+            </Button>
+          </div>
         </DrawerFooter>
       </DrawerContent>
     </Drawer>
