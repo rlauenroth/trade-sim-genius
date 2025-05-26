@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { encryptData, decryptData, generateSalt } from '@/utils/encryption';
@@ -31,20 +32,27 @@ export const useAppState = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const checkSetupStatus = useCallback(() => {
+    console.log('Checking setup status...');
     const hasEncryptedKeys = localStorage.getItem('kiTradingApp_apiKeys');
     const hasSalt = localStorage.getItem('kiTradingApp_securitySalt');
     const hasSettings = localStorage.getItem('kiTradingApp_userSettings');
     
-    setIsSetupComplete(!!(hasEncryptedKeys && hasSalt && hasSettings));
+    const setupComplete = !!(hasEncryptedKeys && hasSalt && hasSettings);
+    console.log('Setup status:', { hasEncryptedKeys: !!hasEncryptedKeys, hasSalt: !!hasSalt, hasSettings: !!hasSettings, setupComplete });
+    
+    setIsSetupComplete(setupComplete);
   }, []);
 
   const loadUserSettings = useCallback(() => {
+    console.log('Loading user settings...');
     try {
       const storedSettings = localStorage.getItem('kiTradingApp_userSettings');
       if (storedSettings) {
         const parsed = JSON.parse(storedSettings);
         setUserSettings(prev => ({ ...prev, ...parsed }));
         console.log('User settings loaded successfully:', parsed);
+      } else {
+        console.log('No stored settings found');
       }
     } catch (error) {
       console.error('Error loading user settings:', error);
@@ -90,7 +98,9 @@ export const useAppState = () => {
   }, []);
 
   const unlockApp = useCallback(async (password: string) => {
+    console.log('Starting unlock process...');
     setIsLoading(true);
+    
     try {
       const encryptedKeys = localStorage.getItem('kiTradingApp_apiKeys');
       const salt = localStorage.getItem('kiTradingApp_securitySalt');
@@ -99,34 +109,40 @@ export const useAppState = () => {
         throw new Error('Verschlüsselte Daten nicht gefunden');
       }
       
+      console.log('Decrypting data...');
       const decryptedData = await decryptData(encryptedKeys, password, salt);
       const apiKeys = JSON.parse(decryptedData);
       
-      console.log('App successfully unlocked, setting states...');
+      console.log('Decryption successful, updating states...');
+      
+      // Update states synchronously
       setDecryptedApiKeys(apiKeys);
-      setIsUnlocked(true);
       setIsFirstTimeAfterSetup(false);
       
-      // Force immediate load of user settings
-      setTimeout(() => {
-        const storedSettings = localStorage.getItem('kiTradingApp_userSettings');
-        if (storedSettings) {
-          try {
-            const parsed = JSON.parse(storedSettings);
-            setUserSettings(prev => ({ ...prev, ...parsed }));
-            console.log('User settings loaded after unlock:', parsed);
-          } catch (error) {
-            console.error('Error loading settings after unlock:', error);
-          }
+      // Load user settings immediately
+      const storedSettings = localStorage.getItem('kiTradingApp_userSettings');
+      if (storedSettings) {
+        try {
+          const parsed = JSON.parse(storedSettings);
+          setUserSettings(prev => ({ ...prev, ...parsed }));
+          console.log('User settings loaded during unlock:', parsed);
+        } catch (error) {
+          console.error('Error loading settings during unlock:', error);
         }
-      }, 100);
+      }
+      
+      // Set unlocked state last to trigger re-render
+      console.log('Setting isUnlocked to true...');
+      setIsUnlocked(true);
       
       toast({
         title: "App entsperrt",
         description: "Willkommen zurück!",
       });
       
+      console.log('Unlock process completed successfully');
       return true;
+      
     } catch (error) {
       console.error('Error unlocking app:', error);
       toast({
@@ -141,6 +157,7 @@ export const useAppState = () => {
   }, []);
 
   const lockApp = useCallback(() => {
+    console.log('Locking app...');
     setDecryptedApiKeys(null);
     setIsUnlocked(false);
     setIsFirstTimeAfterSetup(false);
