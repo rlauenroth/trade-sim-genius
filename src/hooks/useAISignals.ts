@@ -1,7 +1,7 @@
 
 import { useState, useCallback } from 'react';
 import { Signal } from '@/types/simulation';
-import { AISignalService } from '@/services/aiSignalService';
+import { AISignalService } from '@/services/aiSignal';
 
 export const useAISignals = () => {
   const [currentSignal, setCurrentSignal] = useState<Signal | null>(null);
