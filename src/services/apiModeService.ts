@@ -1,5 +1,7 @@
 
 // Centralized API mode management service
+import { KUCOIN_PROXY_BASE } from '@/config';
+
 interface ApiModeStatus {
   kucoinMode: 'live' | 'mock' | 'hybrid';
   openRouterMode: 'live' | 'demo';
@@ -25,20 +27,20 @@ class ApiModeService {
 
   async detectCorsSupport(): Promise<boolean> {
     try {
-      console.log('🔍 Testing CORS support for KuCoin API...');
-      const response = await fetch('https://api.kucoin.com/api/v1/timestamp', {
-        method: 'GET',
-        mode: 'cors'
+      console.log('🔍 Testing proxy connection for KuCoin API...');
+      // Use proxy instead of direct KuCoin API call
+      const response = await fetch(`${KUCOIN_PROXY_BASE}api/v1/timestamp`, {
+        method: 'GET'
       });
       
-      const corsSupported = response.ok;
-      this.status.corsIssuesDetected = !corsSupported;
+      const proxySupported = response.ok || response.status === 401; // 401 is expected without API keys
+      this.status.corsIssuesDetected = !proxySupported;
       this.status.lastChecked = Date.now();
       
-      console.log(`CORS support detected: ${corsSupported}`);
-      return corsSupported;
+      console.log(`Proxy connection detected: ${proxySupported}`);
+      return proxySupported;
     } catch (error) {
-      console.log('CORS not supported, falling back to mock mode');
+      console.log('Proxy not accessible, falling back to mock mode');
       this.status.corsIssuesDetected = true;
       this.status.lastChecked = Date.now();
       return false;
@@ -46,14 +48,14 @@ class ApiModeService {
   }
 
   async initializeApiModes(): Promise<void> {
-    const corsSupported = await this.detectCorsSupport();
+    const proxySupported = await this.detectCorsSupport();
     
-    if (corsSupported) {
-      this.status.kucoinMode = 'hybrid'; // Live for public, mock for private
-      console.log('✅ KuCoin API: Hybrid mode enabled (live public endpoints)');
+    if (proxySupported) {
+      this.status.kucoinMode = 'hybrid'; // Live via proxy
+      console.log('✅ KuCoin API: Hybrid mode enabled (via proxy)');
     } else {
       this.status.kucoinMode = 'mock';
-      console.log('⚠️ KuCoin API: Mock mode (CORS limitations)');
+      console.log('⚠️ KuCoin API: Mock mode (proxy not accessible)');
     }
 
     // OpenRouter typically supports CORS
