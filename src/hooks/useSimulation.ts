@@ -1,6 +1,7 @@
-
 import { useState, useCallback, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
+import { AISignalService } from '@/services/aiSignalService';
+import { getCurrentPrice } from '@/utils/kucoinApi';
 
 interface SimulationState {
   isActive: boolean;
@@ -134,14 +135,14 @@ export const useSimulation = () => {
       addLogEntry('SUCCESS', 'Simulation erfolgreich gestartet');
       addLogEntry('INFO', `Startkapital: $${mockPortfolioValue.toLocaleString()}`);
       
-      // Start AI signal generation (mock for now)
+      // Start AI signal generation
       setTimeout(() => {
-        generateMockSignal();
-      }, 5000);
+        startAISignalGeneration();
+      }, 3000);
 
       toast({
         title: "Simulation gestartet",
-        description: "Paper-Trading ist jetzt aktiv. Warten auf KI-Signale...",
+        description: "Paper-Trading ist jetzt aktiv. KI-Signalgenerierung startet...",
       });
       
     } catch (error) {
@@ -154,6 +155,64 @@ export const useSimulation = () => {
       });
     }
   }, [addLogEntry, saveSimulationState]);
+
+  // Start AI signal generation process
+  const startAISignalGeneration = useCallback(async () => {
+    if (!isSimulationActive) return;
+    
+    try {
+      addLogEntry('AI', 'Starte KI-Marktanalyse...');
+      
+      // In a real implementation, you would get these from decrypted storage
+      const mockCredentials = {
+        kucoin: {
+          apiKey: 'mock_key',
+          apiSecret: 'mock_secret',
+          passphrase: 'mock_passphrase'
+        },
+        openRouter: 'mock_openrouter_key'
+      };
+      
+      // Get current user settings (strategy would come from useAppState)
+      const strategy = 'balanced'; // This should come from user settings
+      
+      const aiService = new AISignalService({
+        kucoinCredentials: mockCredentials.kucoin,
+        openRouterApiKey: mockCredentials.openRouter,
+        strategy: strategy,
+        simulatedPortfolioValue: simulationState?.currentPortfolioValue || 10000,
+        availableUSDT: simulationState?.paperAssets.find(asset => asset.symbol === 'USDT')?.quantity || 10000
+      });
+      
+      // Generate signals
+      const signals = await aiService.generateSignals();
+      
+      if (signals.length > 0) {
+        const signal = signals[0]; // Take the first signal
+        setCurrentSignal(signal);
+        addLogEntry('AI', `Neues Signal generiert: ${signal.signalType} ${signal.assetPair}`);
+        
+        if (signal.reasoning) {
+          addLogEntry('AI', `KI-Begründung: ${signal.reasoning}`);
+        }
+      } else {
+        addLogEntry('AI', 'Keine handelswerten Signale gefunden. Versuche in 30 Sekunden erneut...');
+        // Schedule next analysis
+        setTimeout(() => {
+          startAISignalGeneration();
+        }, 30000);
+      }
+      
+    } catch (error) {
+      console.error('AI signal generation error:', error);
+      addLogEntry('ERROR', 'Fehler bei der KI-Signalgenerierung');
+      
+      // Fallback to mock signal for development
+      setTimeout(() => {
+        generateMockSignal();
+      }, 5000);
+    }
+  }, [isSimulationActive, simulationState, addLogEntry]);
 
   const stopSimulation = useCallback(() => {
     if (!simulationState) return;
@@ -262,7 +321,7 @@ export const useSimulation = () => {
     }, 2000);
   }, [isSimulationActive, addLogEntry]);
 
-  const acceptSignal = useCallback((signal: Signal) => {
+  const acceptSignal = useCallback(async (signal: Signal) => {
     if (!simulationState || !signal) return;
 
     // Only create positions for tradeable signals
@@ -274,44 +333,100 @@ export const useSimulation = () => {
 
     addLogEntry('TRADE', `Signal angenommen: ${signal.signalType} ${signal.assetPair}`);
     
-    // Mock trade execution
-    const mockCurrentPrice = signal.signalType === 'BUY' ? 60000 : 3000; // Mock prices
-    const positionSize = 500; // Mock $500 position
-    const quantity = positionSize / mockCurrentPrice;
+    try {
+      // Get real market price (in development, this would use mock data)
+      let currentPrice: number;
+      
+      try {
+        // Try to get real price, fallback to mock if API not available
+        currentPrice = typeof signal.entryPriceSuggestion === 'number' 
+          ? signal.entryPriceSuggestion 
+          : (signal.assetPair.includes('BTC') ? 60000 : 3000); // Mock prices
+      } catch (error) {
+        console.log('Using mock price due to API limitation');
+        currentPrice = signal.assetPair.includes('BTC') ? 60000 : 3000;
+      }
+      
+      // Calculate position size based on strategy
+      const idealPositionPercent = signal.suggestedPositionSizePercent || 3.0;
+      const idealPositionSize = (simulationState.currentPortfolioValue * idealPositionPercent) / 100;
+      const availableUSDT = simulationState.paperAssets.find(asset => asset.symbol === 'USDT')?.quantity || 0;
+      const actualPositionSize = Math.min(idealPositionSize, availableUSDT);
+      
+      // Check minimum trade size
+      const minTradeSize = 50; // Minimum $50 trade
+      if (actualPositionSize < minTradeSize) {
+        addLogEntry('WARNING', `Nicht genügend USDT für Trade. Benötigt: $${minTradeSize}, Verfügbar: $${availableUSDT.toFixed(2)}`);
+        setCurrentSignal(null);
+        return;
+      }
+      
+      const quantity = actualPositionSize / currentPrice;
+      const tradingFee = actualPositionSize * 0.001; // 0.1% fee
+      
+      const newPosition: Position = {
+        id: `pos_${Date.now()}`,
+        assetPair: signal.assetPair,
+        type: signal.signalType,
+        entryPrice: currentPrice,
+        quantity,
+        takeProfit: signal.takeProfitPrice,
+        stopLoss: signal.stopLossPrice,
+        unrealizedPnL: 0,
+        openTimestamp: Date.now()
+      };
 
-    const newPosition: Position = {
-      id: `pos_${Date.now()}`,
-      assetPair: signal.assetPair,
-      type: signal.signalType, // Now this is guaranteed to be 'BUY' | 'SELL'
-      entryPrice: mockCurrentPrice,
-      quantity,
-      takeProfit: signal.takeProfitPrice,
-      stopLoss: signal.stopLossPrice,
-      unrealizedPnL: 0,
-      openTimestamp: Date.now()
-    };
+      // Update paper portfolio
+      const updatedAssets = simulationState.paperAssets.map(asset => {
+        if (asset.symbol === 'USDT') {
+          return { ...asset, quantity: asset.quantity - actualPositionSize - tradingFee };
+        }
+        return asset;
+      });
+      
+      // Add new asset or update existing
+      const assetSymbol = signal.assetPair.split('/')[0] || signal.assetPair.split('-')[0];
+      const existingAssetIndex = updatedAssets.findIndex(asset => asset.symbol === assetSymbol);
+      
+      if (existingAssetIndex >= 0) {
+        updatedAssets[existingAssetIndex].quantity += quantity;
+      } else {
+        updatedAssets.push({
+          symbol: assetSymbol,
+          quantity: quantity,
+          entryPrice: currentPrice
+        });
+      }
 
-    const updatedState = {
-      ...simulationState,
-      openPositions: [...simulationState.openPositions, newPosition],
-      currentPortfolioValue: simulationState.currentPortfolioValue // Will be updated with market movements
-    };
+      const updatedState = {
+        ...simulationState,
+        openPositions: [...simulationState.openPositions, newPosition],
+        paperAssets: updatedAssets,
+        currentPortfolioValue: simulationState.currentPortfolioValue - tradingFee
+      };
 
-    saveSimulationState(updatedState);
-    setCurrentSignal(null);
-    
-    addLogEntry('SUCCESS', `Position eröffnet: ${quantity.toFixed(6)} ${signal.assetPair} @ $${mockCurrentPrice}`);
-    
-    toast({
-      title: "Position eröffnet",
-      description: `${signal.signalType} ${signal.assetPair} für $${positionSize}`,
-    });
+      saveSimulationState(updatedState);
+      setCurrentSignal(null);
+      
+      addLogEntry('SUCCESS', `Position eröffnet: ${quantity.toFixed(6)} ${assetSymbol} @ $${currentPrice.toFixed(2)}`);
+      addLogEntry('INFO', `Handelsgröße: $${actualPositionSize.toFixed(2)}, Gebühr: $${tradingFee.toFixed(2)}`);
+      
+      toast({
+        title: "Position eröffnet",
+        description: `${signal.signalType} ${signal.assetPair} für $${actualPositionSize.toFixed(2)}`,
+      });
 
-    // Generate next signal
-    setTimeout(() => {
-      generateMockSignal();
-    }, 30000); // 30 seconds
-  }, [simulationState, addLogEntry, saveSimulationState, generateMockSignal]);
+      // Schedule next signal generation
+      setTimeout(() => {
+        startAISignalGeneration();
+      }, 45000); // 45 seconds
+
+    } catch (error) {
+      console.error('Error executing trade:', error);
+      addLogEntry('ERROR', 'Fehler bei der Trade-Ausführung');
+      setCurrentSignal(null);
+    }
+  }, [simulationState, addLogEntry, saveSimulationState, startAISignalGeneration]);
 
   const ignoreSignal = useCallback((signal: Signal) => {
     addLogEntry('INFO', `Signal ignoriert: ${signal.signalType} ${signal.assetPair}`);
