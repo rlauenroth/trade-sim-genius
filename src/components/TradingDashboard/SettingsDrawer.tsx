@@ -46,9 +46,9 @@ const SettingsDrawer = ({ isOpen, onClose }: SettingsDrawerProps) => {
     openRouter: ''
   });
 
-  // Local form state with safe defaults
+  // Initialize form data with safe defaults
   const [formData, setFormData] = useState({
-    apiKeys: apiKeys || createDefaultApiKeys(),
+    apiKeys: createDefaultApiKeys(),
     settings: userSettings
   });
 
@@ -62,6 +62,7 @@ const SettingsDrawer = ({ isOpen, onClose }: SettingsDrawerProps) => {
 
   // Update form when store changes
   useEffect(() => {
+    console.log('SettingsDrawer: Store data changed', { apiKeys, userSettings });
     setFormData({
       apiKeys: apiKeys || createDefaultApiKeys(),
       settings: userSettings
@@ -189,7 +190,7 @@ const SettingsDrawer = ({ isOpen, onClose }: SettingsDrawerProps) => {
                 <div>
                   <Label className="text-slate-400 text-sm">API Key</Label>
                   <Input
-                    value={formData.apiKeys.kucoin.key}
+                    value={formData.apiKeys?.kucoin?.key || ''}
                     onChange={(e) => handleApiKeysChange('kucoin.key', e.target.value)}
                     placeholder="KuCoin API Key eingeben..."
                     className="bg-slate-800 border-slate-600 text-slate-200"
@@ -199,7 +200,7 @@ const SettingsDrawer = ({ isOpen, onClose }: SettingsDrawerProps) => {
                 <div>
                   <Label className="text-slate-400 text-sm">API Secret</Label>
                   <Input
-                    value={formData.apiKeys.kucoin.secret}
+                    value={formData.apiKeys?.kucoin?.secret || ''}
                     onChange={(e) => handleApiKeysChange('kucoin.secret', e.target.value)}
                     placeholder="KuCoin API Secret eingeben..."
                     className="bg-slate-800 border-slate-600 text-slate-200"
@@ -209,7 +210,7 @@ const SettingsDrawer = ({ isOpen, onClose }: SettingsDrawerProps) => {
                 <div>
                   <Label className="text-slate-400 text-sm">Passphrase</Label>
                   <Input
-                    value={formData.apiKeys.kucoin.passphrase}
+                    value={formData.apiKeys?.kucoin?.passphrase || ''}
                     onChange={(e) => handleApiKeysChange('kucoin.passphrase', e.target.value)}
                     placeholder="KuCoin Passphrase eingeben..."
                     className="bg-slate-800 border-slate-600 text-slate-200"
@@ -222,7 +223,7 @@ const SettingsDrawer = ({ isOpen, onClose }: SettingsDrawerProps) => {
               <div>
                 <Label className="text-slate-300 font-medium">OpenRouter API</Label>
                 <Input
-                  value={formData.apiKeys.openRouter}
+                  value={formData.apiKeys?.openRouter || ''}
                   onChange={(e) => handleApiKeysChange('openRouter', e.target.value)}
                   placeholder="OpenRouter API Key eingeben..."
                   className="bg-slate-800 border-slate-600 text-slate-200 mt-1"
