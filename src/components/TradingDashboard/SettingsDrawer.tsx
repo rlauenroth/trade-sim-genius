@@ -40,12 +40,15 @@ const SettingsDrawer = ({ isOpen, onClose }: SettingsDrawerProps) => {
     validateSettings 
   } = useSettingsStore();
 
-  // Local form state
+  // Create safe default values for form data
+  const createDefaultApiKeys = (): ApiKeys => ({
+    kucoin: { key: '', secret: '', passphrase: '' },
+    openRouter: ''
+  });
+
+  // Local form state with safe defaults
   const [formData, setFormData] = useState({
-    apiKeys: apiKeys || {
-      kucoin: { key: '', secret: '', passphrase: '' },
-      openRouter: ''
-    },
+    apiKeys: apiKeys || createDefaultApiKeys(),
     settings: userSettings
   });
 
@@ -60,10 +63,7 @@ const SettingsDrawer = ({ isOpen, onClose }: SettingsDrawerProps) => {
   // Update form when store changes
   useEffect(() => {
     setFormData({
-      apiKeys: apiKeys || {
-        kucoin: { key: '', secret: '', passphrase: '' },
-        openRouter: ''
-      },
+      apiKeys: apiKeys || createDefaultApiKeys(),
       settings: userSettings
     });
   }, [apiKeys, userSettings]);
@@ -154,10 +154,7 @@ const SettingsDrawer = ({ isOpen, onClose }: SettingsDrawerProps) => {
     clearApiKeys();
     setFormData(prev => ({
       ...prev,
-      apiKeys: {
-        kucoin: { key: '', secret: '', passphrase: '' },
-        openRouter: ''
-      }
+      apiKeys: createDefaultApiKeys()
     }));
   };
 

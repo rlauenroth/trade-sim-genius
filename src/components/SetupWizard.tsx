@@ -1,436 +1,121 @@
-
 import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertTriangle, Eye, EyeOff, CheckCircle, ArrowRight, ArrowLeft, Rocket, Wifi, WifiOff } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useToast } from "@/hooks/use-toast"
 import { useAppState } from '@/hooks/useAppState';
-import { useProxyConnection } from '@/hooks/useProxyConnection';
-import { toast } from '@/hooks/use-toast';
-import SecurityWarningDialog from './SecurityWarningDialog';
+import { ApiKeys } from '@/types/appState';
 
 const SetupWizard = () => {
-  const { currentStep, setCurrentStep, saveApiKeys, saveUserSettings, isLoading } = useAppState();
-  const { isTestingProxy, proxyStatus, testConnection } = useProxyConnection();
-  const [showPasswords, setShowPasswords] = useState(false);
-  const [showSecurityWarning, setShowSecurityWarning] = useState(false);
-  const [securityAcknowledged, setSecurityAcknowledged] = useState(false);
-  const [formData, setFormData] = useState({
-    kucoinApiKey: '',
-    kucoinApiSecret: '',
-    kucoinApiPassphrase: '',
-    openRouterApiKey: '',
-    tradingStrategy: 'balanced' as const,
-    selectedAiModelId: 'anthropic/claude-3.5-sonnet'
-  });
+  const [kucoinApiKey, setKucoinApiKey] = useState('');
+  const [kucoinApiSecret, setKucoinApiSecret] = useState('');
+  const [kucoinApiPassphrase, setKucoinApiPassphrase] = useState('');
+  const [openRouterApiKey, setOpenRouterApiKey] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const { saveApiKeys, checkSetupStatus } = useAppState();
+  const { toast } = useToast();
+  const navigate = useNavigate();
 
-  const steps = [
-    'Willkommen',
-    'KuCoin API',
-    'OpenRouter API', 
-    'Strategieauswahl',
-    'Abschluss'
-  ];
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsLoading(true);
 
-  const validateCurrentStep = () => {
-    switch (currentStep) {
-      case 1:
-        return formData.kucoinApiKey && formData.kucoinApiSecret && formData.kucoinApiPassphrase;
-      case 2:
-        return formData.openRouterApiKey;
-      case 3:
-        return formData.tradingStrategy && formData.selectedAiModelId;
-      default:
-        return true;
-    }
-  };
+    try {
+      // Transform to new nested ApiKeys structure
+      const apiKeysData: ApiKeys = {
+        kucoin: {
+          key: kucoinApiKey,
+          secret: kucoinApiSecret,
+          passphrase: kucoinApiPassphrase
+        },
+        openRouter: openRouterApiKey
+      };
 
-  const handleNext = async () => {
-    if (!validateCurrentStep()) {
+      const success = await saveApiKeys(apiKeysData);
+      
+      if (success) {
+        // Mark that user has acknowledged the risk
+        localStorage.setItem('kiTradingApp_userAcknowledgedRisk', 'true');
+        
+        toast({
+          title: "Setup abgeschlossen!",
+          description: "Ihre API-Schlüssel wurden erfolgreich gespeichert.",
+        });
+        
+        // Check setup status to proceed
+        checkSetupStatus();
+      }
+    } catch (error) {
+      console.error('Error saving API keys:', error);
       toast({
-        title: "Unvollständige Eingaben",
-        description: "Bitte füllen Sie alle erforderlichen Felder aus.",
+        title: "Fehler",
+        description: "API-Schlüssel konnten nicht gespeichert werden.",
         variant: "destructive"
       });
-      return;
-    }
-
-    if (currentStep === 3) {
-      // Final step: show security warning before saving
-      setShowSecurityWarning(true);
-    } else {
-      setCurrentStep(currentStep + 1);
-    }
-  };
-
-  const handleSecurityAccept = async () => {
-    setShowSecurityWarning(false);
-    
-    // Test proxy connection before saving
-    console.log('Testing proxy connection before saving...');
-    await testConnection();
-    
-    // Save API keys and settings regardless of proxy status (allow offline setup)
-    const apiKeys = {
-      kucoinApiKey: formData.kucoinApiKey,
-      kucoinApiSecret: formData.kucoinApiSecret,
-      kucoinApiPassphrase: formData.kucoinApiPassphrase,
-      openRouterApiKey: formData.openRouterApiKey
-    };
-
-    const success = await saveApiKeys(apiKeys);
-    if (success) {
-      saveUserSettings({
-        tradingStrategy: formData.tradingStrategy,
-        selectedAiModelId: formData.selectedAiModelId
-      });
-      setCurrentStep(4);
-    }
-  };
-
-  const handleSecurityReject = () => {
-    setShowSecurityWarning(false);
-    setSecurityAcknowledged(false);
-  };
-
-  const renderStepContent = () => {
-    switch (currentStep) {
-      case 0:
-        return (
-          <Card className="max-w-2xl mx-auto bg-slate-800 border-slate-700">
-            <CardHeader>
-              <CardTitle className="text-white text-center">Willkommen beim KI Trading Assistant</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="bg-amber-900/30 border border-amber-600 rounded-lg p-4">
-                <div className="flex items-center space-x-2 mb-2">
-                  <AlertTriangle className="h-5 w-5 text-amber-400" />
-                  <h3 className="font-semibold text-amber-400">Wichtige Hinweise</h3>
-                </div>
-                <ul className="text-amber-200 text-sm space-y-1">
-                  <li>• Dies ist ein MVP für Paper-Trading (Simulation)</li>
-                  <li>• Ihre API-Schlüssel werden unverschlüsselt lokal gespeichert</li>
-                  <li>• Kein echter Handel - nur Signaltesting</li>
-                  <li>• Verwenden Sie nur Test-API-Schlüssel mit minimalen Berechtigungen</li>
-                </ul>
-              </div>
-              
-              {/* Proxy Status Indicator */}
-              <div className="bg-blue-900/30 border border-blue-600 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold text-blue-400">Netzwerk-Status</h3>
-                  <Button
-                    onClick={testConnection}
-                    disabled={isTestingProxy}
-                    variant="outline"
-                    size="sm"
-                    className="border-blue-600 text-blue-300"
-                  >
-                    {isTestingProxy ? (
-                      <>
-                        <WifiOff className="mr-2 h-4 w-4 animate-pulse" />
-                        Teste...
-                      </>
-                    ) : (
-                      <>
-                        <Wifi className="mr-2 h-4 w-4" />
-                        Proxy testen
-                      </>
-                    )}
-                  </Button>
-                </div>
-                <div className="text-blue-200 text-sm">
-                  {proxyStatus === 'connected' && (
-                    <div className="flex items-center text-green-300">
-                      <CheckCircle className="mr-2 h-4 w-4" />
-                      KuCoin-Proxy ist erreichbar
-                    </div>
-                  )}
-                  {proxyStatus === 'failed' && (
-                    <div className="flex items-center text-red-300">
-                      <WifiOff className="mr-2 h-4 w-4" />
-                      Proxy nicht erreichbar - App läuft im Demo-Modus
-                    </div>
-                  )}
-                  {proxyStatus === 'unknown' && (
-                    <div className="text-blue-200">
-                      Proxy-Status noch nicht getestet
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <div className="text-center">
-                <p className="text-slate-300 mb-4">
-                  Lassen Sie uns Ihre Handelsumgebung einrichten. 
-                  Der Prozess dauert nur wenige Minuten.
-                </p>
-                <Button onClick={() => setCurrentStep(1)} className="bg-blue-600 hover:bg-blue-700">
-                  Einrichtung starten
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        );
-
-      case 1:
-        return (
-          <Card className="max-w-2xl mx-auto bg-slate-800 border-slate-700">
-            <CardHeader>
-              <CardTitle className="text-white">KuCoin API-Schlüssel</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="bg-blue-900/30 border border-blue-600 rounded-lg p-4 mb-4">
-                <p className="text-blue-200 text-sm">
-                  Erstellen Sie API-Schlüssel in Ihrem KuCoin-Konto mit den Berechtigungen: 
-                  <strong> Portfolio lesen, Handel</strong>
-                </p>
-              </div>
-              
-              <div>
-                <Label htmlFor="kucoinApiKey" className="text-slate-300">API Key</Label>
-                <Input
-                  id="kucoinApiKey"
-                  type="text"
-                  value={formData.kucoinApiKey}
-                  onChange={(e) => setFormData(prev => ({ ...prev, kucoinApiKey: e.target.value }))}
-                  className="bg-slate-700 border-slate-600 text-white"
-                  placeholder="Ihr KuCoin API Key"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="kucoinApiSecret" className="text-slate-300">API Secret</Label>
-                <div className="relative">
-                  <Input
-                    id="kucoinApiSecret"
-                    type={showPasswords ? "text" : "password"}
-                    value={formData.kucoinApiSecret}
-                    onChange={(e) => setFormData(prev => ({ ...prev, kucoinApiSecret: e.target.value }))}
-                    className="bg-slate-700 border-slate-600 text-white pr-10"
-                    placeholder="Ihr KuCoin API Secret"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 text-slate-400"
-                    onClick={() => setShowPasswords(!showPasswords)}
-                  >
-                    {showPasswords ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
-              
-              <div>
-                <Label htmlFor="kucoinApiPassphrase" className="text-slate-300">API Passphrase</Label>
-                <Input
-                  id="kucoinApiPassphrase"
-                  type={showPasswords ? "text" : "password"}
-                  value={formData.kucoinApiPassphrase}
-                  onChange={(e) => setFormData(prev => ({ ...prev, kucoinApiPassphrase: e.target.value }))}
-                  className="bg-slate-700 border-slate-600 text-white"
-                  placeholder="Ihre KuCoin API Passphrase"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        );
-
-      case 2:
-        return (
-          <Card className="max-w-2xl mx-auto bg-slate-800 border-slate-700">
-            <CardHeader>
-              <CardTitle className="text-white">OpenRouter API-Schlüssel</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="bg-blue-900/30 border border-blue-600 rounded-lg p-4 mb-4">
-                <p className="text-blue-200 text-sm">
-                  Erstellen Sie einen API-Schlüssel bei OpenRouter.ai für den Zugriff auf KI-Modelle.
-                </p>
-              </div>
-              
-              <div>
-                <Label htmlFor="openRouterApiKey" className="text-slate-300">OpenRouter API Key</Label>
-                <Input
-                  id="openRouterApiKey"
-                  type={showPasswords ? "text" : "password"}
-                  value={formData.openRouterApiKey}
-                  onChange={(e) => setFormData(prev => ({ ...prev, openRouterApiKey: e.target.value }))}
-                  className="bg-slate-700 border-slate-600 text-white"
-                  placeholder="Ihr OpenRouter API Key"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        );
-
-      case 3:
-        return (
-          <Card className="max-w-2xl mx-auto bg-slate-800 border-slate-700">
-            <CardHeader>
-              <CardTitle className="text-white">Handelsstrategie auswählen</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <Label className="text-slate-300">Handelsstrategie</Label>
-                <Select value={formData.tradingStrategy} onValueChange={(value: any) => 
-                  setFormData(prev => ({ ...prev, tradingStrategy: value }))}>
-                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="conservative">Konservativ (2% Position, -2% Stop)</SelectItem>
-                    <SelectItem value="balanced">Ausgewogen (5% Position, -4% Stop)</SelectItem>
-                    <SelectItem value="aggressive">Aggressiv (8% Position, -6% Stop)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
-                <Label className="text-slate-300">KI-Modell</Label>
-                <Select value={formData.selectedAiModelId} onValueChange={(value) => 
-                  setFormData(prev => ({ ...prev, selectedAiModelId: value }))}>
-                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (Empfohlen)</SelectItem>
-                    <SelectItem value="openai/gpt-4o">GPT-4o</SelectItem>
-                    <SelectItem value="google/gemini-1.5-pro-preview">Gemini 1.5 Pro</SelectItem>
-                    <SelectItem value="anthropic/claude-3-haiku">Claude 3 Haiku (Schnell)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-        );
-
-      case 4:
-        return (
-          <Card className="max-w-2xl mx-auto bg-slate-800 border-slate-700">
-            <CardHeader>
-              <CardTitle className="text-white text-center">Einrichtung erfolgreich abgeschlossen!</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6 text-center">
-              <div className="flex justify-center">
-                <CheckCircle className="h-16 w-16 text-green-400" />
-              </div>
-              
-              <div>
-                <h3 className="text-xl font-semibold text-white mb-2">Willkommen!</h3>
-                <p className="text-slate-300 mb-4">
-                  Ihre API-Schlüssel wurden im lokalen Speicher Ihres Browsers abgelegt.
-                </p>
-                <p className="text-slate-400 text-sm">
-                  Sie können jetzt mit dem Paper-Trading beginnen. Die App lädt zunächst 
-                  Ihre aktuellen Portfolio-Daten von KuCoin.
-                </p>
-              </div>
-
-              {/* Network Status Summary */}
-              <div className={`border rounded-lg p-4 ${
-                proxyStatus === 'connected' 
-                  ? 'bg-green-900/30 border-green-600' 
-                  : 'bg-blue-900/30 border-blue-600'
-              }`}>
-                <div className="flex items-center justify-center space-x-2 mb-2">
-                  {proxyStatus === 'connected' ? (
-                    <>
-                      <Wifi className="h-5 w-5 text-green-400" />
-                      <span className="text-green-200 font-medium">Live-Modus aktiviert</span>
-                    </>
-                  ) : (
-                    <>
-                      <WifiOff className="h-5 w-5 text-blue-400" />
-                      <span className="text-blue-200 font-medium">Demo-Modus aktiviert</span>
-                    </>
-                  )}
-                </div>
-                <p className="text-sm text-slate-300">
-                  {proxyStatus === 'connected' 
-                    ? 'Alle Trades werden simuliert mit echten Marktdaten.'
-                    : 'Alle Trades werden simuliert mit Demo-Daten.'}
-                </p>
-              </div>
-
-              <Button 
-                onClick={() => window.location.reload()} 
-                className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-3"
-                size="lg"
-              >
-                <Rocket className="mr-2 h-5 w-5" />
-                Zur App starten
-              </Button>
-            </CardContent>
-          </Card>
-        );
-
-      default:
-        return null;
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="space-y-8">
-      {/* Progress indicator */}
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          {steps.map((step, index) => (
-            <div key={step} className="flex items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                index <= currentStep 
-                  ? 'bg-blue-600 text-white' 
-                  : 'bg-slate-600 text-slate-300'
-              }`}>
-                {index + 1}
-              </div>
-              {index < steps.length - 1 && (
-                <div className={`w-24 h-0.5 mx-2 ${
-                  index < currentStep ? 'bg-blue-600' : 'bg-slate-600'
-                }`} />
-              )}
+    <div className="container mx-auto lg:max-w-2xl p-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>KI Trading App einrichten</CardTitle>
+          <CardDescription>
+            Bitte gib deine API-Schlüssel ein, um fortzufahren.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="kucoinApiKey">KuCoin API Key</Label>
+              <Input
+                id="kucoinApiKey"
+                type="password"
+                value={kucoinApiKey}
+                onChange={(e) => setKucoinApiKey(e.target.value)}
+                placeholder="KuCoin API Key"
+              />
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Step content */}
-      {renderStepContent()}
-
-      {/* Navigation buttons */}
-      {currentStep > 0 && currentStep < 4 && (
-        <div className="flex justify-center space-x-4">
-          <Button 
-            variant="outline" 
-            onClick={() => setCurrentStep(currentStep - 1)}
-            className="border-slate-600 text-slate-300 hover:bg-slate-700"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Zurück
-          </Button>
-          <Button 
-            onClick={handleNext}
-            disabled={!validateCurrentStep() || isLoading}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            {currentStep === 3 ? 'Abschließen' : 'Weiter'}
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-        </div>
-      )}
-
-      {/* Security Warning Dialog */}
-      <SecurityWarningDialog
-        isOpen={showSecurityWarning}
-        onAccept={handleSecurityAccept}
-        onReject={handleSecurityReject}
-        acknowledged={securityAcknowledged}
-        onAcknowledgedChange={setSecurityAcknowledged}
-      />
+            <div>
+              <Label htmlFor="kucoinApiSecret">KuCoin API Secret</Label>
+              <Input
+                id="kucoinApiSecret"
+                type="password"
+                value={kucoinApiSecret}
+                onChange={(e) => setKucoinApiSecret(e.target.value)}
+                placeholder="KuCoin API Secret"
+              />
+            </div>
+            <div>
+              <Label htmlFor="kucoinApiPassphrase">KuCoin API Passphrase</Label>
+              <Input
+                id="kucoinApiPassphrase"
+                type="password"
+                value={kucoinApiPassphrase}
+                onChange={(e) => setKucoinApiPassphrase(e.target.value)}
+                placeholder="KuCoin API Passphrase"
+              />
+            </div>
+            <div>
+              <Label htmlFor="openRouterApiKey">OpenRouter API Key</Label>
+              <Input
+                id="openRouterApiKey"
+                type="password"
+                value={openRouterApiKey}
+                onChange={(e) => setOpenRouterApiKey(e.target.value)}
+                placeholder="OpenRouter API Key"
+              />
+            </div>
+            <Button disabled={isLoading} type="submit">
+              {isLoading ? "Einrichten..." : "Einrichten"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 };
