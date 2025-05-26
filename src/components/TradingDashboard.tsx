@@ -17,7 +17,14 @@ import FirstTimeUserInfo from './TradingDashboard/FirstTimeUserInfo';
 import PortfolioLoadingCard from './TradingDashboard/PortfolioLoadingCard';
 
 const TradingDashboard = () => {
-  const { userSettings, lockApp, isFirstTimeAfterSetup, completeFirstTimeSetup, decryptedApiKeys } = useAppState();
+  const { 
+    userSettings, 
+    logoutAndClearData, 
+    isFirstTimeAfterSetup, 
+    completeFirstTimeSetup, 
+    apiKeys 
+  } = useAppState();
+  
   const { portfolioData, isLoading: portfolioLoading, loadPortfolioData } = usePortfolioData();
   
   const { 
@@ -44,7 +51,7 @@ const TradingDashboard = () => {
 
   const { handleStartSimulation, handleOpenSettings } = useTradingDashboardEffects({
     isFirstTimeAfterSetup,
-    decryptedApiKeys,
+    decryptedApiKeys: apiKeys, // renamed from decryptedApiKeys
     portfolioData,
     loadPortfolioData,
     completeFirstTimeSetup,
@@ -65,7 +72,7 @@ const TradingDashboard = () => {
       <DashboardHeader 
         isSimulationActive={isSimulationActive}
         isPaused={simulationState?.isPaused}
-        onLockApp={lockApp}
+        onLogout={logoutAndClearData}
       />
 
       {/* Show first-time user info if applicable */}

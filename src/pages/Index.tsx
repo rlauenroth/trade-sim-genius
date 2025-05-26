@@ -11,7 +11,8 @@ const Index = () => {
     isSetupComplete, 
     isLoading,
     checkSetupStatus,
-    loadApiKeys
+    loadApiKeys,
+    checkFirstTimeSetup
   } = useAppState();
 
   useEffect(() => {
@@ -19,6 +20,13 @@ const Index = () => {
     checkSetupStatus();
     loadApiKeys();
   }, [checkSetupStatus, loadApiKeys]);
+
+  useEffect(() => {
+    // Check if this is first time after setup once we have loaded everything
+    if (isSetupComplete && !isLoading) {
+      checkFirstTimeSetup();
+    }
+  }, [isSetupComplete, isLoading, checkFirstTimeSetup]);
 
   // Monitor state changes for debugging
   useEffect(() => {
