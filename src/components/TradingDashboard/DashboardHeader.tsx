@@ -8,9 +8,10 @@ interface DashboardHeaderProps {
   isSimulationActive: boolean;
   isPaused?: boolean;
   onLogout: () => void;
+  onOpenSettings: () => void;
 }
 
-const DashboardHeader = ({ isSimulationActive, isPaused, onLogout }: DashboardHeaderProps) => {
+const DashboardHeader = ({ isSimulationActive, isPaused, onLogout, onOpenSettings }: DashboardHeaderProps) => {
   const getStatusBadge = () => {
     if (!isSimulationActive) {
       return <Badge variant="secondary" className="bg-slate-600">Bereit</Badge>;
@@ -39,7 +40,7 @@ const DashboardHeader = ({ isSimulationActive, isPaused, onLogout }: DashboardHe
       </div>
       
       <div className="flex items-center space-x-2">
-        <Button variant="ghost" size="sm" className="text-slate-400">
+        <Button variant="ghost" size="sm" onClick={onOpenSettings} className="text-slate-400">
           <Settings className="h-4 w-4 mr-2" />
           Einstellungen
         </Button>
