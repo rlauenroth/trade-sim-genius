@@ -9,6 +9,21 @@ export const STORAGE_KEYS = {
   ACTIVITY_LOG: 'kiTradingApp_activityLog'
 } as const;
 
+// Cleanup corrupted localStorage data
+export const cleanupCorruptedStorage = () => {
+  Object.values(STORAGE_KEYS).forEach(key => {
+    const value = localStorage.getItem(key);
+    if (value && value !== 'true' && value !== 'false') {
+      try {
+        JSON.parse(value);
+      } catch (error) {
+        console.warn(`Removing corrupted localStorage item: ${key}`, error);
+        localStorage.removeItem(key);
+      }
+    }
+  });
+};
+
 export const storageUtils = {
   getItem: (key: string): string | null => {
     try {
@@ -45,6 +60,7 @@ export const storageUtils = {
       return JSON.parse(stored);
     } catch (error) {
       console.error('Error parsing user settings:', error);
+      storageUtils.removeItem(STORAGE_KEYS.USER_SETTINGS);
       return null;
     }
   },
@@ -66,6 +82,7 @@ export const storageUtils = {
       return JSON.parse(stored);
     } catch (error) {
       console.error('Error parsing API keys:', error);
+      storageUtils.removeItem(STORAGE_KEYS.API_KEYS);
       return null;
     }
   },

@@ -51,22 +51,23 @@ export const useAISignals = () => {
     if (!isActive) return;
     
     try {
-      addLogEntry('AI', 'Starte KI-Marktanalyse...');
+      addLogEntry('AI', 'Starte KI-Marktanalyse (Demo-Modus)...');
       
-      const mockCredentials = {
+      // Use mock credentials for demo mode
+      const demoCredentials = {
         kucoin: {
-          kucoinApiKey: 'mock_key',
-          kucoinApiSecret: 'mock_secret',
-          kucoinApiPassphrase: 'mock_passphrase'
+          kucoinApiKey: 'demo_key',
+          kucoinApiSecret: 'demo_secret',
+          kucoinApiPassphrase: 'demo_passphrase'
         },
-        openRouter: 'mock_openrouter_key'
+        openRouter: 'demo_openrouter_key'
       };
       
       const strategy = 'balanced';
       
       const aiService = new AISignalService({
-        kucoinCredentials: mockCredentials.kucoin,
-        openRouterApiKey: mockCredentials.openRouter,
+        kucoinCredentials: demoCredentials.kucoin,
+        openRouterApiKey: demoCredentials.openRouter,
         strategy: strategy,
         simulatedPortfolioValue: simulationState?.currentPortfolioValue || 10000,
         availableUSDT: simulationState?.paperAssets.find((asset: any) => asset.symbol === 'USDT')?.quantity || 10000
@@ -91,11 +92,12 @@ export const useAISignals = () => {
       
     } catch (error) {
       console.error('AI signal generation error:', error);
-      addLogEntry('ERROR', 'Fehler bei der KI-Signalgenerierung');
+      addLogEntry('INFO', 'KI-Service nicht verfügbar, verwende Mock-Signale...');
       
+      // Fallback to simple mock signals
       setTimeout(() => {
         generateMockSignalFallback();
-      }, 5000);
+      }, 3000);
     }
   }, []);
 

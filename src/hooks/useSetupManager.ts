@@ -1,6 +1,6 @@
 
 import { useState, useCallback } from 'react';
-import { storageUtils, STORAGE_KEYS } from '@/utils/appStorage';
+import { storageUtils, STORAGE_KEYS, cleanupCorruptedStorage } from '@/utils/appStorage';
 
 export const useSetupManager = () => {
   const [isSetupComplete, setIsSetupComplete] = useState(false);
@@ -8,6 +8,10 @@ export const useSetupManager = () => {
 
   const checkSetupStatus = useCallback(() => {
     console.log('Checking setup status...');
+    
+    // Clean up any corrupted localStorage data first
+    cleanupCorruptedStorage();
+    
     const hasApiKeys = storageUtils.getApiKeys();
     const hasSettings = storageUtils.getItem(STORAGE_KEYS.USER_SETTINGS);
     const hasAcknowledgedRisk = storageUtils.hasAcknowledgedRisk();
