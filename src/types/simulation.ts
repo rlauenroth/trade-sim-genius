@@ -1,4 +1,3 @@
-
 export interface SimulationState {
   isActive: boolean;
   isPaused: boolean;
@@ -43,4 +42,5 @@ export interface ActivityLogEntry {
   timestamp: number;
   type: 'INFO' | 'AI' | 'TRADE' | 'ERROR' | 'SUCCESS' | 'WARNING';
   message: string;
+  source?: string;
 }

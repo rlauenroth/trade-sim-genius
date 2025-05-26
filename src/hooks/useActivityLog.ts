@@ -17,11 +17,16 @@ export const useActivityLog = () => {
     }
   }, []);
 
-  const addLogEntry = useCallback((type: ActivityLogEntry['type'], message: string) => {
+  const addLogEntry = useCallback((
+    type: ActivityLogEntry['type'], 
+    message: string, 
+    source?: string
+  ) => {
     const entry: ActivityLogEntry = {
       timestamp: Date.now(),
       type,
-      message
+      message,
+      source
     };
 
     setActivityLog(prev => {
@@ -31,9 +36,17 @@ export const useActivityLog = () => {
     });
   }, []);
 
+  const addKucoinLogEntry = useCallback((
+    type: ActivityLogEntry['type'], 
+    message: string
+  ) => {
+    addLogEntry(type, message, 'KuCoin via PHP-Proxy');
+  }, [addLogEntry]);
+
   return {
     activityLog,
     loadActivityLog,
-    addLogEntry
+    addLogEntry,
+    addKucoinLogEntry
   };
 };
