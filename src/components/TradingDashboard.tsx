@@ -9,7 +9,7 @@ import { useSimGuard } from '@/hooks/useSimGuard';
 import { simReadinessStore } from '@/stores/simReadinessStore';
 import DashboardHeader from './TradingDashboard/DashboardHeader';
 import StrategyInfo from './TradingDashboard/StrategyInfo';
-import PortfolioOverview from './TradingDashboard/PortfolioOverview';
+import PortfolioOverviewWithStatus from './TradingDashboard/PortfolioOverviewWithStatus';
 import ProgressTracker from './TradingDashboard/ProgressTracker';
 import ControlCenter from './TradingDashboard/ControlCenter';
 import SignalDisplay from './TradingDashboard/SignalDisplay';
@@ -55,17 +55,6 @@ const TradingDashboard = () => {
 
   const { state: readinessState, isRunningBlocked, reason } = useSimGuard();
 
-  // Show toast when simulation gets auto-paused
-  useEffect(() => {
-    if (isRunningBlocked && simulationState?.isActive && !simulationState?.isPaused) {
-      toast({
-        title: "Simulation pausiert",
-        description: `System nicht bereit: ${reason}`,
-        variant: "destructive"
-      });
-    }
-  }, [isRunningBlocked, simulationState?.isActive, simulationState?.isPaused, reason]);
-
   const {
     timeElapsed,
     getProgressValue,
@@ -83,6 +72,17 @@ const TradingDashboard = () => {
     completeFirstTimeSetup,
     startSimulation
   });
+
+  // Initialize sim readiness store on mount
+  useEffect(() => {
+    console.log('🔄 Initializing SimReadiness system...');
+    simReadinessStore.initialize();
+    
+    return () => {
+      // Cleanup on unmount
+      simReadinessStore.destroy();
+    };
+  }, []);
 
   // Show loading state while portfolio is being loaded for first-time users
   if (isFirstTimeAfterSetup && portfolioLoading) {
@@ -144,7 +144,7 @@ const TradingDashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <PortfolioOverview 
+        <PortfolioOverviewWithStatus 
           currentValue={getDisplayPortfolioValue()}
           startValue={getDisplayStartValue()}
           totalPnL={getTotalPnL()}

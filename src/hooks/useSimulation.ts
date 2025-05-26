@@ -1,3 +1,4 @@
+
 import { useCallback, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { SimulationState } from '@/types/simulation';
@@ -36,26 +37,28 @@ export const useSimulation = () => {
     ignoreSignal: executeIgnoreSignal
   } = useTradeExecution();
 
-  const { isRunningBlocked, state: readinessState } = useSimGuard();
+  const { isRunningBlocked, state: readinessState, reason } = useSimGuard();
 
   // Auto-pause simulation when readiness becomes unstable
   useEffect(() => {
-    if (isSimulationActive && isRunningBlocked) {
-      addLogEntry('WARNING', 'Simulation automatisch pausiert: System nicht bereit');
+    if (isSimulationActive && isRunningBlocked && simulationState && !simulationState.isPaused) {
+      console.log('🚨 Auto-pausing simulation due to system instability:', reason);
+      
+      addLogEntry('WARNING', `Simulation automatisch pausiert: ${reason}`);
+      
+      // Update simulation state to paused
+      const updatedState = { ...simulationState, isPaused: true };
+      saveSimulationState(updatedState);
+      setIsSimulationActive(false);
+      
+      // Show toast notification
       toast({
         title: "Simulation pausiert",
-        description: "System nicht bereit - automatisch pausiert",
+        description: `System nicht bereit: ${reason}`,
         variant: "destructive"
       });
-      
-      // Pause the simulation
-      if (simulationState) {
-        const updatedState = { ...simulationState, isPaused: true };
-        saveSimulationState(updatedState);
-        setIsSimulationActive(false);
-      }
     }
-  }, [isSimulationActive, isRunningBlocked, simulationState, saveSimulationState, setIsSimulationActive, addLogEntry]);
+  }, [isSimulationActive, isRunningBlocked, simulationState, reason, saveSimulationState, setIsSimulationActive, addLogEntry]);
 
   // Load saved state and initialize services on mount
   useEffect(() => {
@@ -192,6 +195,9 @@ export const useSimulation = () => {
 
   const resumeSimulation = useCallback(() => {
     if (!simulationState) return;
+
+    // Notify sim readiness store that simulation is running again
+    simReadinessStore.startSimulation();
 
     const updatedState = { ...simulationState, isPaused: false };
     saveSimulationState(updatedState);
