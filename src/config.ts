@@ -1,5 +1,5 @@
 
-export const KUCOIN_PROXY_BASE = '/images/kucoin-proxy.php?path=';
+export const KUCOIN_PROXY_BASE = 'https://astra1623.startdedicated.de/images/kucoin-proxy.php?path=';
 
 // Memory cache for API keys with TTL
 interface ApiKeyCache {
