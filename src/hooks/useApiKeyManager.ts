@@ -1,9 +1,8 @@
-
 import { useState, useCallback } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { ApiKeys } from '@/types/appState';
 import { storageUtils, STORAGE_KEYS } from '@/utils/appStorage';
-import { testApiKey } from '@/utils/openRouterApi';
+import { testApiKey } from '@/utils/openRouter';
 
 export const useApiKeyManager = () => {
   const [apiKeys, setApiKeys] = useState<ApiKeys | null>(null);

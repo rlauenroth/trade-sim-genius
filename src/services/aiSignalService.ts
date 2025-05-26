@@ -1,6 +1,6 @@
 
 // AI Signal Generation Service with Demo Mode Support
-import { sendAIRequest, createScreeningPrompt, createAnalysisPrompt, testApiKey, OpenRouterError } from '@/utils/openRouterApi';
+import { sendAIRequest, createScreeningPrompt, createAnalysisPrompt, testApiKey, OpenRouterError } from '@/utils/openRouter';
 import { getMarketTickers, getHistoricalCandles, getCurrentPrice } from '@/utils/kucoinApi';
 import { calculateAllIndicators } from '@/utils/technicalIndicators';
 
