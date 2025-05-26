@@ -1,13 +1,12 @@
-
 // AI Signal Generation Service
 import { sendAIRequest, createScreeningPrompt, createAnalysisPrompt } from '@/utils/openRouterApi';
 import { getMarketTickers, getHistoricalCandles, getCurrentPrice } from '@/utils/kucoinApi';
 import { calculateAllIndicators } from '@/utils/technicalIndicators';
 
 interface KuCoinCredentials {
-  apiKey: string;
-  apiSecret: string;
-  passphrase: string;
+  kucoinApiKey: string;
+  kucoinApiSecret: string;
+  kucoinApiPassphrase: string;
 }
 
 interface SignalGenerationParams {
