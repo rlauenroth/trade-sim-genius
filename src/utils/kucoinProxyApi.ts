@@ -14,15 +14,18 @@ export async function kucoinFetch(
     throw new ProxyError('No API keys available');
   }
 
+  // Ensure path starts with forward slash
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+
   const qs = Object.entries(query)
     .filter(([, v]) => v !== undefined)
     .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
     .join('&');
 
-  const url = `${KUCOIN_PROXY_BASE}${path}${qs ? (path.includes('?') ? '&' : '?') + qs : ''}`;
+  const url = `${KUCOIN_PROXY_BASE}${normalizedPath}${qs ? (normalizedPath.includes('?') ? '&' : '?') + qs : ''}`;
 
   const timestamp = Date.now().toString();
-  const requestPath = `/${path}`;
+  const requestPath = normalizedPath;
   const signature = await signKuCoinRequest(timestamp, method, requestPath, body, keys.secret);
 
   try {
@@ -56,9 +59,9 @@ export async function kucoinFetch(
   }
 }
 
-// Refactored API methods using the new proxy
+// Refactored API methods using the new proxy with correct paths
 export async function getMarketTickers() {
-  const response = await kucoinFetch('api/v1/market/allTickers');
+  const response = await kucoinFetch('/api/v1/market/allTickers');
   
   if (response.code === '200000' && response.data?.ticker) {
     return response.data.ticker.map((ticker: any) => ({
@@ -80,7 +83,7 @@ export async function getMarketTickers() {
 }
 
 export async function getCurrentPrice(symbol: string): Promise<number> {
-  const response = await kucoinFetch('api/v1/market/ticker', 'GET', { symbol });
+  const response = await kucoinFetch('/api/v1/market/ticker', 'GET', { symbol });
   
   if (response.code === '200000' && response.data?.price) {
     return parseFloat(response.data.price);
@@ -90,7 +93,7 @@ export async function getCurrentPrice(symbol: string): Promise<number> {
 }
 
 export async function getAccountBalances() {
-  const response = await kucoinFetch('api/v1/accounts');
+  const response = await kucoinFetch('/api/v1/accounts');
   
   if (response.code === '200000' && Array.isArray(response.data)) {
     return response.data.map((account: any) => ({
@@ -114,7 +117,7 @@ export async function getHistoricalCandles(
   if (startAt) query.startAt = startAt;
   if (endAt) query.endAt = endAt;
 
-  const response = await kucoinFetch('api/v1/market/candles', 'GET', query);
+  const response = await kucoinFetch('/api/v1/market/candles', 'GET', query);
   
   if (response.code === '200000' && Array.isArray(response.data)) {
     return response.data.map((candle: string[]) => ({
@@ -131,13 +134,13 @@ export async function getHistoricalCandles(
   throw new ApiError(new Response(JSON.stringify(response), { status: 400 }));
 }
 
-// Proxy connection test
+// Proxy connection test with correct path
 export async function testProxyConnection(): Promise<boolean> {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
     
-    const response = await fetch(`${KUCOIN_PROXY_BASE}api/v1/status`, {
+    const response = await fetch(`${KUCOIN_PROXY_BASE}/api/v1/status`, {
       method: 'HEAD',
       signal: controller.signal
     });

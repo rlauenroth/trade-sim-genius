@@ -28,8 +28,8 @@ class ApiModeService {
   async detectCorsSupport(): Promise<boolean> {
     try {
       console.log('🔍 Testing proxy connection for KuCoin API...');
-      // Use proxy instead of direct KuCoin API call
-      const response = await fetch(`${KUCOIN_PROXY_BASE}api/v1/timestamp`, {
+      // Use proxy instead of direct KuCoin API call with correct leading slash
+      const response = await fetch(`${KUCOIN_PROXY_BASE}/api/v1/timestamp`, {
         method: 'GET'
       });
       
