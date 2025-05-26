@@ -60,16 +60,26 @@ export const useAuthManager = () => {
       const decryptedData = await decryptData(encryptedKeys, password, salt);
       const apiKeys = JSON.parse(decryptedData);
       
-      console.log('useAuthManager: Setting decrypted API keys and state...');
+      console.log('useAuthManager: Setting decrypted API keys...');
       setDecryptedApiKeys(apiKeys);
       setIsFirstTimeAfterSetup(false);
       
-      // Set isUnlocked BEFORE setting isLoading to false - this is critical for proper state flow
       console.log('useAuthManager: Setting isUnlocked to true...');
       setIsUnlocked(true);
       
+      // Add a small delay to ensure state updates are processed
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
       console.log('useAuthManager: Setting isLoading to false...');
       setIsLoading(false);
+      
+      // Trigger a custom event to notify components about the unlock
+      setTimeout(() => {
+        console.log('useAuthManager: Dispatching unlock success event');
+        window.dispatchEvent(new CustomEvent('unlockSuccess', { 
+          detail: { isUnlocked: true, apiKeys } 
+        }));
+      }, 100);
       
       toast({
         title: "App entsperrt",

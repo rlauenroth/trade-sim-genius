@@ -35,13 +35,50 @@ const Index = () => {
     });
   }, [isSetupComplete, isUnlocked, isLoading, forceRerender]);
 
-  // Force rerender when unlock state changes to ensure proper navigation
+  // Force rerender when unlock state changes
   useEffect(() => {
     if (isUnlocked) {
       console.log('Index: isUnlocked is true, forcing rerender to show dashboard...');
       setForceRerender(prev => prev + 1);
     }
   }, [isUnlocked]);
+
+  // Listen for custom navigation events
+  useEffect(() => {
+    const handleForceNavigationCheck = () => {
+      console.log('Index: Force navigation check triggered');
+      setForceRerender(prev => prev + 1);
+      
+      // Double-check the state and force render
+      setTimeout(() => {
+        setForceRerender(prev => prev + 1);
+      }, 100);
+    };
+
+    const handleForceAppRerender = () => {
+      console.log('Index: Force app rerender triggered');
+      setForceRerender(prev => prev + 1);
+    };
+
+    window.addEventListener('forceNavigationCheck', handleForceNavigationCheck);
+    window.addEventListener('forceAppRerender', handleForceAppRerender);
+
+    return () => {
+      window.removeEventListener('forceNavigationCheck', handleForceNavigationCheck);
+      window.removeEventListener('forceAppRerender', handleForceAppRerender);
+    };
+  }, []);
+
+  // Additional effect to ensure proper navigation after unlock
+  useEffect(() => {
+    if (isUnlocked && isSetupComplete && !isLoading) {
+      console.log('Index: All conditions met for dashboard, should show dashboard now');
+      // Force one final rerender to ensure we show the dashboard
+      setTimeout(() => {
+        setForceRerender(prev => prev + 1);
+      }, 50);
+    }
+  }, [isUnlocked, isSetupComplete, isLoading]);
 
   // Show loading spinner while loading
   if (isLoading) {

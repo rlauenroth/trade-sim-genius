@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -19,6 +18,12 @@ const UnlockScreen = () => {
     if (isUnlocked) {
       console.log('UnlockScreen: User is now unlocked, setting success state');
       setUnlockSuccess(true);
+      
+      // Set a timer to force parent re-render if needed
+      setTimeout(() => {
+        console.log('UnlockScreen: Timer expired, forcing navigation check');
+        window.dispatchEvent(new CustomEvent('forceNavigationCheck'));
+      }, 1000);
     }
   }, [isUnlocked]);
 
@@ -33,7 +38,6 @@ const UnlockScreen = () => {
     if (!success) {
       setPassword('');
     }
-    // Don't set unlockSuccess here - let the useEffect handle it based on isUnlocked
   };
 
   const handleReset = () => {
@@ -44,14 +48,24 @@ const UnlockScreen = () => {
     }
   };
 
-  // If already unlocked, show success message (Index.tsx should handle the redirect)
+  const handleManualNavigation = () => {
+    console.log('UnlockScreen: Manual navigation button clicked');
+    // Force a state check and navigation
+    window.dispatchEvent(new CustomEvent('forceNavigationCheck'));
+    // Also force a re-render of the parent
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('forceAppRerender'));
+    }, 100);
+  };
+
+  // If already unlocked, show success message with manual navigation option
   if (isUnlocked || unlockSuccess) {
     console.log('UnlockScreen: Showing success state, isUnlocked:', isUnlocked, 'unlockSuccess:', unlockSuccess);
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Card className="w-full max-w-md bg-slate-800 border-slate-700">
           <CardContent className="py-12">
-            <div className="text-center space-y-4">
+            <div className="text-center space-y-6">
               <div className="text-green-400 font-medium">
                 App erfolgreich entsperrt!
               </div>
@@ -59,6 +73,21 @@ const UnlockScreen = () => {
                 Sie werden automatisch zum Dashboard weitergeleitet...
               </div>
               <div className="animate-spin h-6 w-6 border-2 border-green-400 border-t-transparent rounded-full mx-auto"></div>
+              
+              {/* Manual navigation button as fallback */}
+              <div className="pt-4 border-t border-slate-600">
+                <Button 
+                  onClick={handleManualNavigation}
+                  className="w-full bg-blue-600 hover:bg-blue-700"
+                  size="sm"
+                >
+                  <ArrowRight className="h-4 w-4 mr-2" />
+                  Zum Dashboard
+                </Button>
+                <p className="text-slate-400 text-xs mt-2">
+                  Falls die automatische Weiterleitung nicht funktioniert
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
