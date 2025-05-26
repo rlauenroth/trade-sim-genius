@@ -1,6 +1,5 @@
 
 // KuCoin API utilities for market data and portfolio information
-import { createHmac } from 'crypto';
 
 const KUCOIN_BASE_URL = 'https://api.kucoin.com';
 
@@ -41,27 +40,35 @@ interface Candle {
   turnover: string;
 }
 
-// Generate KuCoin API signature
-function generateSignature(
+// Generate KuCoin API signature using Web Crypto API
+async function generateSignature(
   timestamp: string,
   method: string,
   endpoint: string,
   body: string,
   secret: string
-): string {
+): Promise<string> {
   const what = timestamp + method + endpoint + body;
-  return createHmac('sha256', secret).update(what).digest('base64');
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(what));
+  return btoa(String.fromCharCode(...new Uint8Array(signature)));
 }
 
 // Create authenticated headers for KuCoin API
-function createHeaders(
+async function createHeaders(
   credentials: KuCoinCredentials,
   method: string,
   endpoint: string,
   body: string = ''
-): HeadersInit {
+): Promise<HeadersInit> {
   const timestamp = Date.now().toString();
-  const signature = generateSignature(timestamp, method, endpoint, body, credentials.apiSecret);
+  const signature = await generateSignature(timestamp, method, endpoint, body, credentials.apiSecret);
   
   return {
     'KC-API-KEY': credentials.apiKey,
@@ -76,7 +83,7 @@ function createHeaders(
 // Fetch market tickers for screening
 export async function getMarketTickers(credentials: KuCoinCredentials): Promise<MarketTicker[]> {
   const endpoint = '/api/v1/market/allTickers';
-  const headers = createHeaders(credentials, 'GET', endpoint);
+  const headers = await createHeaders(credentials, 'GET', endpoint);
   
   const response = await fetch(`${KUCOIN_BASE_URL}${endpoint}`, {
     method: 'GET',
@@ -94,7 +101,7 @@ export async function getMarketTickers(credentials: KuCoinCredentials): Promise<
 // Fetch account balances
 export async function getAccountBalances(credentials: KuCoinCredentials): Promise<AccountBalance[]> {
   const endpoint = '/api/v1/accounts';
-  const headers = createHeaders(credentials, 'GET', endpoint);
+  const headers = await createHeaders(credentials, 'GET', endpoint);
   
   const response = await fetch(`${KUCOIN_BASE_URL}${endpoint}`, {
     method: 'GET',
@@ -126,7 +133,7 @@ export async function getHistoricalCandles(
   if (endAt) params.append('endAt', endAt.toString());
   
   const endpoint = `/api/v1/market/candles?${params.toString()}`;
-  const headers = createHeaders(credentials, 'GET', endpoint);
+  const headers = await createHeaders(credentials, 'GET', endpoint);
   
   const response = await fetch(`${KUCOIN_BASE_URL}${endpoint}`, {
     method: 'GET',
@@ -155,7 +162,7 @@ export async function getHistoricalCandles(
 // Get current price for a specific symbol
 export async function getCurrentPrice(credentials: KuCoinCredentials, symbol: string): Promise<number> {
   const endpoint = `/api/v1/market/orderbook/level1?symbol=${symbol}`;
-  const headers = createHeaders(credentials, 'GET', endpoint);
+  const headers = await createHeaders(credentials, 'GET', endpoint);
   
   const response = await fetch(`${KUCOIN_BASE_URL}${endpoint}`, {
     method: 'GET',
