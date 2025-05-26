@@ -1,6 +1,6 @@
 
 import { useState, useCallback } from 'react';
-import { getAccountBalances } from '@/utils/kucoinApi';
+import { getAccountBalances, getCurrentPrice } from '@/utils/kucoinApi';
 import { toast } from '@/hooks/use-toast';
 
 interface PortfolioAsset {
@@ -31,6 +31,7 @@ export const usePortfolioData = () => {
     setError(null);
 
     try {
+      console.log('Lade Portfolio-Daten von KuCoin...');
       const balances = await getAccountBalances(credentials);
       
       // Filter out zero balances and convert to our format
@@ -42,10 +43,38 @@ export const usePortfolioData = () => {
           available: parseFloat(balance.available)
         }));
 
-      // For now, calculate a simple total assuming USDT equivalency
-      // In a real app, you'd fetch current prices and convert
-      const usdtBalance = assets.find(asset => asset.currency === 'USDT')?.balance || 0;
-      const totalValue = Math.max(usdtBalance, 10000); // Minimum 10k for simulation
+      console.log(`${assets.length} Assets mit Guthaben gefunden:`, assets);
+
+      // Calculate USD value for major assets
+      let totalValue = 0;
+      
+      // USDT value directly
+      const usdtAsset = assets.find(asset => asset.currency === 'USDT');
+      if (usdtAsset) {
+        usdtAsset.usdValue = usdtAsset.balance;
+        totalValue += usdtAsset.balance;
+      }
+
+      // For other major cryptocurrencies, try to get current price
+      const majorCryptos = ['BTC', 'ETH', 'BNB', 'ADA', 'SOL', 'DOT'];
+      for (const asset of assets.filter(a => majorCryptos.includes(a.currency))) {
+        try {
+          const price = await getCurrentPrice(credentials, `${asset.currency}-USDT`);
+          asset.usdValue = asset.balance * price;
+          totalValue += asset.usdValue;
+          console.log(`${asset.currency}: $${asset.usdValue.toFixed(2)} (${asset.balance} * $${price})`);
+        } catch (priceError) {
+          console.warn(`Preis für ${asset.currency} konnte nicht abgerufen werden:`, priceError);
+          // Fallback: Assume 0 USD value for unknown assets
+          asset.usdValue = 0;
+        }
+      }
+
+      // Ensure minimum portfolio value for simulation purposes
+      if (totalValue < 1000) {
+        console.log(`Portfolio-Wert von $${totalValue} zu niedrig für Simulation. Setze Mindestwert von $10,000.`);
+        totalValue = 10000;
+      }
 
       const portfolioData: PortfolioData = {
         assets,
@@ -56,17 +85,31 @@ export const usePortfolioData = () => {
       setPortfolioData(portfolioData);
       
       toast({
-        title: "Portfolio geladen",
-        description: `Portfolio-Wert: $${totalValue.toLocaleString()}`,
+        title: "Portfolio erfolgreich geladen",
+        description: `Gesamtwert: $${totalValue.toLocaleString()} aus ${assets.length} Assets`,
       });
 
+      console.log('Portfolio-Daten erfolgreich geladen:', portfolioData);
+
     } catch (error) {
-      console.error('Error loading portfolio:', error);
-      const errorMessage = 'Fehler beim Laden der Portfolio-Daten. Bitte prüfen Sie Ihre API-Schlüssel.';
+      console.error('Fehler beim Laden der Portfolio-Daten:', error);
+      
+      let errorMessage = 'Fehler beim Laden der Portfolio-Daten.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('401') || error.message.includes('403')) {
+          errorMessage = 'Ungültige API-Schlüssel. Bitte überprüfen Sie Ihre KuCoin API-Zugangsdaten.';
+        } else if (error.message.includes('Network') || error.message.includes('fetch')) {
+          errorMessage = 'Netzwerkfehler. Bitte überprüfen Sie Ihre Internetverbindung.';
+        } else {
+          errorMessage = `API-Fehler: ${error.message}`;
+        }
+      }
+      
       setError(errorMessage);
       
       toast({
-        title: "Portfolio-Fehler",
+        title: "Portfolio-Ladefehler",
         description: errorMessage,
         variant: "destructive"
       });
@@ -80,11 +123,17 @@ export const usePortfolioData = () => {
     setError(null);
   }, []);
 
+  const refreshPortfolioData = useCallback(async (credentials: any) => {
+    console.log('Portfolio-Daten werden aktualisiert...');
+    await loadPortfolioData(credentials);
+  }, [loadPortfolioData]);
+
   return {
     portfolioData,
     isLoading,
     error,
     loadPortfolioData,
-    clearPortfolioData
+    clearPortfolioData,
+    refreshPortfolioData
   };
 };

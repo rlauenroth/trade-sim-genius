@@ -4,9 +4,9 @@
 const KUCOIN_BASE_URL = 'https://api.kucoin.com';
 
 interface KuCoinCredentials {
-  apiKey: string;
-  apiSecret: string;
-  passphrase: string;
+  kucoinApiKey: string;
+  kucoinApiSecret: string;
+  kucoinApiPassphrase: string;
 }
 
 interface MarketTicker {
@@ -68,13 +68,13 @@ async function createHeaders(
   body: string = ''
 ): Promise<HeadersInit> {
   const timestamp = Date.now().toString();
-  const signature = await generateSignature(timestamp, method, endpoint, body, credentials.apiSecret);
+  const signature = await generateSignature(timestamp, method, endpoint, body, credentials.kucoinApiSecret);
   
   return {
-    'KC-API-KEY': credentials.apiKey,
+    'KC-API-KEY': credentials.kucoinApiKey,
     'KC-API-SIGN': signature,
     'KC-API-TIMESTAMP': timestamp,
-    'KC-API-PASSPHRASE': credentials.passphrase,
+    'KC-API-PASSPHRASE': credentials.kucoinApiPassphrase,
     'KC-API-KEY-VERSION': '2',
     'Content-Type': 'application/json'
   };
@@ -175,4 +175,49 @@ export async function getCurrentPrice(credentials: KuCoinCredentials, symbol: st
   
   const data = await response.json();
   return parseFloat(data.data?.price || '0');
+}
+
+// Get portfolio summary with total USD value
+export async function getPortfolioSummary(credentials: KuCoinCredentials): Promise<{
+  totalUSDValue: number;
+  assets: Array<{
+    currency: string;
+    balance: number;
+    usdValue: number;
+  }>;
+}> {
+  const balances = await getAccountBalances(credentials);
+  const assets = [];
+  let totalUSDValue = 0;
+
+  for (const balance of balances) {
+    const balanceAmount = parseFloat(balance.balance);
+    if (balanceAmount > 0) {
+      let usdValue = 0;
+      
+      if (balance.currency === 'USDT') {
+        usdValue = balanceAmount;
+      } else {
+        try {
+          const price = await getCurrentPrice(credentials, `${balance.currency}-USDT`);
+          usdValue = balanceAmount * price;
+        } catch (error) {
+          console.warn(`Could not get price for ${balance.currency}:`, error);
+        }
+      }
+      
+      assets.push({
+        currency: balance.currency,
+        balance: balanceAmount,
+        usdValue
+      });
+      
+      totalUSDValue += usdValue;
+    }
+  }
+
+  return {
+    totalUSDValue,
+    assets
+  };
 }
