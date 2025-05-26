@@ -1,6 +1,8 @@
 
 import { useEffect } from 'react';
 import { useActivityLog } from './useActivityLog';
+import { setActivityLogger, testProxyConnection } from '@/utils/kucoinProxyApi';
+import { apiModeService } from '@/services/apiModeService';
 
 interface TradingDashboardEffectsProps {
   isFirstTimeAfterSetup: boolean;
@@ -19,7 +21,46 @@ export const useTradingDashboardEffects = ({
   completeFirstTimeSetup,
   startSimulation
 }: TradingDashboardEffectsProps) => {
-  const { addLogEntry } = useActivityLog();
+  const { 
+    addLogEntry, 
+    addKucoinSuccessLog, 
+    addKucoinErrorLog, 
+    addProxyStatusLog 
+  } = useActivityLog();
+
+  // Initialize activity logger for kucoinProxyApi
+  useEffect(() => {
+    setActivityLogger({
+      addKucoinSuccessLog,
+      addKucoinErrorLog,
+      addProxyStatusLog
+    });
+  }, [addKucoinSuccessLog, addKucoinErrorLog, addProxyStatusLog]);
+
+  // Initialize API modes and test proxy connection on mount
+  useEffect(() => {
+    const initializeApiServices = async () => {
+      addLogEntry('INFO', 'Initialisiere API-Services...');
+      
+      try {
+        // Initialize API mode service
+        await apiModeService.initializeApiModes();
+        addLogEntry('SUCCESS', 'API-Modi erfolgreich initialisiert');
+        
+        // Test proxy connection explicitly
+        const isProxyConnected = await testProxyConnection();
+        if (isProxyConnected) {
+          addLogEntry('SUCCESS', 'KuCoin Proxy erfolgreich verbunden');
+        } else {
+          addLogEntry('WARNING', 'KuCoin Proxy nicht erreichbar - verwende Mock-Daten');
+        }
+      } catch (error) {
+        addLogEntry('ERROR', `Fehler bei API-Initialisierung: ${error.message}`);
+      }
+    };
+
+    initializeApiServices();
+  }, [addLogEntry]);
 
   // Load portfolio data on first mount for new users
   useEffect(() => {
@@ -42,6 +83,7 @@ export const useTradingDashboardEffects = ({
     if (isFirstTimeAfterSetup) {
       completeFirstTimeSetup();
     }
+    addLogEntry('INFO', 'Trading-Simulation gestartet');
     startSimulation();
   };
 
@@ -50,8 +92,7 @@ export const useTradingDashboardEffects = ({
     if (isFirstTimeAfterSetup) {
       completeFirstTimeSetup();
     }
-    // TODO: Implement settings modal/page
-    addLogEntry('INFO', 'Einstellungen geöffnet (noch nicht implementiert)');
+    addLogEntry('INFO', 'Einstellungen geöffnet');
   };
 
   return {

@@ -5,6 +5,9 @@ interface NetworkStatus {
   isProxyReachable: boolean;
   rateLimitActive: boolean;
   rateLimitRetryAfter: number;
+  lastApiCall: string | null; // Track which API was called last
+  totalSuccessfulCalls: number;
+  totalErrorCalls: number;
 }
 
 class NetworkStatusService {
@@ -13,7 +16,10 @@ class NetworkStatusService {
     lastError: null,
     isProxyReachable: true,
     rateLimitActive: false,
-    rateLimitRetryAfter: 0
+    rateLimitRetryAfter: 0,
+    lastApiCall: null,
+    totalSuccessfulCalls: 0,
+    totalErrorCalls: 0
   };
 
   private listeners: ((status: NetworkStatus) => void)[] = [];
@@ -32,16 +38,25 @@ class NetworkStatusService {
     };
   }
 
-  recordSuccessfulCall() {
+  recordSuccessfulCall(apiEndpoint?: string) {
     this.status.lastSuccessfulCall = Date.now();
     this.status.lastError = null;
     this.status.rateLimitActive = false;
     this.status.rateLimitRetryAfter = 0;
+    this.status.isProxyReachable = true;
+    this.status.totalSuccessfulCalls++;
+    if (apiEndpoint) {
+      this.status.lastApiCall = apiEndpoint;
+    }
     this.notifyListeners();
   }
 
-  recordError(error: Error) {
+  recordError(error: Error, apiEndpoint?: string) {
     this.status.lastError = error.message;
+    this.status.totalErrorCalls++;
+    if (apiEndpoint) {
+      this.status.lastApiCall = apiEndpoint;
+    }
     
     if (error.name === 'RateLimitError') {
       this.status.rateLimitActive = true;
@@ -55,6 +70,14 @@ class NetworkStatusService {
 
   recordProxyStatus(isReachable: boolean) {
     this.status.isProxyReachable = isReachable;
+    this.notifyListeners();
+  }
+
+  setInitialProxyStatus(isReachable: boolean) {
+    this.status.isProxyReachable = isReachable;
+    if (isReachable) {
+      this.status.lastSuccessfulCall = Date.now();
+    }
     this.notifyListeners();
   }
 

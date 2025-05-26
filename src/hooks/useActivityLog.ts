@@ -43,10 +43,39 @@ export const useActivityLog = () => {
     addLogEntry(type, message, 'KuCoin via PHP-Proxy');
   }, [addLogEntry]);
 
+  const addKucoinSuccessLog = useCallback((endpoint: string, message?: string) => {
+    const logMessage = message || `KuCoin API erfolgreich: ${endpoint}`;
+    addKucoinLogEntry('SUCCESS', logMessage);
+  }, [addKucoinLogEntry]);
+
+  const addKucoinErrorLog = useCallback((endpoint: string, error: Error) => {
+    const logMessage = `KuCoin API Fehler ${endpoint}: ${error.message}`;
+    addKucoinLogEntry('ERROR', logMessage);
+  }, [addKucoinLogEntry]);
+
+  const addOpenRouterLog = useCallback((
+    type: ActivityLogEntry['type'], 
+    message: string
+  ) => {
+    addLogEntry(type, message, 'OpenRouter AI');
+  }, [addLogEntry]);
+
+  const addProxyStatusLog = useCallback((isConnected: boolean) => {
+    const message = isConnected 
+      ? 'PHP-Proxy erfolgreich verbunden'
+      : 'PHP-Proxy Verbindung fehlgeschlagen';
+    const type = isConnected ? 'SUCCESS' : 'ERROR';
+    addLogEntry(type, message, 'Proxy-Test');
+  }, [addLogEntry]);
+
   return {
     activityLog,
     loadActivityLog,
     addLogEntry,
-    addKucoinLogEntry
+    addKucoinLogEntry,
+    addKucoinSuccessLog,
+    addKucoinErrorLog,
+    addOpenRouterLog,
+    addProxyStatusLog
   };
 };
