@@ -21,6 +21,7 @@ export const useAppState = () => {
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
+  const [isFirstTimeAfterSetup, setIsFirstTimeAfterSetup] = useState(false);
   const [userSettings, setUserSettings] = useState<UserSettings>({
     tradingStrategy: 'balanced',
     selectedAiModelId: 'anthropic/claude-3.5-sonnet',
@@ -67,6 +68,7 @@ export const useAppState = () => {
       setIsSetupComplete(true);
       setDecryptedApiKeys(apiKeys);
       setIsUnlocked(true);
+      setIsFirstTimeAfterSetup(true);
       
       toast({
         title: "Erfolgreich",
@@ -102,6 +104,7 @@ export const useAppState = () => {
       
       setDecryptedApiKeys(apiKeys);
       setIsUnlocked(true);
+      setIsFirstTimeAfterSetup(false);
       
       toast({
         title: "App entsperrt",
@@ -125,6 +128,7 @@ export const useAppState = () => {
   const lockApp = useCallback(() => {
     setDecryptedApiKeys(null);
     setIsUnlocked(false);
+    setIsFirstTimeAfterSetup(false);
     toast({
       title: "App gesperrt",
       description: "Ihre Daten sind sicher gesperrt.",
@@ -162,11 +166,16 @@ export const useAppState = () => {
     setIsUnlocked(false);
     setDecryptedApiKeys(null);
     setCurrentStep(0);
+    setIsFirstTimeAfterSetup(false);
     
     toast({
       title: "App zurückgesetzt",
       description: "Alle Daten wurden gelöscht. Sie können die App neu einrichten.",
     });
+  }, []);
+
+  const completeFirstTimeSetup = useCallback(() => {
+    setIsFirstTimeAfterSetup(false);
   }, []);
 
   return {
@@ -176,6 +185,7 @@ export const useAppState = () => {
     userSettings,
     decryptedApiKeys,
     isLoading,
+    isFirstTimeAfterSetup,
     setCurrentStep,
     checkSetupStatus,
     loadUserSettings,
@@ -183,6 +193,7 @@ export const useAppState = () => {
     unlockApp,
     lockApp,
     saveUserSettings,
-    resetApp
+    resetApp,
+    completeFirstTimeSetup
   };
 };

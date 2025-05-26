@@ -1,11 +1,10 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertTriangle, Eye, EyeOff, CheckCircle, ArrowRight, ArrowLeft } from 'lucide-react';
+import { AlertTriangle, Eye, EyeOff, CheckCircle, ArrowRight, ArrowLeft, Rocket } from 'lucide-react';
 import { useAppState } from '@/hooks/useAppState';
 import { toast } from '@/hooks/use-toast';
 
@@ -316,7 +315,7 @@ const SetupWizard = () => {
         return (
           <Card className="max-w-2xl mx-auto bg-slate-800 border-slate-700">
             <CardHeader>
-              <CardTitle className="text-white text-center">Einrichtung abgeschlossen!</CardTitle>
+              <CardTitle className="text-white text-center">Einrichtung erfolgreich abgeschlossen!</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6 text-center">
               <div className="flex justify-center">
@@ -325,18 +324,30 @@ const SetupWizard = () => {
               
               <div>
                 <h3 className="text-xl font-semibold text-white mb-2">Willkommen!</h3>
-                <p className="text-slate-300">
-                  Ihre API-Schlüssel wurden sicher verschlüsselt und gespeichert. 
-                  Sie können jetzt mit dem Paper-Trading beginnen.
+                <p className="text-slate-300 mb-4">
+                  Ihre API-Schlüssel wurden mit Ihrem Sicherheitspasswort verschlüsselt und 
+                  sicher im lokalen Speicher Ihres Browsers abgelegt.
+                </p>
+                <p className="text-slate-400 text-sm">
+                  Sie können jetzt mit dem Paper-Trading beginnen. Die App lädt zunächst 
+                  Ihre aktuellen Portfolio-Daten von KuCoin.
                 </p>
               </div>
               
               <div className="bg-green-900/30 border border-green-600 rounded-lg p-4">
                 <p className="text-green-200 text-sm">
-                  Die App ist jetzt einsatzbereit. Alle Trades werden simuliert - 
-                  kein echtes Geld ist gefährdet.
+                  Alle Trades werden simuliert - kein echtes Geld ist gefährdet.
                 </p>
               </div>
+
+              <Button 
+                onClick={() => window.location.reload()} 
+                className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-3"
+                size="lg"
+              >
+                <Rocket className="mr-2 h-5 w-5" />
+                Zur App starten
+              </Button>
             </CardContent>
           </Card>
         );
