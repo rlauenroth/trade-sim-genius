@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,21 +13,27 @@ const UnlockScreen = () => {
   const [showResetWarning, setShowResetWarning] = useState(false);
   const [unlockSuccess, setUnlockSuccess] = useState(false);
 
+  // Monitor unlock state changes
+  useEffect(() => {
+    console.log('UnlockScreen: isUnlocked changed to:', isUnlocked);
+    if (isUnlocked) {
+      console.log('UnlockScreen: User is now unlocked, setting success state');
+      setUnlockSuccess(true);
+    }
+  }, [isUnlocked]);
+
   const handleUnlock = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!password) return;
     
+    console.log('UnlockScreen: Attempting to unlock...');
     const success = await unlockApp(password);
-    if (success) {
-      setUnlockSuccess(true);
-    } else {
+    console.log('UnlockScreen: Unlock result:', success);
+    
+    if (!success) {
       setPassword('');
     }
-  };
-
-  const handleManualRedirect = () => {
-    console.log('Manual redirect to dashboard triggered');
-    window.location.reload(); // Force a complete reload to ensure state is updated
+    // Don't set unlockSuccess here - let the useEffect handle it based on isUnlocked
   };
 
   const handleReset = () => {
@@ -37,6 +43,28 @@ const UnlockScreen = () => {
       setShowResetWarning(true);
     }
   };
+
+  // If already unlocked, show success message (Index.tsx should handle the redirect)
+  if (isUnlocked || unlockSuccess) {
+    console.log('UnlockScreen: Showing success state, isUnlocked:', isUnlocked, 'unlockSuccess:', unlockSuccess);
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="w-full max-w-md bg-slate-800 border-slate-700">
+          <CardContent className="py-12">
+            <div className="text-center space-y-4">
+              <div className="text-green-400 font-medium">
+                App erfolgreich entsperrt!
+              </div>
+              <div className="text-green-200 text-sm">
+                Sie werden automatisch zum Dashboard weitergeleitet...
+              </div>
+              <div className="animate-spin h-6 w-6 border-2 border-green-400 border-t-transparent rounded-full mx-auto"></div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center justify-center min-h-[60vh]">
@@ -51,26 +79,6 @@ const UnlockScreen = () => {
         </CardHeader>
         
         <CardContent className="space-y-6">
-          {unlockSuccess && (
-            <div className="bg-green-900/30 border border-green-600 rounded-lg p-4">
-              <div className="text-center space-y-3">
-                <div className="text-green-400 font-medium">
-                  App erfolgreich entsperrt!
-                </div>
-                <Button 
-                  onClick={handleManualRedirect}
-                  className="w-full bg-green-600 hover:bg-green-700"
-                >
-                  <ArrowRight className="h-4 w-4 mr-2" />
-                  Zum Dashboard
-                </Button>
-                <p className="text-green-200 text-xs">
-                  Falls Sie nicht automatisch weitergeleitet werden, klicken Sie hier.
-                </p>
-              </div>
-            </div>
-          )}
-
           <form onSubmit={handleUnlock} className="space-y-4">
             <div>
               <Label htmlFor="password" className="text-slate-300">
@@ -84,70 +92,67 @@ const UnlockScreen = () => {
                 className="bg-slate-700 border-slate-600 text-white"
                 placeholder="Ihr Sicherheitspasswort eingeben"
                 autoFocus
-                disabled={unlockSuccess}
               />
             </div>
             
             <Button 
               type="submit" 
               className="w-full bg-blue-600 hover:bg-blue-700"
-              disabled={!password || isLoading || unlockSuccess}
+              disabled={!password || isLoading}
             >
               {isLoading ? 'Entsperren...' : 'App entsperren'}
             </Button>
           </form>
 
-          {!unlockSuccess && (
-            <div className="border-t border-slate-600 pt-4">
-              <div className="text-center">
-                <p className="text-slate-400 text-sm mb-2">
-                  Passwort vergessen?
-                </p>
-                
-                {!showResetWarning ? (
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={handleReset}
-                    className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
-                  >
-                    App zurücksetzen
-                  </Button>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="bg-red-900/30 border border-red-600 rounded-lg p-3">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <AlertTriangle className="h-4 w-4 text-red-400" />
-                        <span className="font-medium text-red-400 text-sm">Warnung</span>
-                      </div>
-                      <p className="text-red-200 text-xs">
-                        Dies löscht alle gespeicherten API-Schlüssel und Einstellungen unwiderruflich.
-                      </p>
+          <div className="border-t border-slate-600 pt-4">
+            <div className="text-center">
+              <p className="text-slate-400 text-sm mb-2">
+                Passwort vergessen?
+              </p>
+              
+              {!showResetWarning ? (
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={handleReset}
+                  className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                >
+                  App zurücksetzen
+                </Button>
+              ) : (
+                <div className="space-y-3">
+                  <div className="bg-red-900/30 border border-red-600 rounded-lg p-3">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <AlertTriangle className="h-4 w-4 text-red-400" />
+                      <span className="font-medium text-red-400 text-sm">Warnung</span>
                     </div>
-                    
-                    <div className="flex space-x-2">
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => setShowResetWarning(false)}
-                        className="text-slate-400 hover:text-slate-300"
-                      >
-                        Abbrechen
-                      </Button>
-                      <Button 
-                        variant="destructive" 
-                        size="sm"
-                        onClick={handleReset}
-                        className="bg-red-600 hover:bg-red-700"
-                      >
-                        Alles löschen
-                      </Button>
-                    </div>
+                    <p className="text-red-200 text-xs">
+                      Dies löscht alle gespeicherten API-Schlüssel und Einstellungen unwiderruflich.
+                    </p>
                   </div>
-                )}
-              </div>
+                  
+                  <div className="flex space-x-2">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => setShowResetWarning(false)}
+                      className="text-slate-400 hover:text-slate-300"
+                    >
+                      Abbrechen
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      size="sm"
+                      onClick={handleReset}
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      Alles löschen
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </CardContent>
       </Card>
     </div>

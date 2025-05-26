@@ -18,22 +18,34 @@ const Index = () => {
     loadUserSettings 
   } = useAppState();
 
+  const [forceRerender, setForceRerender] = useState(0);
+
   useEffect(() => {
     console.log('Index component mounted, checking setup status...');
     checkSetupStatus();
   }, [checkSetupStatus]);
 
+  // Monitor all state changes for debugging
   useEffect(() => {
     console.log('=== INDEX STATE CHANGE ===', { 
       isSetupComplete, 
       isUnlocked, 
-      isLoading 
+      isLoading,
+      forceRerender
     });
-  }, [isSetupComplete, isUnlocked, isLoading]);
+  }, [isSetupComplete, isUnlocked, isLoading, forceRerender]);
+
+  // Force rerender when unlock state changes to ensure proper navigation
+  useEffect(() => {
+    if (isUnlocked) {
+      console.log('Index: isUnlocked is true, forcing rerender to show dashboard...');
+      setForceRerender(prev => prev + 1);
+    }
+  }, [isUnlocked]);
 
   // Show loading spinner while loading
   if (isLoading) {
-    console.log('Showing loading screen...');
+    console.log('Index: Showing loading screen...');
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         <div className="container mx-auto px-4 py-8">
@@ -59,7 +71,7 @@ const Index = () => {
 
   // Show setup wizard if first time user
   if (!isSetupComplete) {
-    console.log('Showing setup wizard');
+    console.log('Index: Showing setup wizard');
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         <div className="container mx-auto px-4 py-8">
@@ -82,7 +94,7 @@ const Index = () => {
 
   // Show unlock screen if app is locked
   if (!isUnlocked) {
-    console.log('Showing unlock screen');
+    console.log('Index: Showing unlock screen');
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         <div className="container mx-auto px-4 py-8">
@@ -104,7 +116,7 @@ const Index = () => {
   }
 
   // Show main trading dashboard
-  console.log('Showing trading dashboard');
+  console.log('Index: Showing trading dashboard (unlocked and setup complete)');
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <TradingDashboard />

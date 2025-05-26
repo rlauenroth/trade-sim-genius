@@ -20,9 +20,11 @@ export const useAuthManager = () => {
       storageUtils.setItem(STORAGE_KEYS.API_KEYS, encryptedKeys);
       storageUtils.setItem(STORAGE_KEYS.SECURITY_SALT, salt);
       
+      console.log('useAuthManager: Setting decrypted API keys and unlock state after setup');
       setDecryptedApiKeys(apiKeys);
-      setIsUnlocked(true);
       setIsFirstTimeAfterSetup(true);
+      setIsUnlocked(true);
+      setIsLoading(false);
       
       toast({
         title: "Erfolgreich",
@@ -32,14 +34,13 @@ export const useAuthManager = () => {
       return true;
     } catch (error) {
       console.error('Error saving API keys:', error);
+      setIsLoading(false);
       toast({
         title: "Fehler",
         description: "API-Schlüssel konnten nicht gespeichert werden.",
         variant: "destructive"
       });
       return false;
-    } finally {
-      setIsLoading(false);
     }
   }, []);
 
@@ -55,22 +56,27 @@ export const useAuthManager = () => {
         throw new Error('Verschlüsselte Daten nicht gefunden');
       }
       
-      console.log('Decrypting data...');
+      console.log('useAuthManager: Decrypting data...');
       const decryptedData = await decryptData(encryptedKeys, password, salt);
       const apiKeys = JSON.parse(decryptedData);
       
-      console.log('Setting decrypted API keys...');
+      console.log('useAuthManager: Setting decrypted API keys and state...');
       setDecryptedApiKeys(apiKeys);
       setIsFirstTimeAfterSetup(false);
-      setIsLoading(false);
+      
+      // Set isUnlocked BEFORE setting isLoading to false - this is critical for proper state flow
+      console.log('useAuthManager: Setting isUnlocked to true...');
       setIsUnlocked(true);
+      
+      console.log('useAuthManager: Setting isLoading to false...');
+      setIsLoading(false);
       
       toast({
         title: "App entsperrt",
         description: "Willkommen zurück!",
       });
       
-      console.log('=== UNLOCK PROCESS COMPLETED ===');
+      console.log('=== UNLOCK PROCESS COMPLETED - STATE SHOULD BE UNLOCKED ===');
       return true;
       
     } catch (error) {
@@ -86,7 +92,7 @@ export const useAuthManager = () => {
   }, []);
 
   const lockApp = useCallback(() => {
-    console.log('Locking app...');
+    console.log('useAuthManager: Locking app...');
     setDecryptedApiKeys(null);
     setIsUnlocked(false);
     setIsFirstTimeAfterSetup(false);
@@ -97,6 +103,7 @@ export const useAuthManager = () => {
   }, []);
 
   const completeFirstTimeSetup = useCallback(() => {
+    console.log('useAuthManager: Completing first time setup...');
     setIsFirstTimeAfterSetup(false);
   }, []);
 
