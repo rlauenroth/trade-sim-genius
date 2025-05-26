@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { SimulationState } from '@/types/simulation';
@@ -6,6 +5,7 @@ import { useSimulationState } from './useSimulationState';
 import { useActivityLog } from './useActivityLog';
 import { useAISignals } from './useAISignals';
 import { useTradeExecution } from './useTradeExecution';
+import { apiModeService } from '@/services/apiModeService';
 
 export const useSimulation = () => {
   const {
@@ -34,15 +34,30 @@ export const useSimulation = () => {
     ignoreSignal: executeIgnoreSignal
   } = useTradeExecution();
 
-  // Load saved state on mount
+  // Load saved state and initialize API modes on mount
   useEffect(() => {
     loadSimulationState();
     loadActivityLog();
-  }, [loadSimulationState, loadActivityLog]);
+    
+    // Initialize API modes detection
+    apiModeService.initializeApiModes().then(() => {
+      const status = apiModeService.getApiModeStatus();
+      if (status.corsIssuesDetected) {
+        addLogEntry('INFO', 'CORS-Beschränkungen erkannt. App läuft im Hybrid-Modus mit simulierten privaten Daten.');
+      } else {
+        addLogEntry('INFO', 'API-Modi initialisiert. Live-Daten verfügbar für öffentliche Endpunkte.');
+      }
+    });
+  }, [loadSimulationState, loadActivityLog, addLogEntry]);
 
   const startSimulation = useCallback(async () => {
     try {
       addLogEntry('INFO', 'Simulation wird gestartet...');
+      
+      // Check API status before starting
+      const apiStatus = apiModeService.getApiModeStatus();
+      addLogEntry('INFO', `KuCoin API-Modus: ${apiStatus.kucoinMode}`);
+      addLogEntry('INFO', `OpenRouter API-Modus: ${apiStatus.openRouterMode}`);
       
       const mockPortfolioValue = 10000;
       
@@ -65,6 +80,10 @@ export const useSimulation = () => {
       addLogEntry('SUCCESS', 'Simulation erfolgreich gestartet');
       addLogEntry('INFO', `Startkapital: $${mockPortfolioValue.toLocaleString()}`);
       
+      if (apiStatus.corsIssuesDetected) {
+        addLogEntry('INFO', 'Verwende Hybrid-Modus: Live-Marktdaten + simulierte Portfolio-Daten');
+      }
+      
       setTimeout(() => {
         startAISignalGeneration(
           true,
@@ -76,7 +95,7 @@ export const useSimulation = () => {
 
       toast({
         title: "Simulation gestartet",
-        description: "Paper-Trading ist jetzt aktiv. KI-Signalgenerierung startet...",
+        description: `Paper-Trading aktiv im ${apiStatus.kucoinMode}-Modus. KI-Signalgenerierung startet...`,
       });
       
     } catch (error) {

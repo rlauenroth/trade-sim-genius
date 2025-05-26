@@ -15,6 +15,7 @@ import OpenPositions from './TradingDashboard/OpenPositions';
 import ActivityLog from './TradingDashboard/ActivityLog';
 import FirstTimeUserInfo from './TradingDashboard/FirstTimeUserInfo';
 import PortfolioLoadingCard from './TradingDashboard/PortfolioLoadingCard';
+import LiveStatusIndicator from './TradingDashboard/LiveStatusIndicator';
 
 const TradingDashboard = () => {
   const { 
@@ -51,7 +52,7 @@ const TradingDashboard = () => {
 
   const { handleStartSimulation, handleOpenSettings } = useTradingDashboardEffects({
     isFirstTimeAfterSetup,
-    decryptedApiKeys: apiKeys, // renamed from decryptedApiKeys
+    decryptedApiKeys: apiKeys,
     portfolioData,
     loadPortfolioData,
     completeFirstTimeSetup,
@@ -85,12 +86,20 @@ const TradingDashboard = () => {
         />
       )}
 
-      <StrategyInfo 
-        strategy={userSettings.tradingStrategy}
-        aiModel={userSettings.selectedAiModelId}
-        timeElapsed={timeElapsed}
-        isSimulationActive={isSimulationActive}
-      />
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="lg:col-span-3">
+          <StrategyInfo 
+            strategy={userSettings.tradingStrategy}
+            aiModel={userSettings.selectedAiModelId}
+            timeElapsed={timeElapsed}
+            isSimulationActive={isSimulationActive}
+          />
+        </div>
+        
+        <div>
+          <LiveStatusIndicator />
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <PortfolioOverview 
