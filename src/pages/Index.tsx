@@ -18,37 +18,22 @@ const Index = () => {
     loadUserSettings 
   } = useAppState();
 
-  const [isTransitioning, setIsTransitioning] = useState(false);
-
   useEffect(() => {
     console.log('Index component mounted, checking setup status...');
     checkSetupStatus();
   }, [checkSetupStatus]);
 
   useEffect(() => {
-    console.log('App state changed:', { isSetupComplete, isUnlocked, isLoading });
-    
-    if (isSetupComplete && isUnlocked && !isLoading) {
-      console.log('Loading user settings and transitioning to dashboard...');
-      setIsTransitioning(true);
-      loadUserSettings();
-      
-      // Small delay to ensure smooth transition
-      setTimeout(() => {
-        setIsTransitioning(false);
-      }, 500);
-    }
-  }, [isSetupComplete, isUnlocked, isLoading, loadUserSettings]);
+    console.log('=== INDEX STATE CHANGE ===', { 
+      isSetupComplete, 
+      isUnlocked, 
+      isLoading 
+    });
+  }, [isSetupComplete, isUnlocked, isLoading]);
 
-  console.log('Current render state:', { 
-    isSetupComplete, 
-    isUnlocked, 
-    isLoading, 
-    isTransitioning 
-  });
-
-  // Show loading during transition or while unlocking
-  if ((isLoading && isSetupComplete) || isTransitioning) {
+  // Show loading spinner while loading
+  if (isLoading) {
+    console.log('Showing loading screen...');
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         <div className="container mx-auto px-4 py-8">
@@ -58,7 +43,7 @@ const Index = () => {
                 <div className="text-center space-y-4">
                   <Loader2 className="h-8 w-8 animate-spin text-blue-400 mx-auto" />
                   <div className="text-white font-medium">
-                    {isLoading ? 'App wird entsperrt...' : 'Dashboard wird geladen...'}
+                    App wird entsperrt...
                   </div>
                   <div className="text-slate-400 text-sm">
                     Bitte warten Sie einen Moment.

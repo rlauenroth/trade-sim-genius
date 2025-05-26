@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { encryptData, decryptData, generateSalt } from '@/utils/encryption';
@@ -98,7 +97,7 @@ export const useAppState = () => {
   }, []);
 
   const unlockApp = useCallback(async (password: string) => {
-    console.log('Starting unlock process...');
+    console.log('=== UNLOCK PROCESS STARTED ===');
     setIsLoading(true);
     
     try {
@@ -113,46 +112,48 @@ export const useAppState = () => {
       const decryptedData = await decryptData(encryptedKeys, password, salt);
       const apiKeys = JSON.parse(decryptedData);
       
-      console.log('Decryption successful, updating states...');
-      
-      // Update states synchronously
+      console.log('Setting decrypted API keys...');
       setDecryptedApiKeys(apiKeys);
-      setIsFirstTimeAfterSetup(false);
       
-      // Load user settings immediately
+      console.log('Loading user settings...');
       const storedSettings = localStorage.getItem('kiTradingApp_userSettings');
       if (storedSettings) {
         try {
           const parsed = JSON.parse(storedSettings);
           setUserSettings(prev => ({ ...prev, ...parsed }));
-          console.log('User settings loaded during unlock:', parsed);
+          console.log('User settings loaded:', parsed);
         } catch (error) {
-          console.error('Error loading settings during unlock:', error);
+          console.error('Error loading settings:', error);
         }
       }
       
-      // Set unlocked state last to trigger re-render
-      console.log('Setting isUnlocked to true...');
-      setIsUnlocked(true);
+      setIsFirstTimeAfterSetup(false);
       
-      toast({
-        title: "App entsperrt",
-        description: "Willkommen zurück!",
-      });
+      // Small delay to ensure all state updates are processed
+      setTimeout(() => {
+        console.log('Setting isUnlocked to true...');
+        setIsUnlocked(true);
+        setIsLoading(false);
+        
+        toast({
+          title: "App entsperrt",
+          description: "Willkommen zurück!",
+        });
+        
+        console.log('=== UNLOCK PROCESS COMPLETED ===');
+      }, 100);
       
-      console.log('Unlock process completed successfully');
       return true;
       
     } catch (error) {
       console.error('Error unlocking app:', error);
+      setIsLoading(false);
       toast({
         title: "Fehler",
         description: "Falsches Passwort oder beschädigte Daten.",
         variant: "destructive"
       });
       return false;
-    } finally {
-      setIsLoading(false);
     }
   }, []);
 
