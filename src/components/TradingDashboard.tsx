@@ -1,10 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppState } from '@/hooks/useAppState';
 import { useSimulation } from '@/hooks/useSimulation';
 import { usePortfolioData } from '@/hooks/usePortfolioData';
 import { useTradingDashboardData } from '@/hooks/useTradingDashboardData';
 import { useTradingDashboardEffects } from '@/hooks/useTradingDashboardEffects';
+import { useSimGuard } from '@/hooks/useSimGuard';
+import { simReadinessStore } from '@/stores/simReadinessStore';
 import DashboardHeader from './TradingDashboard/DashboardHeader';
 import StrategyInfo from './TradingDashboard/StrategyInfo';
 import PortfolioOverview from './TradingDashboard/PortfolioOverview';
@@ -17,6 +19,7 @@ import FirstTimeUserInfo from './TradingDashboard/FirstTimeUserInfo';
 import PortfolioLoadingCard from './TradingDashboard/PortfolioLoadingCard';
 import LiveStatusIndicator from './TradingDashboard/LiveStatusIndicator';
 import SettingsDrawer from './TradingDashboard/SettingsDrawer';
+import { toast } from '@/hooks/use-toast';
 
 const TradingDashboard = () => {
   const [showSettings, setShowSettings] = useState(false);
@@ -49,6 +52,19 @@ const TradingDashboard = () => {
     currentSignal,
     activityLog
   } = useSimulation();
+
+  const { state: readinessState, isRunningBlocked, reason } = useSimGuard();
+
+  // Show toast when simulation gets auto-paused
+  useEffect(() => {
+    if (isRunningBlocked && simulationState?.isActive && !simulationState?.isPaused) {
+      toast({
+        title: "Simulation pausiert",
+        description: `System nicht bereit: ${reason}`,
+        variant: "destructive"
+      });
+    }
+  }, [isRunningBlocked, simulationState?.isActive, simulationState?.isPaused, reason]);
 
   const {
     timeElapsed,

@@ -6,6 +6,8 @@ import { useActivityLog } from './useActivityLog';
 import { useAISignals } from './useAISignals';
 import { useTradeExecution } from './useTradeExecution';
 import { apiModeService } from '@/services/apiModeService';
+import { simReadinessStore } from '@/stores/simReadinessStore';
+import { useSimGuard } from './useSimGuard';
 
 export const useSimulation = () => {
   const {
@@ -34,10 +36,34 @@ export const useSimulation = () => {
     ignoreSignal: executeIgnoreSignal
   } = useTradeExecution();
 
-  // Load saved state and initialize API modes on mount
+  const { isRunningBlocked, state: readinessState } = useSimGuard();
+
+  // Auto-pause simulation when readiness becomes unstable
+  useEffect(() => {
+    if (isSimulationActive && isRunningBlocked) {
+      addLogEntry('WARNING', 'Simulation automatisch pausiert: System nicht bereit');
+      toast({
+        title: "Simulation pausiert",
+        description: "System nicht bereit - automatisch pausiert",
+        variant: "destructive"
+      });
+      
+      // Pause the simulation
+      if (simulationState) {
+        const updatedState = { ...simulationState, isPaused: true };
+        saveSimulationState(updatedState);
+        setIsSimulationActive(false);
+      }
+    }
+  }, [isSimulationActive, isRunningBlocked, simulationState, saveSimulationState, setIsSimulationActive, addLogEntry]);
+
+  // Load saved state and initialize services on mount
   useEffect(() => {
     loadSimulationState();
     loadActivityLog();
+    
+    // Initialize sim readiness store
+    simReadinessStore.initialize();
     
     // Initialize API modes detection
     apiModeService.initializeApiModes().then(() => {
@@ -53,6 +79,9 @@ export const useSimulation = () => {
   const startSimulation = useCallback(async () => {
     try {
       addLogEntry('INFO', 'Simulation wird gestartet...');
+      
+      // Notify sim readiness store
+      simReadinessStore.startSimulation();
       
       // Check API status before starting
       const apiStatus = apiModeService.getApiModeStatus();
@@ -111,6 +140,9 @@ export const useSimulation = () => {
 
   const stopSimulation = useCallback(() => {
     if (!simulationState) return;
+
+    // Notify sim readiness store
+    simReadinessStore.stopSimulation();
 
     addLogEntry('INFO', 'Simulation wird beendet...');
     

@@ -3,6 +3,7 @@ import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Play, Pause, Square } from 'lucide-react';
+import { useSimGuard } from '@/hooks/useSimGuard';
 
 interface ControlCenterProps {
   isSimulationActive: boolean;
@@ -21,6 +22,20 @@ const ControlCenter = ({
   onResumeSimulation,
   onStopSimulation
 }: ControlCenterProps) => {
+  const { canStart, reason, state } = useSimGuard();
+
+  const handleStartSimulation = () => {
+    if (canStart) {
+      onStartSimulation();
+    }
+  };
+
+  const handleResumeSimulation = () => {
+    if (canStart) {
+      onResumeSimulation();
+    }
+  };
+
   return (
     <Card className="bg-slate-800 border-slate-700">
       <CardHeader>
@@ -28,13 +43,22 @@ const ControlCenter = ({
       </CardHeader>
       <CardContent className="space-y-3">
         {!isSimulationActive ? (
-          <Button 
-            onClick={onStartSimulation} 
-            className="w-full bg-green-600 hover:bg-green-700"
-          >
-            <Play className="mr-2 h-4 w-4" />
-            Simulation starten
-          </Button>
+          <div>
+            <Button 
+              onClick={handleStartSimulation}
+              disabled={!canStart}
+              className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed"
+              title={!canStart ? reason : undefined}
+            >
+              <Play className="mr-2 h-4 w-4" />
+              Simulation starten
+            </Button>
+            {!canStart && (
+              <div className="mt-2 text-xs text-red-400 text-center">
+                {reason}
+              </div>
+            )}
+          </div>
         ) : (
           <div className="space-y-2">
             {!isPaused ? (
@@ -47,13 +71,22 @@ const ControlCenter = ({
                 Pausieren
               </Button>
             ) : (
-              <Button 
-                onClick={onResumeSimulation} 
-                className="w-full bg-blue-600 hover:bg-blue-700"
-              >
-                <Play className="mr-2 h-4 w-4" />
-                Fortsetzen
-              </Button>
+              <div>
+                <Button 
+                  onClick={handleResumeSimulation}
+                  disabled={!canStart}
+                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed"
+                  title={!canStart ? reason : undefined}
+                >
+                  <Play className="mr-2 h-4 w-4" />
+                  Fortsetzen
+                </Button>
+                {!canStart && (
+                  <div className="mt-2 text-xs text-red-400 text-center">
+                    {reason}
+                  </div>
+                )}
+              </div>
             )}
             
             <Button 
