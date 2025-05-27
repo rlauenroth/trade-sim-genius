@@ -23,6 +23,20 @@ export function setActivityLogger(logger: typeof globalActivityLogger) {
   globalActivityLogger = logger;
 }
 
+// Encrypt passphrase using HMAC-SHA256 with secret (KuCoin API v2 requirement)
+async function encryptPassphrase(passphrase: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(passphrase));
+  return btoa(String.fromCharCode(...new Uint8Array(signature)));
+}
+
 // Enhanced error parsing for KuCoin responses
 async function parseKuCoinError(response: Response, requestPath: string, payload?: string): Promise<never> {
   let kucoinData: any = null;
@@ -86,9 +100,13 @@ export async function kucoinFetch(
   const signaturePayload = timestamp + method.toUpperCase() + signaturePath + (body ? JSON.stringify(body) : '');
   
   const signature = await signKuCoinRequest(timestamp, method, signaturePath, body, keys.secret);
+  
+  // Encrypt passphrase with secret key (KuCoin API v2 requirement)
+  const encryptedPassphrase = await encryptPassphrase(keys.passphrase, keys.secret);
 
   try {
     console.log(`🔗 KuCoin API Request: ${method} ${signaturePath}`);
+    console.log(`🔐 Using encrypted passphrase for API v2`);
     
     const res = await fetch(url, {
       method,
@@ -96,7 +114,7 @@ export async function kucoinFetch(
         'KC-API-KEY': keys.apiKey,
         'KC-API-SIGN': signature,
         'KC-API-TIMESTAMP': timestamp,
-        'KC-API-PASSPHRASE': keys.passphrase,
+        'KC-API-PASSPHRASE': encryptedPassphrase,
         'KC-API-KEY-VERSION': '2',
         'Content-Type': 'application/json',
       },
