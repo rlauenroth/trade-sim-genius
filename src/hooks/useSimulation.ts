@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect } from 'react';
 import { Signal } from '@/types/simulation';
 import { useSimulationState } from './useSimulationState';
@@ -97,12 +96,13 @@ export const useSimulation = () => {
     );
 
     // Start exit screening for open positions
-    if (apiKeys?.encryptedOpenRouterKey && userSettings.tradingStrategy) {
+    if (apiKeys?.openRouter && userSettings.tradingStrategy) {
       const currentState = JSON.parse(localStorage.getItem('kiTradingApp_simulationState') || '{}');
       if (currentState && currentState.openPositions?.length > 0) {
         startExitScreening(
           currentState,
-          apiKeys.encryptedOpenRouterKey,
+          userSettings.tradingStrategy,
+          apiKeys,
           updateSimulationState,
           addLogEntry
         );
@@ -159,12 +159,13 @@ export const useSimulation = () => {
     );
 
     // Restart exit screening
-    if (apiKeys?.encryptedOpenRouterKey && userSettings.tradingStrategy) {
+    if (apiKeys?.openRouter && userSettings.tradingStrategy) {
       const currentState = JSON.parse(localStorage.getItem('kiTradingApp_simulationState') || '{}');
       if (currentState && currentState.openPositions?.length > 0) {
         startExitScreening(
           currentState,
-          apiKeys.encryptedOpenRouterKey,
+          userSettings.tradingStrategy,
+          apiKeys,
           updateSimulationState,
           addLogEntry
         );
