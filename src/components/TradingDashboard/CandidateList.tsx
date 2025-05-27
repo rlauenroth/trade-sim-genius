@@ -4,41 +4,51 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, ChevronUp, Info, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { ChevronDown, ChevronUp, Info, TrendingUp, TrendingDown, Minus, Search, Eye } from 'lucide-react';
 import { Candidate } from '@/types/candidate';
 
 interface CandidateListProps {
   candidates: Candidate[];
   maxCandidates?: number;
+  openPositions?: any[];
 }
 
 const CandidateList: React.FC<CandidateListProps> = ({ 
   candidates, 
-  maxCandidates = 5 
+  maxCandidates = 5,
+  openPositions = []
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
 
   const getStatusColor = (candidate: Candidate) => {
     switch (candidate.status) {
       case 'screening':
-        return 'bg-gray-400';
+        return 'bg-yellow-400';
       case 'analyzed':
         return 'bg-blue-400';
       case 'signal':
         if (candidate.signalType === 'BUY') return 'bg-green-400';
         if (candidate.signalType === 'SELL') return 'bg-red-400';
-        if (candidate.signalType === 'HOLD') return 'bg-yellow-400';
+        if (candidate.signalType === 'HOLD') return 'bg-gray-400';
         return 'bg-blue-400';
+      case 'exit-screening':
+        return 'bg-orange-400';
       default:
         return 'bg-gray-400';
     }
   };
 
   const getStatusIcon = (candidate: Candidate) => {
+    if (candidate.status === 'screening') {
+      return <Search className="h-3 w-3 text-yellow-600" />;
+    }
+    if (candidate.status === 'exit-screening') {
+      return <Eye className="h-3 w-3 text-orange-600" />;
+    }
     if (candidate.status === 'signal') {
       if (candidate.signalType === 'BUY') return <TrendingUp className="h-3 w-3 text-green-600" />;
       if (candidate.signalType === 'SELL') return <TrendingDown className="h-3 w-3 text-red-600" />;
-      if (candidate.signalType === 'HOLD') return <Minus className="h-3 w-3 text-yellow-600" />;
+      if (candidate.signalType === 'HOLD') return <Minus className="h-3 w-3 text-gray-600" />;
     }
     return null;
   };
@@ -46,11 +56,13 @@ const CandidateList: React.FC<CandidateListProps> = ({
   const getStatusText = (candidate: Candidate) => {
     switch (candidate.status) {
       case 'screening':
-        return 'Wird analysiert...';
+        return 'Screening läuft...';
       case 'analyzed':
         return 'Analyse abgeschlossen';
       case 'signal':
         return `Signal: ${candidate.signalType}`;
+      case 'exit-screening':
+        return 'Exit-Screening aktiv';
       default:
         return 'Unbekannt';
     }
@@ -65,7 +77,22 @@ const CandidateList: React.FC<CandidateListProps> = ({
     });
   };
 
-  const displayedCandidates = candidates.slice(0, maxCandidates);
+  // Check if candidate has open position
+  const hasOpenPosition = (symbol: string) => {
+    return openPositions.some(pos => 
+      pos.assetPair?.includes(symbol) || pos.assetPair?.startsWith(symbol)
+    );
+  };
+
+  // Enhance candidates with exit-screening status for open positions
+  const enhancedCandidates = candidates.map(candidate => {
+    if (hasOpenPosition(candidate.symbol) && candidate.status === 'signal') {
+      return { ...candidate, status: 'exit-screening' as const };
+    }
+    return candidate;
+  });
+
+  const displayedCandidates = enhancedCandidates.slice(0, maxCandidates);
 
   return (
     <Card className="bg-slate-800 border-slate-700">
@@ -81,7 +108,7 @@ const CandidateList: React.FC<CandidateListProps> = ({
                   </TooltipTrigger>
                   <TooltipContent className="bg-slate-700 border-slate-600">
                     <p className="text-sm text-white">
-                      Zeigt alle Assets, die gerade von der KI analysiert werden
+                      Zeigt alle Assets im AI-Screening-Prozess und Exit-Überwachung
                     </p>
                   </TooltipContent>
                 </Tooltip>
@@ -97,7 +124,7 @@ const CandidateList: React.FC<CandidateListProps> = ({
         
         <CollapsibleContent>
           <CardContent className="pt-0">
-            {candidates.length === 0 ? (
+            {enhancedCandidates.length === 0 ? (
               <div className="text-center py-6">
                 <p className="text-slate-400 text-sm">Keine Kandidaten verfügbar</p>
                 <p className="text-slate-500 text-xs mt-1">
@@ -123,6 +150,9 @@ const CandidateList: React.FC<CandidateListProps> = ({
                             <div>
                               <p className="text-white font-medium text-sm">
                                 {candidate.symbol}
+                                {hasOpenPosition(candidate.symbol) && (
+                                  <span className="ml-2 text-xs text-orange-400">(Position offen)</span>
+                                )}
                               </p>
                               <p className="text-slate-400 text-xs">
                                 {getStatusText(candidate)}
@@ -149,16 +179,19 @@ const CandidateList: React.FC<CandidateListProps> = ({
                             <p><strong>Confidence:</strong> {Math.round(candidate.confidence * 100)}%</p>
                           )}
                           <p><strong>Zeit:</strong> {formatTimestamp(candidate.timestamp)}</p>
+                          {hasOpenPosition(candidate.symbol) && (
+                            <p className="text-orange-400"><strong>Exit-Screening aktiv</strong></p>
+                          )}
                         </div>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                 ))}
                 
-                {candidates.length > maxCandidates && (
+                {enhancedCandidates.length > maxCandidates && (
                   <div className="text-center pt-2">
                     <p className="text-slate-500 text-xs">
-                      +{candidates.length - maxCandidates} weitere Kandidaten
+                      +{enhancedCandidates.length - maxCandidates} weitere Kandidaten
                     </p>
                   </div>
                 )}

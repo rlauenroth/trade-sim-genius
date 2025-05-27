@@ -1,8 +1,13 @@
 
 export interface Candidate {
-  symbol: string;            // e.g. "ETH-USDT"
-  status: 'screening' | 'analyzed' | 'signal';
+  symbol: string;
+  status: 'screening' | 'analyzed' | 'signal' | 'exit-screening';
   signalType?: 'BUY' | 'SELL' | 'HOLD';
-  confidence?: number;       // 0-1
-  timestamp: number;         // when this status was set
+  confidence?: number;
+  timestamp: number;
+  entryPrice?: number;
+  targetPrice?: number;
+  stopLoss?: number;
+  volume?: number;
+  change24h?: number;
 }

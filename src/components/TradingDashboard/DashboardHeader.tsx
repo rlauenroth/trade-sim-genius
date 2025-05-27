@@ -34,7 +34,13 @@ const DashboardHeader = ({ isSimulationActive, isPaused, onLogout, onOpenSetting
           </div>
           <div>
             <h1 className="text-2xl font-bold text-white">KI Trading Assistant</h1>
-            <p className="text-slate-400">Paper-Trading Dashboard</p>
+            <div className="flex items-center space-x-2">
+              <p className="text-slate-400">Paper-Trading Dashboard</p>
+              <span className="text-slate-500">•</span>
+              <Badge variant="outline" className="border-green-500 text-green-400 text-xs">
+                Automatisch ausgeführt
+              </Badge>
+            </div>
           </div>
         </div>
         {getStatusBadge()}

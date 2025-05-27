@@ -1,14 +1,13 @@
+
 import React from 'react';
-import ActivityLog from './ActivityLog';
-import SettingsDrawer from './SettingsDrawer';
-import LoadingErrorStates from './sections/LoadingErrorStates';
+import { Container } from '@/components/ui/container';
 import DashboardHeaderSection from './sections/DashboardHeader';
+import LoadingErrorStates from './sections/LoadingErrorStates';
 import DashboardGrids from './sections/DashboardGrids';
 import DashboardTrading from './sections/DashboardTrading';
-import PerformanceMetrics from './PerformanceMetrics';
+import SettingsDrawer from './SettingsDrawer';
 
 interface DashboardContentProps {
-  // State props
   userSettings: any;
   isFirstTimeAfterSetup: boolean;
   portfolioLoading: boolean;
@@ -22,8 +21,6 @@ interface DashboardContentProps {
   activityLog: any[];
   apiKeys: any;
   candidates: any[];
-  
-  // Display values
   timeElapsed: string;
   displayPortfolioValue: number;
   displayStartValue: number | null;
@@ -32,10 +29,7 @@ interface DashboardContentProps {
   progressValue: number;
   simulationDataForLog: any;
   autoTradeCount?: number;
-  autoModeError?: string;
-  portfolioHealthStatus?: 'HEALTHY' | 'WARNING' | 'CRITICAL';
-  
-  // Handlers
+  portfolioHealthStatus: string;
   logoutAndClearData: () => void;
   handleManualRefresh: () => void;
   handleStartSimulation: () => void;
@@ -44,9 +38,7 @@ interface DashboardContentProps {
   stopSimulation: () => void;
   acceptSignal: () => void;
   ignoreSignal: () => void;
-  retryLoadPortfolioData: (keys: any) => void;
-  
-  // UI state
+  retryLoadPortfolioData: () => void;
   showSettings: boolean;
   setShowSettings: (show: boolean) => void;
 }
@@ -73,8 +65,7 @@ const DashboardContent = ({
   progressValue,
   simulationDataForLog,
   autoTradeCount,
-  autoModeError,
-  portfolioHealthStatus = 'HEALTHY',
+  portfolioHealthStatus,
   logoutAndClearData,
   handleManualRefresh,
   handleStartSimulation,
@@ -87,34 +78,13 @@ const DashboardContent = ({
   showSettings,
   setShowSettings
 }: DashboardContentProps) => {
-  // Check for loading/error states first
-  const loadingErrorComponent = (
-    <LoadingErrorStates
-      isFirstTimeAfterSetup={isFirstTimeAfterSetup}
-      portfolioLoading={portfolioLoading}
-      livePortfolioLoading={livePortfolioLoading}
-      portfolioError={portfolioError}
-      livePortfolioError={livePortfolioError}
-      apiKeys={apiKeys}
-      onRetry={retryLoadPortfolioData}
-    />
-  );
-
-  if (loadingErrorComponent) {
-    const shouldShowLoadingError = 
-      (isFirstTimeAfterSetup && (portfolioLoading || livePortfolioLoading)) ||
-      (isFirstTimeAfterSetup && (portfolioError || livePortfolioError));
-    
-    if (shouldShowLoadingError) {
-      return loadingErrorComponent;
-    }
-  }
+  const isPaused = simulationState?.isPaused;
 
   return (
-    <div className="container mx-auto px-4 py-6 space-y-6">
+    <Container className="py-8 space-y-8">
       <DashboardHeaderSection
         isSimulationActive={isSimulationActive}
-        isPaused={simulationState?.isPaused}
+        isPaused={isPaused}
         isFirstTimeAfterSetup={isFirstTimeAfterSetup}
         livePortfolio={livePortfolio}
         userSettings={userSettings}
@@ -124,49 +94,54 @@ const DashboardContent = ({
         onOpenSettings={() => setShowSettings(true)}
       />
 
+      <LoadingErrorStates
+        portfolioLoading={portfolioLoading}
+        livePortfolioLoading={livePortfolioLoading}
+        portfolioError={portfolioError}
+        livePortfolioError={livePortfolioError}
+        onRetryPortfolio={retryLoadPortfolioData}
+        onRetryLive={handleManualRefresh}
+      />
+
       <DashboardGrids
-        userSettings={userSettings}
-        timeElapsed={timeElapsed}
-        isSimulationActive={isSimulationActive}
-        simulationState={simulationState}
         displayPortfolioValue={displayPortfolioValue}
         displayStartValue={displayStartValue}
         totalPnL={totalPnL}
         totalPnLPercentage={totalPnLPercentage}
         progressValue={progressValue}
-        livePortfolio={livePortfolio}
+        timeElapsed={timeElapsed}
+        portfolioHealthStatus={portfolioHealthStatus}
+        simulationState={simulationState}
+        isSimulationActive={isSimulationActive}
+        isPaused={isPaused}
         onStartSimulation={handleStartSimulation}
         onPauseSimulation={pauseSimulation}
         onResumeSimulation={resumeSimulation}
         onStopSimulation={stopSimulation}
         autoTradeCount={autoTradeCount}
-        autoModeError={autoModeError}
+        candidates={candidates}
+        openPositions={simulationState?.openPositions || []}
+        currentSignal={currentSignal}
+        onAcceptSignal={acceptSignal}
+        onIgnoreSignal={ignoreSignal}
+        activityLog={activityLog}
+        simulationDataForLog={simulationDataForLog}
+        userSettings={userSettings}
+        apiKeys={apiKeys}
       />
 
       <DashboardTrading
-        currentSignal={currentSignal}
-        candidates={candidates}
         simulationState={simulationState}
-        onAcceptSignal={acceptSignal}
-        onIgnoreSignal={ignoreSignal}
+        livePortfolio={livePortfolio}
       />
 
-      {/* Performance Metrics - Only show during active simulation */}
-      {isSimulationActive && (
-        <PerformanceMetrics portfolioHealthStatus={portfolioHealthStatus} />
-      )}
-
-      <ActivityLog 
-        activityLog={activityLog}
-        simulationData={simulationDataForLog}
-      />
-
-      {/* Settings Drawer */}
-      <SettingsDrawer 
+      <SettingsDrawer
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
+        userSettings={userSettings}
+        apiKeys={apiKeys}
       />
-    </div>
+    </Container>
   );
 };
 

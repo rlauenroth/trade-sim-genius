@@ -11,7 +11,7 @@ import LogControls from './ActivityLog/LogControls';
 
 interface ActivityLogEntry {
   timestamp: number;
-  type: 'INFO' | 'AI' | 'TRADE' | 'ERROR' | 'SUCCESS' | 'WARNING' | 'PORTFOLIO_UPDATE' | 'MARKET_DATA' | 'SYSTEM' | 'PERFORMANCE' | 'API' | 'SIM';
+  type: 'INFO' | 'AI' | 'TRADE' | 'ERROR' | 'SUCCESS' | 'WARNING' | 'PORTFOLIO_UPDATE' | 'MARKET_DATA' | 'SYSTEM' | 'PERFORMANCE' | 'API' | 'SIM' | 'EXIT_SCREENING';
   message: string;
   source?: string;
   details?: {
@@ -19,6 +19,13 @@ interface ActivityLogEntry {
     tradeData?: any;
     portfolioData?: any;
     performanceData?: any;
+    apiCall?: {
+      method: string;
+      endpoint: string;
+      duration?: number;
+      status?: number;
+      response?: any;
+    };
   };
   relatedTradeId?: string;
   simulationCycleId?: string;
@@ -52,6 +59,55 @@ const ActivityLog = ({ activityLog, simulationData }: ActivityLogProps) => {
     return unsubscribe;
   }, []);
 
+  // Enhanced log processing for API calls
+  const enhanceLogEntry = (entry: any) => {
+    let enhancedMessage = entry.message;
+    
+    // Add API call details to message if available
+    if (entry.meta?.endpoint) {
+      const method = entry.meta.method || 'GET';
+      const endpoint = entry.meta.endpoint;
+      
+      if (endpoint.includes('/candles')) {
+        enhancedMessage = `CALL ${method} ${endpoint} → OHLCV-Daten für Indikatoren`;
+      } else if (endpoint.includes('/orderbook/level1')) {
+        enhancedMessage = `CALL ${method} ${endpoint} → Aktueller Preis`;
+      } else if (endpoint.includes('/allTickers')) {
+        enhancedMessage = `CALL ${method} ${endpoint} → Bulk-Market-Screening`;
+      } else if (endpoint.includes('/accounts')) {
+        enhancedMessage = `CALL ${method} ${endpoint} → Portfolio-Snapshot`;
+      } else if (endpoint.includes('/timestamp')) {
+        enhancedMessage = `CALL ${method} ${endpoint} → Health Check`;
+      } else {
+        enhancedMessage = `CALL ${method} ${endpoint}`;
+      }
+      
+      // Add response time if available
+      if (entry.meta.duration) {
+        enhancedMessage += ` (${entry.meta.duration}ms)`;
+      }
+    }
+
+    // Add OpenRouter call details
+    if (entry.meta?.openRouterCall) {
+      const callType = entry.meta.callType || 'analysis';
+      if (callType === 'screening') {
+        enhancedMessage = `OpenRouter Bulk-Screening → Top-N Kandidaten`;
+      } else if (callType === 'detail') {
+        enhancedMessage = `OpenRouter Detail-Analyse → Signal generiert`;
+      } else if (callType === 'exit') {
+        enhancedMessage = `OpenRouter Exit-Screening → Position-Bewertung`;
+      } else {
+        enhancedMessage = `OpenRouter ${callType} call`;
+      }
+    }
+
+    return {
+      ...entry,
+      message: enhancedMessage
+    };
+  };
+
   // Combine activity log with central logs
   const combinedLogs = [
     ...activityLog.map(entry => ({ ...entry, source: entry.source || 'Legacy' })),
@@ -60,7 +116,9 @@ const ActivityLog = ({ activityLog, simulationData }: ActivityLogProps) => {
       source: 'Central Logging',
       details: entry.meta ? { meta: entry.meta } : undefined
     }))
-  ].sort((a, b) => a.timestamp - b.timestamp);
+  ]
+    .map(enhanceLogEntry)
+    .sort((a, b) => a.timestamp - b.timestamp);
 
   const filteredLog = filterType === 'all' 
     ? combinedLogs 
@@ -148,7 +206,7 @@ ${entry.source ? `*Quelle: ${entry.source}*` : ''}${metaInfo}`;
         <div className="flex items-center justify-between">
           <CardTitle className="text-white flex items-center space-x-2">
             <Activity className="h-5 w-5" />
-            <span>Comprehensive Logging</span>
+            <span>KI Trading Assistant - Aktivitätsbericht</span>
             {filteredLog.length > 0 && (
               <span className="text-sm text-slate-400 ml-2">
                 ({filteredLog.length} Einträge, {stats.total} total)

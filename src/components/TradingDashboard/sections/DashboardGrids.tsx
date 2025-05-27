@@ -1,101 +1,123 @@
 
 import React from 'react';
-import StrategyInfo from '../StrategyInfo';
-import LiveStatusIndicator from '../LiveStatusIndicator';
 import PortfolioOverviewWithStatus from '../PortfolioOverviewWithStatus';
-import ProgressTracker from '../ProgressTracker';
 import ControlCenter from '../ControlCenter';
-import PortfolioTable from '../PortfolioTable';
+import ProgressTracker from '../ProgressTracker';
+import CandidateList from '../CandidateList';
+import SignalDisplay from '../SignalDisplay';
+import ActivityLog from '../ActivityLog';
+import OpenPositions from '../OpenPositions';
+import PerformanceMetrics from '../PerformanceMetrics';
 
 interface DashboardGridsProps {
-  userSettings: any;
-  timeElapsed: string;
-  isSimulationActive: boolean;
-  simulationState: any;
   displayPortfolioValue: number;
   displayStartValue: number | null;
   totalPnL: number;
   totalPnLPercentage: number;
   progressValue: number;
-  livePortfolio: any;
+  timeElapsed: string;
+  portfolioHealthStatus: string;
+  simulationState: any;
+  isSimulationActive: boolean;
+  isPaused?: boolean;
   onStartSimulation: () => void;
   onPauseSimulation: () => void;
   onResumeSimulation: () => void;
   onStopSimulation: () => void;
   autoTradeCount?: number;
-  autoModeError?: string;
+  candidates: any[];
+  openPositions: any[];
+  currentSignal: any;
+  onAcceptSignal: () => void;
+  onIgnoreSignal: () => void;
+  activityLog: any[];
+  simulationDataForLog: any;
+  userSettings: any;
+  apiKeys: any;
 }
 
 const DashboardGrids = ({
-  userSettings,
-  timeElapsed,
-  isSimulationActive,
-  simulationState,
   displayPortfolioValue,
   displayStartValue,
   totalPnL,
   totalPnLPercentage,
   progressValue,
-  livePortfolio,
+  timeElapsed,
+  portfolioHealthStatus,
+  simulationState,
+  isSimulationActive,
+  isPaused,
   onStartSimulation,
   onPauseSimulation,
   onResumeSimulation,
   onStopSimulation,
   autoTradeCount,
-  autoModeError
+  candidates,
+  openPositions,
+  currentSignal,
+  onAcceptSignal,
+  onIgnoreSignal,
+  activityLog,
+  simulationDataForLog,
+  userSettings,
+  apiKeys
 }: DashboardGridsProps) => {
   return (
-    <>
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-3">
-          <StrategyInfo 
-            strategy={userSettings.tradingStrategy}
-            aiModel={userSettings.selectedAiModelId}
-            timeElapsed={timeElapsed}
-            isSimulationActive={isSimulationActive}
-          />
-        </div>
-        
-        <div>
-          <LiveStatusIndicator />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <PortfolioOverviewWithStatus 
+    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+      {/* Left Column */}
+      <div className="space-y-6">
+        <PortfolioOverviewWithStatus
           currentValue={displayPortfolioValue}
           startValue={displayStartValue}
           totalPnL={totalPnL}
           totalPnLPercentage={totalPnLPercentage}
         />
-
-        <ProgressTracker 
-          startValue={displayStartValue}
-          currentValue={displayPortfolioValue}
-          progressValue={progressValue}
+        
+        <ControlCenter
           isSimulationActive={isSimulationActive}
-        />
-
-        <ControlCenter 
-          isSimulationActive={isSimulationActive}
-          isPaused={simulationState?.isPaused}
+          isPaused={isPaused}
           onStartSimulation={onStartSimulation}
           onPauseSimulation={onPauseSimulation}
           onResumeSimulation={onResumeSimulation}
           onStopSimulation={onStopSimulation}
           autoTradeCount={autoTradeCount}
-          autoModeError={autoModeError}
+        />
+        
+        <ProgressTracker
+          progressValue={progressValue}
+          timeElapsed={timeElapsed}
+          portfolioHealthStatus={portfolioHealthStatus}
         />
       </div>
 
-      {/* Live Portfolio Table - now using centralized data */}
-      {livePortfolio && livePortfolio.positions.length > 0 && (
-        <PortfolioTable 
-          positions={livePortfolio.positions}
-          totalUSDValue={livePortfolio.totalUSDValue}
+      {/* Middle Column */}
+      <div className="space-y-6">
+        <CandidateList 
+          candidates={candidates} 
+          openPositions={openPositions}
         />
-      )}
-    </>
+        
+        <SignalDisplay
+          currentSignal={currentSignal}
+          onAcceptSignal={onAcceptSignal}
+          onIgnoreSignal={onIgnoreSignal}
+        />
+        
+        <PerformanceMetrics simulationState={simulationState} />
+      </div>
+
+      {/* Right Column */}
+      <div className="lg:col-span-2 xl:col-span-1 space-y-6">
+        <ActivityLog
+          activityLog={activityLog}
+          simulationData={simulationDataForLog}
+        />
+        
+        <OpenPositions
+          positions={simulationState?.openPositions || []}
+        />
+      </div>
+    </div>
   );
 };
 
