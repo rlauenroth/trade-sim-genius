@@ -33,7 +33,7 @@ export const useDashboardStateManager = () => {
   const { 
     simulationState, 
     isSimulationActive, 
-    startSimulation: startSimulationWithPortfolio, 
+    startSimulation, 
     stopSimulation, 
     pauseSimulation,
     resumeSimulation,
@@ -56,14 +56,22 @@ export const useDashboardStateManager = () => {
     hasValidSimulation
   } = useTradingDashboardData(simulationState, portfolioData, isSimulationActive);
 
-  const { handleStartSimulation, handleOpenSettings } = useTradingDashboardEffects({
+  // Fix: Change the function signature to match expected type
+  const { handleStartSimulation: originalHandleStartSimulation, handleOpenSettings } = useTradingDashboardEffects({
     isFirstTimeAfterSetup,
     decryptedApiKeys: apiKeys,
     portfolioData,
     loadPortfolioData,
     completeFirstTimeSetup,
-    startSimulation: startSimulationWithPortfolio
+    startSimulation
   });
+
+  // Wrap the original function to match the expected signature
+  const handleStartSimulation = useCallback(() => {
+    if (portfolioData) {
+      originalHandleStartSimulation();
+    }
+  }, [originalHandleStartSimulation, portfolioData]);
 
   // Add handler for manual refresh
   const handleManualRefresh = useCallback(() => {
@@ -105,7 +113,7 @@ export const useDashboardStateManager = () => {
     livePortfolioError,
     simulationState,
     isSimulationActive,
-    startSimulation: startSimulationWithPortfolio,
+    startSimulation,
     stopSimulation,
     pauseSimulation,
     resumeSimulation,

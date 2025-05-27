@@ -30,19 +30,22 @@ export const useSimulation = () => {
 
   const { activityLog, addLogEntry } = useActivityLog();
   const { executeTradeFromSignal } = useTradeExecution();
-  const { validateTradeRisk } = useRiskManagement();
+  // Fix: Provide the required strategy argument
+  const { validateTradeRisk } = useRiskManagement('balanced');
 
   const [aiGenerationTimer, setAiGenerationTimer] = useState<NodeJS.Timeout | null>(null);
 
   // Start simulation with portfolio data
   const startSimulation = useCallback(async (portfolioData: any) => {
     try {
-      loggingService.logEvent('SIMULATION', 'Starting simulation', {
+      // Fix: Use 'SIM' instead of 'SIMULATION' for loggingService
+      loggingService.logEvent('SIM', 'Starting simulation', {
         portfolioValue: portfolioData.totalUSDValue,
         availablePositions: portfolioData.positions.length
       });
 
-      addLogEntry('SIMULATION', `Simulation gestartet mit Portfolio-Wert: $${portfolioData.totalUSDValue.toFixed(2)}`);
+      // Fix: Use 'SIM' instead of 'SIMULATION' for addLogEntry
+      addLogEntry('SIM', `Simulation gestartet mit Portfolio-Wert: $${portfolioData.totalUSDValue.toFixed(2)}`);
       
       // Initialize simulation state
       const initialState = initializeSimulation(portfolioData);
@@ -71,7 +74,8 @@ export const useSimulation = () => {
 
   // Stop simulation
   const stopSimulation = useCallback(() => {
-    loggingService.logEvent('SIMULATION', 'Stopping simulation');
+    // Fix: Use 'SIM' instead of 'SIMULATION'
+    loggingService.logEvent('SIM', 'Stopping simulation');
     
     if (aiGenerationTimer) {
       clearInterval(aiGenerationTimer);
@@ -83,12 +87,14 @@ export const useSimulation = () => {
     setAvailableSignals([]);
     
     stopSimulationState();
-    addLogEntry('SIMULATION', 'Simulation beendet');
+    // Fix: Use 'SIM' instead of 'SIMULATION'
+    addLogEntry('SIM', 'Simulation beendet');
   }, [aiGenerationTimer, setCurrentSignal, setAvailableSignals, stopSimulationState, addLogEntry]);
 
   // Pause simulation
   const pauseSimulation = useCallback(() => {
-    loggingService.logEvent('SIMULATION', 'Pausing simulation');
+    // Fix: Use 'SIM' instead of 'SIMULATION'
+    loggingService.logEvent('SIM', 'Pausing simulation');
     
     if (aiGenerationTimer) {
       clearInterval(aiGenerationTimer);
@@ -96,15 +102,18 @@ export const useSimulation = () => {
     }
     
     pauseSimulationState();
-    addLogEntry('SIMULATION', 'Simulation pausiert');
+    // Fix: Use 'SIM' instead of 'SIMULATION'
+    addLogEntry('SIM', 'Simulation pausiert');
   }, [aiGenerationTimer, pauseSimulationState, addLogEntry]);
 
   // Resume simulation
   const resumeSimulation = useCallback(async () => {
-    loggingService.logEvent('SIMULATION', 'Resuming simulation');
+    // Fix: Use 'SIM' instead of 'SIMULATION'
+    loggingService.logEvent('SIM', 'Resuming simulation');
     
     resumeSimulationState();
-    addLogEntry('SIMULATION', 'Simulation fortgesetzt');
+    // Fix: Use 'SIM' instead of 'SIMULATION'
+    addLogEntry('SIM', 'Simulation fortgesetzt');
     
     // Restart AI signal generation
     if (simulationState) {
@@ -136,7 +145,8 @@ export const useSimulation = () => {
       // Validate risk before executing
       const riskValidation = validateTradeRisk(signal, simulationState);
       if (!riskValidation.isValid) {
-        addLogEntry('RISK', `Trade abgelehnt: ${riskValidation.reason}`);
+        // Fix: Use 'WARNING' instead of 'RISK'
+        addLogEntry('WARNING', `Trade abgelehnt: ${riskValidation.reason}`);
         return;
       }
       
