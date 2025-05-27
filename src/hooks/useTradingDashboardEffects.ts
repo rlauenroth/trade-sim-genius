@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react';
 import { useActivityLog } from './useActivityLog';
 import { setActivityLogger, testProxyConnection } from '@/utils/kucoinProxyApi';
@@ -10,7 +9,7 @@ interface TradingDashboardEffectsProps {
   portfolioData: any;
   loadPortfolioData: (keys: any) => void;
   completeFirstTimeSetup: () => void;
-  startSimulation: () => void;
+  startSimulation: (portfolioData: any) => Promise<void>;
 }
 
 export const useTradingDashboardEffects = ({
@@ -79,12 +78,15 @@ export const useTradingDashboardEffects = ({
     }
   }, [portfolioData, isFirstTimeAfterSetup, addLogEntry]);
 
-  const handleStartSimulation = () => {
+  const handleStartSimulation = async () => {
     if (isFirstTimeAfterSetup) {
       completeFirstTimeSetup();
     }
     addLogEntry('INFO', 'Trading-Simulation gestartet');
-    startSimulation();
+    
+    if (portfolioData) {
+      await startSimulation(portfolioData);
+    }
   };
 
   const handleOpenSettings = () => {

@@ -1,4 +1,3 @@
-
 import { useCallback } from 'react';
 import { useAppState } from '@/hooks/useAppState';
 import { useSimulation } from '@/hooks/useSimulation';
@@ -33,7 +32,7 @@ export const useDashboardStateManager = () => {
   const { 
     simulationState, 
     isSimulationActive, 
-    startSimulation, 
+    startSimulation,
     stopSimulation, 
     pauseSimulation,
     resumeSimulation,
@@ -56,8 +55,7 @@ export const useDashboardStateManager = () => {
     hasValidSimulation
   } = useTradingDashboardData(simulationState, portfolioData, isSimulationActive);
 
-  // Fix: Change the function signature to match expected type
-  const { handleStartSimulation: originalHandleStartSimulation, handleOpenSettings } = useTradingDashboardEffects({
+  const { handleStartSimulation: handleStartSimulationFromEffects, handleOpenSettings } = useTradingDashboardEffects({
     isFirstTimeAfterSetup,
     decryptedApiKeys: apiKeys,
     portfolioData,
@@ -66,12 +64,10 @@ export const useDashboardStateManager = () => {
     startSimulation
   });
 
-  // Wrap the original function to match the expected signature
+  // Use the handleStartSimulation from effects which has the correct signature
   const handleStartSimulation = useCallback(() => {
-    if (portfolioData) {
-      originalHandleStartSimulation();
-    }
-  }, [originalHandleStartSimulation, portfolioData]);
+    handleStartSimulationFromEffects();
+  }, [handleStartSimulationFromEffects]);
 
   // Add handler for manual refresh
   const handleManualRefresh = useCallback(() => {
