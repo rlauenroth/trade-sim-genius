@@ -5,8 +5,7 @@ import { kucoinService } from '@/services/kucoinService';
 import { getCurrentPrice } from '@/utils/kucoinApi';
 import { getStoredKeys } from '@/config';
 import { toast } from '@/hooks/use-toast';
-
-const TTL_MS = 60 * 1000; // 60 seconds
+import { SIM_CONFIG } from '@/services/cacheService';
 
 export const usePortfolioLive = () => {
   const { 
@@ -62,18 +61,18 @@ export const usePortfolioLive = () => {
     }
   }, [setSnapshot, setLoading, setError]);
 
-  // Auto-refresh logic with TTL
+  // Auto-refresh logic with new TTL configuration
   useEffect(() => {
-    const shouldRefresh = !snapshot || (Date.now() - snapshot.fetchedAt > TTL_MS);
+    const shouldRefresh = !snapshot || (Date.now() - snapshot.fetchedAt > SIM_CONFIG.PORTFOLIO_REFRESH_INTERVAL);
     
     if (shouldRefresh) {
       fetchPortfolioData();
     }
 
-    // Set up interval for regular updates
+    // Set up interval for regular updates using harmonized interval
     const intervalId = setInterval(() => {
       fetchPortfolioData();
-    }, TTL_MS);
+    }, SIM_CONFIG.PORTFOLIO_REFRESH_INTERVAL);
 
     return () => clearInterval(intervalId);
   }, [snapshot, fetchPortfolioData]);
@@ -87,6 +86,6 @@ export const usePortfolioLive = () => {
     isLoading,
     error,
     refresh,
-    isStale: snapshot ? (Date.now() - snapshot.fetchedAt > TTL_MS) : true
+    isStale: snapshot ? (Date.now() - snapshot.fetchedAt > SIM_CONFIG.PORTFOLIO_REFRESH_INTERVAL) : true
   };
 };

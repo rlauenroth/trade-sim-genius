@@ -1,11 +1,9 @@
+
 import { SimReadinessState, SimReadinessStatus, SimReadinessAction, PortfolioSnapshot } from '@/types/simReadiness';
 import { kucoinService } from '@/services/kucoinService';
 import { retryScheduler } from '@/services/retryScheduler';
 import { RateLimitError, ProxyError, ApiError } from '@/utils/errors';
-
-const SNAPSHOT_TTL = 60 * 1000; // 60 seconds in milliseconds
-const HEALTH_CHECK_INTERVAL = 30 * 1000; // 30 seconds (reduced from 10s)
-const PORTFOLIO_REFRESH_INTERVAL = 60 * 1000; // 60 seconds (reduced from 30s)
+import { SIM_CONFIG } from '@/services/cacheService';
 
 class SimReadinessStore {
   private static instance: SimReadinessStore;
@@ -22,6 +20,7 @@ class SimReadinessStore {
   private ttlTimer: NodeJS.Timeout | null = null;
   private healthCheckTimer: NodeJS.Timeout | null = null;
   private refreshTimer: NodeJS.Timeout | null = null;
+  private watchdogTimer: NodeJS.Timeout | null = null;
 
   static getInstance(): SimReadinessStore {
     if (!SimReadinessStore.instance) {
@@ -99,7 +98,7 @@ class SimReadinessStore {
         return {
           ...state,
           state: 'UNSTABLE',
-          reason: 'Portfolio data expired (>60s old)'
+          reason: `Portfolio data expired (>${SIM_CONFIG.SNAPSHOT_TTL / 1000}s old)`
         };
 
       case 'API_UP':
@@ -119,7 +118,7 @@ class SimReadinessStore {
       case 'STOP_SIMULATION':
         return {
           ...state,
-          state: state.portfolio && (now - state.portfolio.fetchedAt) < SNAPSHOT_TTL ? 'READY' : 'UNSTABLE'
+          state: state.portfolio && (now - state.portfolio.fetchedAt) < SIM_CONFIG.SNAPSHOT_TTL ? 'READY' : 'UNSTABLE'
         };
 
       default:
@@ -141,6 +140,7 @@ class SimReadinessStore {
       case 'SIM_RUNNING':
         this.startHealthChecks();
         this.startPortfolioRefresh();
+        this.startWatchdog();
         break;
         
       case 'UNSTABLE':
@@ -185,7 +185,7 @@ class SimReadinessStore {
     this.ttlTimer = setTimeout(() => {
       console.log('⏰ Portfolio snapshot TTL exceeded');
       this.dispatch({ type: 'AGE_EXCEEDED' });
-    }, SNAPSHOT_TTL);
+    }, SIM_CONFIG.SNAPSHOT_TTL);
   }
 
   private startHealthChecks(): void {
@@ -200,7 +200,7 @@ class SimReadinessStore {
         console.error('❌ Health check failed:', error);
         this.dispatch({ type: 'API_DOWN', payload: 'API health check failed' });
       }
-    }, HEALTH_CHECK_INTERVAL);
+    }, 30 * 1000); // 30 seconds
   }
 
   private startPortfolioRefresh(): void {
@@ -208,10 +208,33 @@ class SimReadinessStore {
     
     this.refreshTimer = setInterval(() => {
       if (this.status.state === 'READY' || this.status.state === 'SIM_RUNNING') {
-        console.log('🔄 Refreshing portfolio data...');
+        console.log('🔄 Scheduled portfolio refresh...');
         this.fetchPortfolioData();
       }
-    }, PORTFOLIO_REFRESH_INTERVAL);
+    }, SIM_CONFIG.PORTFOLIO_REFRESH_INTERVAL);
+  }
+
+  private startWatchdog(): void {
+    this.stopWatchdog();
+    
+    this.watchdogTimer = setInterval(() => {
+      if (this.status.state === 'SIM_RUNNING' && this.status.portfolio) {
+        const now = Date.now();
+        const age = now - this.status.portfolio.fetchedAt;
+        const dangerZone = SIM_CONFIG.SNAPSHOT_TTL - SIM_CONFIG.REFRESH_MARGIN;
+        
+        console.log(`🐕 Watchdog check: Portfolio age ${Math.round(age/1000)}s, danger zone: ${dangerZone/1000}s`);
+        
+        if (age >= dangerZone) {
+          console.log('⚠️ Watchdog triggered early refresh to prevent simulation pause');
+          this.fetchPortfolioData();
+        }
+        
+        // Log cache health for debugging
+        const cacheHealth = kucoinService.getPortfolioCacheHealth();
+        console.log('📊 Cache health:', cacheHealth);
+      }
+    }, SIM_CONFIG.WATCHDOG_INTERVAL);
   }
 
   private scheduleRetry(): void {
@@ -256,10 +279,18 @@ class SimReadinessStore {
     }
   }
 
+  private stopWatchdog(): void {
+    if (this.watchdogTimer) {
+      clearInterval(this.watchdogTimer);
+      this.watchdogTimer = null;
+    }
+  }
+
   private stopAllTimers(): void {
     this.stopTTLTimer();
     this.stopHealthChecks();
     this.stopPortfolioRefresh();
+    this.stopWatchdog();
   }
 
   private notifyListeners(): void {
@@ -286,19 +317,44 @@ class SimReadinessStore {
     this.listeners = [];
   }
 
-  // Add method to get cache stats
+  // Add method to get cache stats including new metrics
   getCacheStats(): Record<string, number> {
-    return kucoinService.getCacheStats();
+    const baseStats = kucoinService.getCacheStats();
+    const cacheHealth = kucoinService.getPortfolioCacheHealth();
+    
+    return {
+      ...baseStats,
+      cacheIsStale: cacheHealth.isStale ? 1 : 0,
+      cacheStaleness: cacheHealth.staleness
+    };
   }
 
-  // Add method to manually refresh data
+  // Add method to manually refresh data with improved logging
   forceRefresh(): void {
-    console.log('🔄 Forcing cache refresh...');
+    console.log('🔄 Forcing cache refresh and portfolio update...');
     kucoinService.invalidateCache();
     
     if (this.status.state === 'READY' || this.status.state === 'SIM_RUNNING') {
       this.fetchPortfolioData();
     }
+  }
+
+  // New method to get detailed status for debugging
+  getDetailedStatus(): Record<string, any> {
+    const status = this.getStatus();
+    const cacheStats = this.getCacheStats();
+    
+    return {
+      ...status,
+      cacheStats,
+      timers: {
+        ttlTimer: !!this.ttlTimer,
+        healthCheckTimer: !!this.healthCheckTimer,
+        refreshTimer: !!this.refreshTimer,
+        watchdogTimer: !!this.watchdogTimer
+      },
+      config: SIM_CONFIG
+    };
   }
 }
 

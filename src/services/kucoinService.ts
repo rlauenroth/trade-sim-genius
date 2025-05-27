@@ -16,6 +16,9 @@ export class KuCoinService {
       this.executePing.bind(this),
       CACHE_TTL.TIMESTAMP
     );
+
+    // Register proactive refresh callbacks
+    this.setupProactiveRefresh();
   }
 
   static getInstance(): KuCoinService {
@@ -23,6 +26,30 @@ export class KuCoinService {
       KuCoinService.instance = new KuCoinService();
     }
     return KuCoinService.instance;
+  }
+
+  private setupProactiveRefresh(): void {
+    // Register portfolio proactive refresh
+    cacheService.registerProactiveRefresh('portfolio', async () => {
+      console.log('🔄 Proactive portfolio refresh triggered');
+      try {
+        await this.fetchPortfolio();
+        console.log('✅ Proactive portfolio refresh completed');
+      } catch (error) {
+        console.error('❌ Proactive portfolio refresh failed:', error);
+      }
+    });
+
+    // Register timestamp proactive refresh
+    cacheService.registerProactiveRefresh('timestamp', async () => {
+      console.log('🔄 Proactive timestamp refresh triggered');
+      try {
+        await this.executePing();
+        console.log('✅ Proactive timestamp refresh completed');
+      } catch (error) {
+        console.error('❌ Proactive timestamp refresh failed:', error);
+      }
+    });
   }
 
   private trackApiCall(source: string, endpoint: string): void {
@@ -54,7 +81,7 @@ export class KuCoinService {
       
       if (response.code === '200000' && response.data) {
         console.log('✅ KuCoin API ping successful');
-        // Cache the timestamp
+        // Cache the timestamp with updated TTL
         cacheService.set('timestamp', response.data, CACHE_TTL.TIMESTAMP);
         return true;
       }
@@ -85,10 +112,11 @@ export class KuCoinService {
 
   async fetchPortfolio(): Promise<PortfolioSnapshot> {
     try {
-      // Check cache first
+      // Check cache first with staleness detection
       const cachedPortfolio = cacheService.get<PortfolioSnapshot>('portfolio');
       if (cachedPortfolio) {
-        console.log('📊 Portfolio snapshot (cached) - no API call made');
+        const isStale = cacheService.isStale('portfolio');
+        console.log(`📊 Portfolio snapshot (cached) - no API call made${isStale ? ' [STALE]' : ' [FRESH]'}`);
         return cachedPortfolio;
       }
 
@@ -140,10 +168,10 @@ export class KuCoinService {
           fetchedAt: Date.now()
         };
 
-        // Cache the portfolio snapshot
+        // Cache the portfolio snapshot with updated TTL
         cacheService.set('portfolio', snapshot, CACHE_TTL.PORTFOLIO);
 
-        console.log('✅ Portfolio snapshot created:', snapshot);
+        console.log('✅ Portfolio snapshot created and cached:', snapshot);
         return snapshot;
       }
       
@@ -185,7 +213,7 @@ export class KuCoinService {
     console.log('🗑️ All KuCoin service caches invalidated');
   }
 
-  // Get cache statistics
+  // Get cache statistics including staleness info
   getCacheStats(): Record<string, number> {
     const stats = cacheService.getStats();
     return {
@@ -197,6 +225,16 @@ export class KuCoinService {
   // Get API call tracker for debugging
   getApiCallTracker(): { source: string; timestamp: number; endpoint: string }[] {
     return [...this.apiCallTracker];
+  }
+
+  // New method to check portfolio cache health
+  getPortfolioCacheHealth(): { isStale: boolean; age: number; staleness: number } {
+    const stats = cacheService.getStats();
+    return {
+      isStale: cacheService.isStale('portfolio'),
+      age: stats.portfolioAge,
+      staleness: stats.portfolioStaleness
+    };
   }
 }
 
