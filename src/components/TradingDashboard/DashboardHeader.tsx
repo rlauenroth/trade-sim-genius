@@ -2,16 +2,17 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Bot, Settings, LogOut } from 'lucide-react';
+import { Bot, Settings, LogOut, RefreshCw } from 'lucide-react';
 
 interface DashboardHeaderProps {
   isSimulationActive: boolean;
   isPaused?: boolean;
   onLogout: () => void;
   onOpenSettings: () => void;
+  onRefresh: () => void;
 }
 
-const DashboardHeader = ({ isSimulationActive, isPaused, onLogout, onOpenSettings }: DashboardHeaderProps) => {
+const DashboardHeader = ({ isSimulationActive, isPaused, onLogout, onOpenSettings, onRefresh }: DashboardHeaderProps) => {
   const getStatusBadge = () => {
     if (!isSimulationActive) {
       return <Badge variant="secondary" className="bg-slate-600">Bereit</Badge>;
@@ -40,6 +41,10 @@ const DashboardHeader = ({ isSimulationActive, isPaused, onLogout, onOpenSetting
       </div>
       
       <div className="flex items-center space-x-2">
+        <Button variant="ghost" size="sm" onClick={onRefresh} className="text-slate-400">
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Aktualisieren
+        </Button>
         <Button variant="ghost" size="sm" onClick={onOpenSettings} className="text-slate-400">
           <Settings className="h-4 w-4 mr-2" />
           Einstellungen
