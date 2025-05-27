@@ -1,4 +1,3 @@
-
 import React from 'react';
 import DashboardHeader from './DashboardHeader';
 import StrategyInfo from './StrategyInfo';
@@ -13,6 +12,7 @@ import FirstTimeUserInfo from './FirstTimeUserInfo';
 import PortfolioLoadingCard from './PortfolioLoadingCard';
 import LiveStatusIndicator from './LiveStatusIndicator';
 import SettingsDrawer from './SettingsDrawer';
+import CandidateList from './CandidateList';
 
 interface DashboardContentProps {
   // State props
@@ -28,6 +28,7 @@ interface DashboardContentProps {
   currentSignal: any;
   activityLog: any[];
   apiKeys: any;
+  candidates: any[];
   
   // Display values
   timeElapsed: string;
@@ -67,6 +68,7 @@ const DashboardContent = ({
   currentSignal,
   activityLog,
   apiKeys,
+  candidates,
   timeElapsed,
   displayPortfolioValue,
   displayStartValue,
@@ -179,15 +181,23 @@ const DashboardContent = ({
         />
       )}
 
-      <SignalDisplay 
-        currentSignal={currentSignal}
-        onAcceptSignal={acceptSignal}
-        onIgnoreSignal={ignoreSignal}
-      />
-
-      <OpenPositions 
-        positions={simulationState?.openPositions || []}
-      />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="space-y-6">
+          <SignalDisplay 
+            currentSignal={currentSignal}
+            onAcceptSignal={acceptSignal}
+            onIgnoreSignal={ignoreSignal}
+          />
+          
+          <CandidateList candidates={candidates} maxCandidates={5} />
+        </div>
+        
+        <div>
+          <OpenPositions 
+            positions={simulationState?.openPositions || []}
+          />
+        </div>
+      </div>
 
       <ActivityLog 
         activityLog={activityLog}

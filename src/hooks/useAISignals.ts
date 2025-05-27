@@ -1,12 +1,22 @@
 
 import { useState, useCallback } from 'react';
 import { Signal } from '@/types/simulation';
+import { Candidate } from '@/types/candidate';
 import { AISignalService } from '@/services/aiSignal';
 import { loggingService } from '@/services/loggingService';
+import { useCandidates } from '@/hooks/useCandidates';
 
 export const useAISignals = () => {
   const [currentSignal, setCurrentSignal] = useState<Signal | null>(null);
   const [availableSignals, setAvailableSignals] = useState<Signal[]>([]);
+  
+  const {
+    candidates,
+    updateCandidates,
+    updateCandidateStatus,
+    addCandidate,
+    clearCandidates
+  } = useCandidates();
 
   const startAISignalGeneration = useCallback(async (
     isActive: boolean, 
@@ -19,6 +29,9 @@ export const useAISignals = () => {
       });
       return;
     }
+    
+    // Clear previous candidates when starting new cycle
+    clearCandidates();
     
     try {
       loggingService.logEvent('AI', 'Starting comprehensive AI market analysis', {
@@ -83,8 +96,61 @@ export const useAISignals = () => {
         portfolioValue,
         availableUSDT
       });
+
+      // Stage 1: Market screening - add candidates with screening status
+      addLogEntry('AI', 'Stage 1: Market-Screening wird gestartet...');
+      const selectedPairs = await aiService.performMarketScreening();
       
-      const signals = await aiService.generateSignals();
+      // Add all screened pairs as candidates
+      selectedPairs.forEach(pair => addCandidate(pair));
+      addLogEntry('AI', `${selectedPairs.length} Assets für Detailanalyse ausgewählt`);
+      
+      // Stage 2: Generate detailed signals for all selected pairs
+      const signals: any[] = [];
+      
+      for (let i = 0; i < selectedPairs.length; i++) {
+        const pair = selectedPairs[i];
+        
+        // Update candidate status to analyzed
+        updateCandidateStatus(pair, 'analyzed');
+        addLogEntry('AI', `Analysiere ${pair} (${i + 1}/${selectedPairs.length})...`);
+        
+        try {
+          const signal = await aiService.generateDetailedSignal(pair);
+          if (signal) {
+            signals.push(signal);
+            
+            // Update candidate with signal
+            updateCandidateStatus(
+              pair, 
+              'signal', 
+              signal.signalType as 'BUY' | 'SELL' | 'HOLD',
+              signal.confidenceScore
+            );
+            
+            loggingService.logEvent('AI', 'Signal generated for pair', {
+              pair,
+              signalType: signal.signalType,
+              confidence: signal.confidenceScore
+            });
+          } else {
+            // Mark as analyzed but no signal
+            updateCandidateStatus(pair, 'analyzed');
+          }
+        } catch (error) {
+          // Mark as analyzed but with error
+          updateCandidateStatus(pair, 'analyzed');
+          loggingService.logError('Signal generation failed for pair', {
+            pair,
+            error: error instanceof Error ? error.message : 'unknown'
+          });
+        }
+        
+        // Add delay between requests to avoid rate limiting
+        if (i < selectedPairs.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
       
       loggingService.logEvent('AI', 'Multi-signal generation completed', {
         signalsGenerated: signals.length,
@@ -142,13 +208,14 @@ export const useAISignals = () => {
       setAvailableSignals([]);
       setCurrentSignal(null);
     }
-  }, []);
+  }, [clearCandidates, addCandidate, updateCandidateStatus]);
 
   return {
     currentSignal,
     setCurrentSignal,
     availableSignals,
     setAvailableSignals,
-    startAISignalGeneration
+    startAISignalGeneration,
+    candidates
   };
 };

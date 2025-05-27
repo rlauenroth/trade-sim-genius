@@ -1,17 +1,10 @@
 
-import { useCallback, useEffect } from 'react';
-import { toast } from '@/hooks/use-toast';
-import { SimulationState } from '@/types/simulation';
+import { useState, useCallback, useEffect } from 'react';
+import { Signal, SimulationState } from '@/types/simulation';
 import { useSimulationState } from './useSimulationState';
-import { useActivityLog } from './useActivityLog';
 import { useAISignals } from './useAISignals';
+import { useActivityLog } from './useActivityLog';
 import { useTradeExecution } from './useTradeExecution';
-import { usePortfolioLive } from './usePortfolioLive';
-import { useAppState } from './useAppState';
-import { apiModeService } from '@/services/apiModeService';
-import { simReadinessStore } from '@/stores/simReadinessStore';
-import { useSimGuard } from './useSimGuard';
-import { getStrategyConfig, MINIMUM_TRADE_USDT } from '@/config/strategy';
 import { useRiskManagement } from './useRiskManagement';
 import { loggingService } from '@/services/loggingService';
 
@@ -19,400 +12,195 @@ export const useSimulation = () => {
   const {
     simulationState,
     isSimulationActive,
-    setIsSimulationActive,
-    loadSimulationState,
-    saveSimulationState,
-    clearSimulationState
+    initializeSimulation,
+    updateSimulationState,
+    pauseSimulation: pauseSimulationState,
+    resumeSimulation: resumeSimulationState,
+    stopSimulation: stopSimulationState
   } = useSimulationState();
-
-  const {
-    activityLog,
-    loadActivityLog,
-    addLogEntry,
-    addSimulationStartLog,
-    addSimulationStopLog,
-    addTradeLog,
-    addSignalLog,
-    addPortfolioUpdateLog
-  } = useActivityLog();
 
   const {
     currentSignal,
     setCurrentSignal,
-    startAISignalGeneration
+    availableSignals,
+    setAvailableSignals,
+    startAISignalGeneration,
+    candidates
   } = useAISignals();
 
-  const {
-    acceptSignal: executeAcceptSignal,
-    ignoreSignal: executeIgnoreSignal
-  } = useTradeExecution();
+  const { activityLog, addLogEntry } = useActivityLog();
+  const { executeTradeFromSignal } = useTradeExecution();
+  const { validateTradeRisk } = useRiskManagement();
 
-  const { isRunningBlocked, state: readinessState, reason } = useSimGuard();
-  const { snapshot: livePortfolio } = usePortfolioLive();
-  const { userSettings } = useAppState();
+  const [aiGenerationTimer, setAiGenerationTimer] = useState<NodeJS.Timeout | null>(null);
 
-  // Auto-pause simulation when readiness becomes unstable
-  useEffect(() => {
-    if (isSimulationActive && isRunningBlocked && simulationState && !simulationState.isPaused) {
-      console.log('🚨 Auto-pausing simulation due to system instability:', reason);
-      
-      loggingService.logEvent('SIM', 'Auto-pause triggered', {
-        reason,
-        from: 'SIM_RUNNING',
-        to: 'PAUSED',
-        portfolioValue: simulationState.currentPortfolioValue,
-        openPositions: simulationState.openPositions.length
-      });
-      
-      addLogEntry('WARNING', `Simulation automatisch pausiert: ${reason}`);
-      
-      const updatedState = { ...simulationState, isPaused: true };
-      saveSimulationState(updatedState);
-      setIsSimulationActive(false);
-      
-      toast({
-        title: "Simulation pausiert",
-        description: `System nicht bereit: ${reason}`,
-        variant: "destructive"
-      });
-    }
-  }, [isSimulationActive, isRunningBlocked, simulationState, reason, saveSimulationState, setIsSimulationActive, addLogEntry]);
-
-  // Load saved state and migrate old data
-  useEffect(() => {
-    const currentPortfolioValue = livePortfolio?.totalUSDValue;
-    
-    // Clean up old demo simulation states
+  // Start simulation with portfolio data
+  const startSimulation = useCallback(async (portfolioData: any) => {
     try {
-      const saved = localStorage.getItem('kiTradingApp_simulationState');
-      if (saved) {
-        const state = JSON.parse(saved);
-        // Remove old hardcoded 10000 start values
-        if (state.startPortfolioValue === 10000) {
-          console.log('🗑️ Removing old demo simulation state with 10000 start value');
-          loggingService.logEvent('SIM', 'Cleanup old demo state', {
-            oldStartValue: 10000,
-            action: 'remove_demo_state'
-          });
-          localStorage.removeItem('kiTradingApp_simulationState');
+      loggingService.logEvent('SIMULATION', 'Starting simulation', {
+        portfolioValue: portfolioData.totalUSDValue,
+        availablePositions: portfolioData.positions.length
+      });
+
+      addLogEntry('SIMULATION', `Simulation gestartet mit Portfolio-Wert: $${portfolioData.totalUSDValue.toFixed(2)}`);
+      
+      // Initialize simulation state
+      const initialState = initializeSimulation(portfolioData);
+      
+      // Start AI signal generation immediately
+      await startAISignalGeneration(true, initialState, addLogEntry);
+      
+      // Set up periodic AI signal generation (every 15 minutes)
+      const timer = setInterval(async () => {
+        if (simulationState?.isActive && !simulationState?.isPaused) {
+          await startAISignalGeneration(true, simulationState, addLogEntry);
         }
-      }
-    } catch (error) {
-      console.error('Error cleaning old simulation state:', error);
-      loggingService.logError('Failed to cleanup old simulation state', {
-        error: error instanceof Error ? error.message : 'unknown'
-      });
-    }
-
-    // Remove demo mode flag
-    localStorage.removeItem('demoModeEnabled');
-    
-    loadSimulationState(currentPortfolioValue);
-    loadActivityLog();
-    
-    simReadinessStore.initialize();
-    
-    apiModeService.initializeApiModes().then(() => {
-      const status = apiModeService.getApiModeStatus();
+      }, 15 * 60 * 1000); // 15 minutes
       
-      loggingService.logEvent('SIM', 'API modes initialized', {
-        kucoinMode: status.kucoinMode,
-        openRouterMode: status.openRouterMode,
-        corsIssuesDetected: status.corsIssuesDetected
-      });
-      
-      if (status.corsIssuesDetected) {
-        addLogEntry('INFO', 'CORS-Beschränkungen erkannt. App läuft im Hybrid-Modus mit simulierten privaten Daten.');
-      } else {
-        addLogEntry('INFO', 'API-Modi initialisiert. Live-Daten verfügbar für öffentliche Endpunkte.');
-      }
-    });
-  }, [loadSimulationState, loadActivityLog, addLogEntry, livePortfolio]);
-
-  const startSimulation = useCallback(async () => {
-    try {
-      loggingService.logEvent('SIM', 'Start simulation requested', {
-        hasLivePortfolio: !!livePortfolio,
-        portfolioValue: livePortfolio?.totalUSDValue,
-        portfolioPositions: livePortfolio?.positions.length
-      });
-      
-      if (!livePortfolio) {
-        loggingService.logError('Simulation start failed - no portfolio', {
-          reason: 'no_live_portfolio'
-        });
-        addLogEntry('ERROR', 'Live-Portfolio-Daten nicht verfügbar. Bitte warten Sie, bis die Daten geladen sind.');
-        toast({
-          title: "Fehler",
-          description: "Portfolio-Daten müssen geladen sein, bevor die Simulation gestartet werden kann.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Validate portfolio has meaningful value
-      if (livePortfolio.totalUSDValue === 0 || livePortfolio.positions.length === 0) {
-        loggingService.logError('Simulation start failed - empty portfolio', {
-          reason: 'empty_portfolio',
-          totalValue: livePortfolio.totalUSDValue,
-          positionCount: livePortfolio.positions.length
-        });
-        addLogEntry('ERROR', 'Portfolio leer – Simulation nicht möglich');
-        toast({
-          title: "Portfolio leer",
-          description: "Simulation nicht möglich mit leerem Portfolio.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Only check if portfolio has at least minimum trade size
-      if (livePortfolio.totalUSDValue < MINIMUM_TRADE_USDT) {
-        loggingService.logError('Simulation start failed - portfolio too small', {
-          reason: 'portfolio_too_small',
-          currentValue: livePortfolio.totalUSDValue,
-          minimumRequired: MINIMUM_TRADE_USDT
-        });
-        addLogEntry('ERROR', `Portfolio-Wert zu niedrig. Minimum: $${MINIMUM_TRADE_USDT}`);
-        toast({
-          title: "Portfolio zu klein",
-          description: `Mindestens $${MINIMUM_TRADE_USDT} für Trading benötigt`,
-          variant: "destructive"
-        });
-        return;
-      }
-
-      addLogEntry('INFO', 'Realistische Simulation wird gestartet...');
-      
-      clearSimulationState();
-      simReadinessStore.startSimulation();
-      
-      const apiStatus = apiModeService.getApiModeStatus();
-      addLogEntry('INFO', `KuCoin API-Modus: ${apiStatus.kucoinMode}`);
-      addLogEntry('INFO', `OpenRouter API-Modus: ${apiStatus.openRouterMode}`);
-      
-      // Use exact live portfolio value as start value
-      const actualStartValue = livePortfolio.totalUSDValue;
-      
-      // Create paper assets matching live portfolio structure
-      const paperAssets = livePortfolio.positions.map(pos => ({
-        symbol: pos.currency,
-        quantity: pos.balance,
-        entryPrice: pos.currency === 'USDT' ? 1 : undefined
-      }));
-
-      const newState: SimulationState = {
-        isActive: true,
-        isPaused: false,
-        startTime: Date.now(),
-        startPortfolioValue: actualStartValue,
-        currentPortfolioValue: actualStartValue,
-        realizedPnL: 0,
-        openPositions: [],
-        paperAssets
-      };
-
-      loggingService.logEvent('SIM', 'Simulation started', {
-        from: 'IDLE',
-        to: 'SIM_RUNNING',
-        startValue: actualStartValue,
-        strategy: userSettings.tradingStrategy || 'balanced',
-        paperAssets: paperAssets.length,
-        apiMode: apiStatus.corsIssuesDetected ? 'hybrid' : 'live'
-      });
-
-      saveSimulationState(newState);
-      setIsSimulationActive(true);
-      
-      addSimulationStartLog(actualStartValue);
-      addLogEntry('INFO', `Echtes Startkapital: $${actualStartValue.toLocaleString()}`);
-      
-      const strategy = userSettings.tradingStrategy || 'balanced';
-      const config = getStrategyConfig(strategy);
-      const { getTradeDisplayInfo } = useRiskManagement(strategy);
-      const displayInfo = getTradeDisplayInfo(actualStartValue, strategy);
-      
-      addLogEntry('INFO', `Strategie: ${strategy} (${displayInfo.percentage}% pro Trade, Min: $${displayInfo.minimum})`);
-      
-      if (apiStatus.corsIssuesDetected) {
-        addLogEntry('INFO', 'Verwende Hybrid-Modus: Live-Marktdaten + simulierte Portfolio-Daten');
-      }
-      
-      setTimeout(() => {
-        startAISignalGeneration(
-          true,
-          newState,
-          (type, message) => addLogEntry(type, message)
-        );
-      }, 3000);
-
-      toast({
-        title: "Realistische Simulation gestartet",
-        description: `Paper-Trading aktiv mit $${actualStartValue.toLocaleString()} echtem Startkapital (${strategy} Strategie).`,
-      });
+      setAiGenerationTimer(timer);
       
     } catch (error) {
-      console.error('Error starting simulation:', error);
-      
-      loggingService.logError('Simulation start error', {
+      loggingService.logError('Simulation start failed', {
         error: error instanceof Error ? error.message : 'unknown',
-        stack: error instanceof Error ? error.stack : undefined
+        portfolioValue: portfolioData?.totalUSDValue
       });
       
-      addLogEntry('ERROR', 'Fehler beim Starten der Simulation');
-      toast({
-        title: "Fehler",
-        description: "Simulation konnte nicht gestartet werden.",
-        variant: "destructive"
-      });
+      addLogEntry('ERROR', `Simulation-Start fehlgeschlagen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
     }
-  }, [livePortfolio, userSettings.tradingStrategy, addSimulationStartLog, addLogEntry, saveSimulationState, setIsSimulationActive, startAISignalGeneration, clearSimulationState]);
+  }, [initializeSimulation, startAISignalGeneration, addLogEntry, simulationState]);
 
+  // Stop simulation
   const stopSimulation = useCallback(() => {
-    if (!simulationState) return;
-
-    simReadinessStore.stopSimulation();
-
-    addLogEntry('INFO', 'Simulation wird beendet...');
+    loggingService.logEvent('SIMULATION', 'Stopping simulation');
     
-    let finalValue = simulationState.currentPortfolioValue;
-    if (simulationState.openPositions.length > 0) {
-      addLogEntry('INFO', 'Schließe alle offenen Positionen...');
-      finalValue += simulationState.openPositions.reduce((sum, pos) => sum + pos.unrealizedPnL, 0);
+    if (aiGenerationTimer) {
+      clearInterval(aiGenerationTimer);
+      setAiGenerationTimer(null);
     }
-
-    const totalPnL = finalValue - simulationState.startPortfolioValue;
-    const totalPnLPercent = (totalPnL / simulationState.startPortfolioValue) * 100;
-
-    loggingService.logEvent('SIM', 'Simulation stopped', {
-      from: 'SIM_RUNNING',
-      to: 'IDLE',
-      startValue: simulationState.startPortfolioValue,
-      finalValue,
-      totalPnL,
-      totalPnLPercent,
-      duration: Date.now() - simulationState.startTime,
-      openPositions: simulationState.openPositions.length
-    });
-
-    const updatedState: SimulationState = {
-      ...simulationState,
-      isActive: false,
-      isPaused: false,
-      currentPortfolioValue: finalValue,
-      realizedPnL: totalPnL,
-      openPositions: []
-    };
-
-    saveSimulationState(updatedState);
-    setIsSimulationActive(false);
+    
+    // Clear current signals
     setCurrentSignal(null);
+    setAvailableSignals([]);
     
-    addSimulationStopLog(finalValue, totalPnL, totalPnLPercent);
-    
-    toast({
-      title: "Simulation beendet",
-      description: `Endergebnis: ${totalPnL >= 0 ? '+' : ''}$${totalPnL.toFixed(2)} (${totalPnLPercent.toFixed(2)}%)`,
-    });
-  }, [simulationState, addLogEntry, addSimulationStopLog, saveSimulationState, setIsSimulationActive, setCurrentSignal]);
+    stopSimulationState();
+    addLogEntry('SIMULATION', 'Simulation beendet');
+  }, [aiGenerationTimer, setCurrentSignal, setAvailableSignals, stopSimulationState, addLogEntry]);
 
+  // Pause simulation
   const pauseSimulation = useCallback(() => {
+    loggingService.logEvent('SIMULATION', 'Pausing simulation');
+    
+    if (aiGenerationTimer) {
+      clearInterval(aiGenerationTimer);
+      setAiGenerationTimer(null);
+    }
+    
+    pauseSimulationState();
+    addLogEntry('SIMULATION', 'Simulation pausiert');
+  }, [aiGenerationTimer, pauseSimulationState, addLogEntry]);
+
+  // Resume simulation
+  const resumeSimulation = useCallback(async () => {
+    loggingService.logEvent('SIMULATION', 'Resuming simulation');
+    
+    resumeSimulationState();
+    addLogEntry('SIMULATION', 'Simulation fortgesetzt');
+    
+    // Restart AI signal generation
+    if (simulationState) {
+      await startAISignalGeneration(true, simulationState, addLogEntry);
+      
+      const timer = setInterval(async () => {
+        if (simulationState?.isActive && !simulationState?.isPaused) {
+          await startAISignalGeneration(true, simulationState, addLogEntry);
+        }
+      }, 15 * 60 * 1000);
+      
+      setAiGenerationTimer(timer);
+    }
+  }, [resumeSimulationState, addLogEntry, simulationState, startAISignalGeneration]);
+
+  // Accept signal and execute trade
+  const acceptSignal = useCallback(async (signal: Signal) => {
     if (!simulationState) return;
-
-    loggingService.logEvent('SIM', 'Simulation paused', {
-      from: 'SIM_RUNNING',
-      to: 'PAUSED',
-      portfolioValue: simulationState.currentPortfolioValue,
-      openPositions: simulationState.openPositions.length,
-      trigger: 'manual'
-    });
-
-    const updatedState = { ...simulationState, isPaused: true };
-    saveSimulationState(updatedState);
-    setIsSimulationActive(false);
     
-    addLogEntry('INFO', 'Simulation pausiert');
-    toast({
-      title: "Simulation pausiert",
-      description: "KI-Signalgenerierung gestoppt",
+    try {
+      loggingService.logEvent('TRADE', 'Signal accepted', {
+        assetPair: signal.assetPair,
+        signalType: signal.signalType,
+        confidence: signal.confidenceScore
+      });
+      
+      addLogEntry('TRADE', `Signal akzeptiert: ${signal.signalType} ${signal.assetPair}`);
+      
+      // Validate risk before executing
+      const riskValidation = validateTradeRisk(signal, simulationState);
+      if (!riskValidation.isValid) {
+        addLogEntry('RISK', `Trade abgelehnt: ${riskValidation.reason}`);
+        return;
+      }
+      
+      // Execute the trade
+      const tradeResult = await executeTradeFromSignal(signal, simulationState);
+      
+      if (tradeResult.success) {
+        // Update simulation state with new trade
+        updateSimulationState({
+          ...simulationState,
+          openPositions: [...(simulationState.openPositions || []), tradeResult.position],
+          paperAssets: tradeResult.updatedAssets
+        });
+        
+        addLogEntry('TRADE', `Trade ausgeführt: ${signal.signalType} ${tradeResult.position.quantity} ${signal.assetPair}`);
+      } else {
+        addLogEntry('ERROR', `Trade fehlgeschlagen: ${tradeResult.error}`);
+      }
+      
+      // Clear current signal after handling
+      setCurrentSignal(null);
+      
+    } catch (error) {
+      loggingService.logError('Signal acceptance failed', {
+        error: error instanceof Error ? error.message : 'unknown',
+        signal: signal.assetPair
+      });
+      
+      addLogEntry('ERROR', `Signal-Verarbeitung fehlgeschlagen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
+    }
+  }, [simulationState, validateTradeRisk, executeTradeFromSignal, updateSimulationState, addLogEntry, setCurrentSignal]);
+
+  // Ignore signal
+  const ignoreSignal = useCallback((signal: Signal) => {
+    loggingService.logEvent('TRADE', 'Signal ignored', {
+      assetPair: signal.assetPair,
+      signalType: signal.signalType
     });
-  }, [simulationState, addLogEntry, saveSimulationState, setIsSimulationActive]);
-
-  const resumeSimulation = useCallback(() => {
-    if (!simulationState) return;
-
-    simReadinessStore.startSimulation();
-
-    loggingService.logEvent('SIM', 'Simulation resumed', {
-      from: 'PAUSED',
-      to: 'SIM_RUNNING',
-      portfolioValue: simulationState.currentPortfolioValue,
-      openPositions: simulationState.openPositions.length
-    });
-
-    const updatedState = { ...simulationState, isPaused: false };
-    saveSimulationState(updatedState);
-    setIsSimulationActive(true);
     
-    addLogEntry('INFO', 'Simulation fortgesetzt');
-    toast({
-      title: "Simulation fortgesetzt",
-      description: "KI-Signalgenerierung läuft wieder",
-    });
-    
-    setTimeout(() => {
-      startAISignalGeneration(
-        true,
-        updatedState,
-        (type, message) => addLogEntry(type, message)
-      );
-    }, 3000);
-  }, [simulationState, addLogEntry, saveSimulationState, setIsSimulationActive, startAISignalGeneration]);
+    addLogEntry('TRADE', `Signal ignoriert: ${signal.signalType} ${signal.assetPair}`);
+    setCurrentSignal(null);
+  }, [addLogEntry, setCurrentSignal]);
 
-  const acceptSignal = useCallback((signal: any) => {
-    const strategy = userSettings.tradingStrategy || 'balanced';
-    executeAcceptSignal(
-      signal,
-      simulationState,
-      (type, message) => addLogEntry(type, message),
-      saveSimulationState,
-      setCurrentSignal,
-      () => startAISignalGeneration(
-        isSimulationActive,
-        simulationState,
-        (type, message) => addLogEntry(type, message)
-      ),
-      addTradeLog,
-      addSignalLog,
-      addPortfolioUpdateLog,
-      strategy
-    );
-  }, [executeAcceptSignal, simulationState, addLogEntry, saveSimulationState, setCurrentSignal, startAISignalGeneration, isSimulationActive, addTradeLog, addSignalLog, addPortfolioUpdateLog, userSettings.tradingStrategy]);
-
-  const ignoreSignal = useCallback((signal: any) => {
-    executeIgnoreSignal(
-      signal,
-      (type, message) => addLogEntry(type, message),
-      setCurrentSignal,
-      () => startAISignalGeneration(
-        isSimulationActive,
-        simulationState,
-        (type, message) => addLogEntry(type, message)
-      ),
-      addSignalLog
-    );
-  }, [executeIgnoreSignal, addLogEntry, setCurrentSignal, startAISignalGeneration, isSimulationActive, simulationState, addSignalLog]);
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (aiGenerationTimer) {
+        clearInterval(aiGenerationTimer);
+      }
+    };
+  }, [aiGenerationTimer]);
 
   return {
     simulationState,
     isSimulationActive,
-    currentSignal,
-    activityLog,
     startSimulation,
     stopSimulation,
     pauseSimulation,
     resumeSimulation,
     acceptSignal,
-    ignoreSignal
+    ignoreSignal,
+    currentSignal,
+    availableSignals,
+    activityLog,
+    candidates
   };
 };

@@ -29,6 +29,7 @@ const TradingDashboard = () => {
     ignoreSignal,
     currentSignal,
     activityLog,
+    candidates,
     timeElapsed,
     getProgressValue,
     getTotalPnL,
@@ -72,6 +73,7 @@ const TradingDashboard = () => {
         currentSignal={currentSignal}
         activityLog={activityLog}
         apiKeys={apiKeys}
+        candidates={candidates}
         timeElapsed={timeElapsed}
         displayPortfolioValue={getDisplayPortfolioValue()}
         displayStartValue={getDisplayStartValue()}

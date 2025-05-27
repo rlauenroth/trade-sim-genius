@@ -40,7 +40,8 @@ export const useDashboardStateManager = () => {
     acceptSignal,
     ignoreSignal,
     currentSignal,
-    activityLog
+    activityLog,
+    candidates
   } = useSimulation();
 
   const { state: readinessState, isRunningBlocked, reason } = useSimGuard();
@@ -112,6 +113,7 @@ export const useDashboardStateManager = () => {
     ignoreSignal,
     currentSignal,
     activityLog,
+    candidates,
     timeElapsed,
     getProgressValue,
     getTotalPnL,
