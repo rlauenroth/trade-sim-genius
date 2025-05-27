@@ -222,8 +222,45 @@ export const useTradeExecution = () => {
     }, 15000);
   }, []);
 
+  // Add the missing executeTradeFromSignal method
+  const executeTradeFromSignal = useCallback(async (signal: Signal, simulationState: SimulationState) => {
+    try {
+      // This is a simplified version for compatibility
+      const currentPrice = typeof signal.entryPriceSuggestion === 'number' 
+        ? signal.entryPriceSuggestion 
+        : (signal.assetPair.includes('BTC') ? 60000 : 3000);
+      
+      const quantity = 0.001; // Mock quantity
+      const assetSymbol = signal.assetPair.split('/')[0] || signal.assetPair.split('-')[0];
+      
+      const newPosition: Position = {
+        id: `pos_${Date.now()}`,
+        assetPair: signal.assetPair,
+        type: signal.signalType as 'BUY' | 'SELL',
+        entryPrice: currentPrice,
+        quantity,
+        takeProfit: signal.takeProfitPrice,
+        stopLoss: signal.stopLossPrice,
+        unrealizedPnL: 0,
+        openTimestamp: Date.now()
+      };
+
+      return {
+        success: true,
+        position: newPosition,
+        updatedAssets: simulationState.paperAssets
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }, []);
+
   return {
     acceptSignal,
-    ignoreSignal
+    ignoreSignal,
+    executeTradeFromSignal
   };
 };

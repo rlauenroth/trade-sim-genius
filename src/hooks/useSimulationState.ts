@@ -61,12 +61,67 @@ export const useSimulationState = () => {
     setIsSimulationActive(false);
   }, []);
 
+  // Add missing methods
+  const initializeSimulation = useCallback((portfolioData: any): SimulationState => {
+    const initialState: SimulationState = {
+      isActive: true,
+      isPaused: false,
+      startTime: Date.now(),
+      startPortfolioValue: portfolioData.totalUSDValue,
+      currentPortfolioValue: portfolioData.totalUSDValue,
+      realizedPnL: 0,
+      openPositions: [],
+      paperAssets: portfolioData.positions.map((pos: any) => ({
+        symbol: pos.currency,
+        quantity: pos.balance,
+        entryPrice: pos.currency === 'USDT' ? 1 : undefined
+      }))
+    };
+    
+    saveSimulationState(initialState);
+    setIsSimulationActive(true);
+    return initialState;
+  }, [saveSimulationState]);
+
+  const updateSimulationState = useCallback((newState: SimulationState) => {
+    saveSimulationState(newState);
+  }, [saveSimulationState]);
+
+  const pauseSimulation = useCallback(() => {
+    if (simulationState) {
+      const updatedState = { ...simulationState, isPaused: true };
+      saveSimulationState(updatedState);
+      setIsSimulationActive(false);
+    }
+  }, [simulationState, saveSimulationState]);
+
+  const resumeSimulation = useCallback(() => {
+    if (simulationState) {
+      const updatedState = { ...simulationState, isPaused: false };
+      saveSimulationState(updatedState);
+      setIsSimulationActive(true);
+    }
+  }, [simulationState, saveSimulationState]);
+
+  const stopSimulation = useCallback(() => {
+    if (simulationState) {
+      const updatedState = { ...simulationState, isActive: false, isPaused: false };
+      saveSimulationState(updatedState);
+      setIsSimulationActive(false);
+    }
+  }, [simulationState, saveSimulationState]);
+
   return {
     simulationState,
     isSimulationActive,
     setIsSimulationActive,
     loadSimulationState,
     saveSimulationState,
-    clearSimulationState
+    clearSimulationState,
+    initializeSimulation,
+    updateSimulationState,
+    pauseSimulation,
+    resumeSimulation,
+    stopSimulation
   };
 };

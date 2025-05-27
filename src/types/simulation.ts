@@ -41,7 +41,7 @@ export interface Signal {
 
 export interface ActivityLogEntry {
   timestamp: number;
-  type: 'INFO' | 'AI' | 'TRADE' | 'ERROR' | 'SUCCESS' | 'WARNING' | 'PORTFOLIO_UPDATE' | 'MARKET_DATA' | 'SYSTEM' | 'PERFORMANCE' | 'API' | 'SIM';
+  type: 'INFO' | 'AI' | 'TRADE' | 'ERROR' | 'SUCCESS' | 'WARNING' | 'PORTFOLIO_UPDATE' | 'MARKET_DATA' | 'SYSTEM' | 'PERFORMANCE' | 'API' | 'SIM' | 'SIMULATION' | 'RISK';
   message: string;
   source?: string;
   details?: {

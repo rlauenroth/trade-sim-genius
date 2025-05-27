@@ -33,7 +33,7 @@ export const useDashboardStateManager = () => {
   const { 
     simulationState, 
     isSimulationActive, 
-    startSimulation, 
+    startSimulation: startSimulationWithPortfolio, 
     stopSimulation, 
     pauseSimulation,
     resumeSimulation,
@@ -62,7 +62,7 @@ export const useDashboardStateManager = () => {
     portfolioData,
     loadPortfolioData,
     completeFirstTimeSetup,
-    startSimulation
+    startSimulation: startSimulationWithPortfolio
   });
 
   // Add handler for manual refresh
@@ -105,7 +105,7 @@ export const useDashboardStateManager = () => {
     livePortfolioError,
     simulationState,
     isSimulationActive,
-    startSimulation,
+    startSimulation: startSimulationWithPortfolio,
     stopSimulation,
     pauseSimulation,
     resumeSimulation,
