@@ -40,6 +40,19 @@ const TradingDashboard = () => {
     getSimulationDataForLog
   } = useDashboardStateManager();
 
+  // Wrap acceptSignal and ignoreSignal to handle current signal automatically
+  const handleAcceptSignal = () => {
+    if (currentSignal) {
+      acceptSignal(currentSignal);
+    }
+  };
+
+  const handleIgnoreSignal = () => {
+    if (currentSignal) {
+      ignoreSignal(currentSignal);
+    }
+  };
+
   return (
     <>
       <DashboardInitializer 
@@ -72,8 +85,8 @@ const TradingDashboard = () => {
         pauseSimulation={pauseSimulation}
         resumeSimulation={resumeSimulation}
         stopSimulation={stopSimulation}
-        acceptSignal={acceptSignal}
-        ignoreSignal={ignoreSignal}
+        acceptSignal={handleAcceptSignal}
+        ignoreSignal={handleIgnoreSignal}
         retryLoadPortfolioData={retryLoadPortfolioData}
         showSettings={showSettings}
         setShowSettings={setShowSettings}
