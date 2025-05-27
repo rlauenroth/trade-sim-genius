@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Activity, CheckCircle, AlertTriangle, XCircle, Info, Zap, Copy, Filter, ChevronDown, ChevronRight, Download, FileJson } from 'lucide-react';
+import { Activity } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { generateMarkdownReport, copyToClipboard } from '@/utils/markdownExport';
 import { loggingService } from '@/services/loggingService';
+import LogEntry from './ActivityLog/LogEntry';
+import LogStats from './ActivityLog/LogStats';
+import LogControls from './ActivityLog/LogControls';
 
 interface ActivityLogEntry {
   timestamp: number;
@@ -61,64 +61,6 @@ const ActivityLog = ({ activityLog, simulationData }: ActivityLogProps) => {
       details: entry.meta ? { meta: entry.meta } : undefined
     }))
   ].sort((a, b) => a.timestamp - b.timestamp);
-
-  const getTypeIcon = (type: ActivityLogEntry['type']) => {
-    switch (type) {
-      case 'SUCCESS':
-        return <CheckCircle className="h-3 w-3 text-green-400" />;
-      case 'ERROR':
-        return <XCircle className="h-3 w-3 text-red-400" />;
-      case 'WARNING':
-        return <AlertTriangle className="h-3 w-3 text-yellow-400" />;
-      case 'AI':
-        return <Zap className="h-3 w-3 text-blue-400" />;
-      case 'TRADE':
-        return <Activity className="h-3 w-3 text-purple-400" />;
-      case 'API':
-        return <Activity className="h-3 w-3 text-orange-400" />;
-      case 'SIM':
-        return <Activity className="h-3 w-3 text-cyan-400" />;
-      case 'PORTFOLIO_UPDATE':
-        return <Activity className="h-3 w-3 text-cyan-400" />;
-      case 'MARKET_DATA':
-        return <Activity className="h-3 w-3 text-orange-400" />;
-      case 'SYSTEM':
-        return <Activity className="h-3 w-3 text-gray-400" />;
-      case 'PERFORMANCE':
-        return <Activity className="h-3 w-3 text-emerald-400" />;
-      default:
-        return <Info className="h-3 w-3 text-slate-400" />;
-    }
-  };
-
-  const getTypeColor = (type: ActivityLogEntry['type']) => {
-    switch (type) {
-      case 'ERROR':
-        return 'text-red-400';
-      case 'SUCCESS':
-        return 'text-green-400';
-      case 'WARNING':
-        return 'text-yellow-400';
-      case 'AI':
-        return 'text-blue-400';
-      case 'TRADE':
-        return 'text-purple-400';
-      case 'API':
-        return 'text-orange-400';
-      case 'SIM':
-        return 'text-cyan-400';
-      case 'PORTFOLIO_UPDATE':
-        return 'text-cyan-400';
-      case 'MARKET_DATA':
-        return 'text-orange-400';
-      case 'SYSTEM':
-        return 'text-gray-400';
-      case 'PERFORMANCE':
-        return 'text-emerald-400';
-      default:
-        return 'text-slate-300';
-    }
-  };
 
   const filteredLog = filterType === 'all' 
     ? combinedLogs 
@@ -198,11 +140,6 @@ ${entry.source ? `*Quelle: ${entry.source}*` : ''}${metaInfo}`;
     setExpandedEntries(newExpanded);
   };
 
-  const hasDetails = (entry: ActivityLogEntry) => {
-    return (entry.details && Object.keys(entry.details).length > 0) || 
-           (entry.meta && Object.keys(entry.meta).length > 0);
-  };
-
   const stats = loggingService.getStats();
 
   return (
@@ -218,50 +155,14 @@ ${entry.source ? `*Quelle: ${entry.source}*` : ''}${metaInfo}`;
               </span>
             )}
           </CardTitle>
-          <div className="flex items-center space-x-2">
-            <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="w-32 h-8 bg-slate-700 border-slate-600">
-                <Filter className="h-3 w-3 mr-1" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-slate-700 border-slate-600">
-                <SelectItem value="all">Alle</SelectItem>
-                <SelectItem value="SUCCESS">Erfolg</SelectItem>
-                <SelectItem value="TRADE">Trades</SelectItem>
-                <SelectItem value="AI">KI</SelectItem>
-                <SelectItem value="API">API</SelectItem>
-                <SelectItem value="SIM">Simulation</SelectItem>
-                <SelectItem value="ERROR">Fehler</SelectItem>
-                <SelectItem value="WARNING">Warnungen</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportJSON}
-              className="bg-slate-700 border-slate-600 hover:bg-slate-600"
-            >
-              <FileJson className="h-3 w-3 mr-1" />
-              JSON
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportReport}
-              className="bg-slate-700 border-slate-600 hover:bg-slate-600"
-            >
-              <Download className="h-3 w-3 mr-1" />
-              MD
-            </Button>
-          </div>
+          <LogControls
+            filterType={filterType}
+            onFilterChange={setFilterType}
+            onExportMarkdown={handleExportReport}
+            onExportJSON={handleExportJSON}
+          />
         </div>
-        {stats.total > 0 && (
-          <div className="text-xs text-slate-400 space-x-4">
-            {Object.entries(stats.byType).map(([type, count]) => (
-              <span key={type}>{type}: {count}</span>
-            ))}
-          </div>
-        )}
+        <LogStats stats={stats} />
       </CardHeader>
       <CardContent>
         <div className="space-y-2 max-h-96 overflow-y-auto">
@@ -271,96 +172,14 @@ ${entry.source ? `*Quelle: ${entry.source}*` : ''}${metaInfo}`;
             </div>
           ) : (
             filteredLog.slice(-50).reverse().map((entry, index) => (
-              <div key={index} className="border border-slate-700 rounded p-3 space-y-2">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center space-x-3 min-w-0 flex-1">
-                    <div className="flex items-center space-x-2">
-                      {getTypeIcon(entry.type)}
-                      <div className="text-slate-400 font-mono text-xs">
-                        {new Date(entry.timestamp).toLocaleTimeString('de-DE')}
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <div className={`${getTypeColor(entry.type)} leading-tight text-sm`}>
-                        {entry.message}
-                      </div>
-                      {entry.source && (
-                        <div className="text-xs text-slate-500 mt-1">
-                          {entry.source}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-1 ml-2">
-                    {hasDetails(entry) && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleEntryExpansion(index)}
-                        className="h-6 w-6 p-0 text-slate-400 hover:text-slate-200"
-                      >
-                        {expandedEntries.has(index) ? 
-                          <ChevronDown className="h-3 w-3" /> : 
-                          <ChevronRight className="h-3 w-3" />
-                        }
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleCopyEntry(entry)}
-                      className="h-6 w-6 p-0 text-slate-400 hover:text-slate-200"
-                    >
-                      <Copy className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-                
-                {hasDetails(entry) && expandedEntries.has(index) && (
-                  <Collapsible open={expandedEntries.has(index)}>
-                    <CollapsibleContent>
-                      <div className="mt-2 pl-6 border-l-2 border-slate-600">
-                        <div className="text-xs text-slate-400 space-y-1">
-                          {entry.meta && (
-                            <div>
-                              <div className="font-medium text-slate-300">Meta Data:</div>
-                              <pre className="text-xs bg-slate-900 p-2 rounded overflow-x-auto">
-                                {JSON.stringify(entry.meta, null, 2)}
-                              </pre>
-                            </div>
-                          )}
-                          {entry.details?.signalData && (
-                            <div>
-                              <div className="font-medium text-slate-300">Signal Details:</div>
-                              <div>Typ: {entry.details.signalData.signalType}</div>
-                              <div>Asset: {entry.details.signalData.assetPair}</div>
-                              {entry.details.signalData.confidenceScore && (
-                                <div>Konfidenz: {Math.round(entry.details.signalData.confidenceScore * 100)}%</div>
-                              )}
-                            </div>
-                          )}
-                          {entry.details?.tradeData && (
-                            <div>
-                              <div className="font-medium text-slate-300">Trade Details:</div>
-                              <div>Menge: {entry.details.tradeData.quantity?.toFixed(6)}</div>
-                              <div>Preis: ${entry.details.tradeData.price?.toFixed(2)}</div>
-                              <div>Gebühr: ${entry.details.tradeData.fee?.toFixed(2)}</div>
-                            </div>
-                          )}
-                          {entry.details?.portfolioData && (
-                            <div>
-                              <div className="font-medium text-slate-300">Portfolio Change:</div>
-                              <div>Vorher: ${entry.details.portfolioData.valueBefore?.toFixed(2)}</div>
-                              <div>Nachher: ${entry.details.portfolioData.valueAfter?.toFixed(2)}</div>
-                              <div>Änderung: {entry.details.portfolioData.changePercent >= 0 ? '+' : ''}{entry.details.portfolioData.changePercent?.toFixed(2)}%</div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-                )}
-              </div>
+              <LogEntry
+                key={index}
+                entry={entry}
+                index={index}
+                isExpanded={expandedEntries.has(index)}
+                onToggleExpansion={toggleEntryExpansion}
+                onCopyEntry={handleCopyEntry}
+              />
             ))
           )}
         </div>
