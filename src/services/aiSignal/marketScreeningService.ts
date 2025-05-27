@@ -3,6 +3,7 @@
 import { sendAIRequest, createScreeningPrompt, OpenRouterError } from '@/utils/openRouter';
 import { getMarketTickers } from '@/utils/kucoinApi';
 import { SignalGenerationParams, MarketDataPoint } from '@/types/aiSignal';
+import { safeJsonParse } from '@/utils/aiResponseValidator';
 
 export class MarketScreeningService {
   private params: SignalGenerationParams;
@@ -39,11 +40,15 @@ export class MarketScreeningService {
       const screeningPrompt = createScreeningPrompt(this.params.strategy, marketData);
       const aiResponse = await sendAIRequest(this.params.openRouterApiKey, screeningPrompt);
       
-      // Parse AI response
-      const parsed = JSON.parse(aiResponse);
+      console.log('Raw AI screening response:', aiResponse);
+      
+      // Parse AI response with validation
+      const fallbackResponse = { selected_pairs: ['BTC-USDT', 'ETH-USDT', 'SOL-USDT'] };
+      const parsed = safeJsonParse(aiResponse, fallbackResponse);
+      
       console.log('📊 Market screening completed:', parsed.selected_pairs);
       
-      return parsed.selected_pairs || [];
+      return parsed.selected_pairs || ['BTC-USDT', 'ETH-USDT', 'SOL-USDT'];
       
     } catch (error) {
       console.error('❌ Market screening failed:', error);

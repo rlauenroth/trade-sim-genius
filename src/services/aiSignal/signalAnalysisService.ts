@@ -4,6 +4,7 @@ import { sendAIRequest, createAnalysisPrompt, OpenRouterError } from '@/utils/op
 import { getHistoricalCandles, getCurrentPrice } from '@/utils/kucoinApi';
 import { calculateAllIndicators } from '@/utils/technicalIndicators';
 import { SignalGenerationParams, GeneratedSignal, CandleData, DetailedMarketData, PortfolioData } from '@/types/aiSignal';
+import { safeJsonParse } from '@/utils/aiResponseValidator';
 
 export class SignalAnalysisService {
   private params: SignalGenerationParams;
@@ -75,7 +76,22 @@ export class SignalAnalysisService {
       
       // Send to AI for detailed analysis
       const aiResponse = await sendAIRequest(this.params.openRouterApiKey, analysisPrompt);
-      const signal = JSON.parse(aiResponse);
+      
+      console.log('Raw AI signal response:', aiResponse);
+      
+      // Parse AI response with validation and fallback
+      const fallbackSignal = {
+        asset_pair: assetPair,
+        signal_type: 'NO_TRADE',
+        entry_price_suggestion: 'MARKET',
+        take_profit_price: 0,
+        stop_loss_price: 0,
+        confidence_score: 0,
+        reasoning: 'AI response parsing failed, no trade recommended',
+        suggested_position_size_percent: 0
+      };
+      
+      const signal = safeJsonParse(aiResponse, fallbackSignal);
       
       console.log(`✅ Signal generated for ${assetPair}:`, signal.signal_type);
       
