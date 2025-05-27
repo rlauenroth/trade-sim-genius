@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { getAccountBalances, getCurrentPrice } from '@/utils/kucoinApi';
 import { toast } from '@/hooks/use-toast';
@@ -77,12 +76,6 @@ export const usePortfolioData = () => {
         }
       }
 
-      // Ensure minimum portfolio value for simulation purposes
-      if (totalValue < 1000) {
-        console.log(`Portfolio-Wert von $${totalValue} zu niedrig für Simulation. Setze Mindestwert von $10,000.`);
-        totalValue = 10000;
-      }
-
       const portfolioData: PortfolioData = {
         assets,
         totalValue,
@@ -111,6 +104,8 @@ export const usePortfolioData = () => {
           errorMessage = 'Netzwerkfehler. Bitte überprüfen Sie Ihre Internetverbindung.';
         } else if (error.message.includes('Rate limit')) {
           errorMessage = 'Rate Limit erreicht. Bitte warten Sie einen Moment und versuchen Sie es erneut.';
+        } else if (error.name === 'ProxyError') {
+          errorMessage = 'KuCoin API nicht erreichbar. Bitte versuchen Sie es später erneut.';
         } else {
           errorMessage = `API-Fehler: ${error.message}`;
         }

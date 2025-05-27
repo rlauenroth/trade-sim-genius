@@ -69,16 +69,26 @@ export const useAISignals = () => {
       // Get API keys from localStorage
       const storedKeys = JSON.parse(localStorage.getItem('kiTradingApp_apiKeys') || '{}');
       
+      // Use actual portfolio value instead of hardcoded fallback
+      const portfolioValue = simulationState?.currentPortfolioValue || null;
+      const availableUSDT = simulationState?.paperAssets.find((asset: any) => asset.symbol === 'USDT')?.quantity || null;
+      
+      if (!portfolioValue || !availableUSDT) {
+        addLogEntry('ERROR', 'Portfolio-Daten nicht verfügbar für KI-Analyse');
+        setTimeout(() => generateMockSignalFallback(), 3000);
+        return;
+      }
+      
       const aiService = new AISignalService({
         kucoinCredentials: {
-          kucoinApiKey: storedKeys.kucoinApiKey || 'demo_key',
-          kucoinApiSecret: storedKeys.kucoinApiSecret || 'demo_secret',
-          kucoinApiPassphrase: storedKeys.kucoinApiPassphrase || 'demo_passphrase'
+          kucoinApiKey: storedKeys.kucoinApiKey || '',
+          kucoinApiSecret: storedKeys.kucoinApiSecret || '',
+          kucoinApiPassphrase: storedKeys.kucoinApiPassphrase || ''
         },
         openRouterApiKey: storedKeys.openRouterApiKey || '',
         strategy: 'balanced',
-        simulatedPortfolioValue: simulationState?.currentPortfolioValue || 10000,
-        availableUSDT: simulationState?.paperAssets.find((asset: any) => asset.symbol === 'USDT')?.quantity || 10000
+        simulatedPortfolioValue: portfolioValue,
+        availableUSDT: availableUSDT
       });
       
       // Check if we'll be using demo mode

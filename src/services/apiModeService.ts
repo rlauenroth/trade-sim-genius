@@ -1,9 +1,9 @@
 
-// Centralized API mode management service
+// Centralized API mode management service - NO MOCK FALLBACKS
 import { KUCOIN_PROXY_BASE } from '@/config';
 
 interface ApiModeStatus {
-  kucoinMode: 'live' | 'mock' | 'hybrid';
+  kucoinMode: 'live' | 'error';
   openRouterMode: 'live' | 'demo';
   corsIssuesDetected: boolean;
   lastChecked: number;
@@ -12,7 +12,7 @@ interface ApiModeStatus {
 class ApiModeService {
   private static instance: ApiModeService;
   private status: ApiModeStatus = {
-    kucoinMode: 'hybrid',
+    kucoinMode: 'live',
     openRouterMode: 'demo',
     corsIssuesDetected: false,
     lastChecked: 0
@@ -28,7 +28,6 @@ class ApiModeService {
   async detectCorsSupport(): Promise<boolean> {
     try {
       console.log('🔍 Testing proxy connection for KuCoin API...');
-      // Use proxy instead of direct KuCoin API call with correct leading slash
       const response = await fetch(`${KUCOIN_PROXY_BASE}/api/v1/timestamp`, {
         method: 'GET'
       });
@@ -40,7 +39,7 @@ class ApiModeService {
       console.log(`Proxy connection detected: ${proxySupported}`);
       return proxySupported;
     } catch (error) {
-      console.log('Proxy not accessible, falling back to mock mode');
+      console.log('Proxy not accessible');
       this.status.corsIssuesDetected = true;
       this.status.lastChecked = Date.now();
       return false;
@@ -51,11 +50,11 @@ class ApiModeService {
     const proxySupported = await this.detectCorsSupport();
     
     if (proxySupported) {
-      this.status.kucoinMode = 'hybrid'; // Live via proxy
-      console.log('✅ KuCoin API: Hybrid mode enabled (via proxy)');
+      this.status.kucoinMode = 'live';
+      console.log('✅ KuCoin API: Live mode enabled (via proxy)');
     } else {
-      this.status.kucoinMode = 'mock';
-      console.log('⚠️ KuCoin API: Mock mode (proxy not accessible)');
+      this.status.kucoinMode = 'error';
+      console.log('❌ KuCoin API: Error mode (proxy not accessible)');
     }
 
     // OpenRouter typically supports CORS
@@ -67,7 +66,7 @@ class ApiModeService {
     return { ...this.status };
   }
 
-  setKucoinMode(mode: 'live' | 'mock' | 'hybrid'): void {
+  setKucoinMode(mode: 'live' | 'error'): void {
     this.status.kucoinMode = mode;
   }
 

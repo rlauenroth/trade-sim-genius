@@ -1,7 +1,5 @@
 
-// Enhanced KuCoin API utilities with PHP proxy support
-import { mockKucoinApi } from '@/services/mockKucoinApi';
-import { apiModeService } from '@/services/apiModeService';
+// Enhanced KuCoin API utilities with PHP proxy support - NO MOCK FALLBACKS
 import { 
   getMarketTickers as proxyGetMarketTickers,
   getCurrentPrice as proxyGetCurrentPrice,
@@ -10,6 +8,7 @@ import {
   testProxyConnection
 } from './kucoinProxyApi';
 import { networkStatusService } from '@/services/networkStatusService';
+import { ProxyError, ApiError } from './errors';
 
 interface KuCoinCredentials {
   kucoinApiKey: string;
@@ -48,43 +47,29 @@ interface Candle {
   turnover: string;
 }
 
-// Enhanced public endpoint implementations with proxy support
+// Enhanced public endpoint implementations with proxy support - NO MOCK FALLBACKS
 export async function getMarketTickers(credentials: KuCoinCredentials): Promise<MarketTicker[]> {
-  const apiMode = apiModeService.getApiModeStatus();
-  
-  // Try proxy first if available
-  if (apiMode.kucoinMode !== 'mock') {
-    try {
-      console.log('Using PHP proxy for KuCoin API - getMarketTickers');
-      const result = await proxyGetMarketTickers();
-      return result;
-    } catch (error) {
-      console.warn('PHP proxy failed, falling back to mock:', error);
-      networkStatusService.recordError(error as Error);
-      apiModeService.setKucoinMode('mock');
-    }
+  try {
+    console.log('Using PHP proxy for KuCoin API - getMarketTickers');
+    const result = await proxyGetMarketTickers();
+    return result;
+  } catch (error) {
+    console.error('KuCoin API failed:', error);
+    networkStatusService.recordError(error as Error);
+    throw new ProxyError('KuCoin market data not available');
   }
-  
-  console.log('Using mock KuCoin API - getMarketTickers');
-  return mockKucoinApi.getMarketTickers();
 }
 
 export async function getCurrentPrice(credentials: KuCoinCredentials, symbol: string): Promise<number> {
-  const apiMode = apiModeService.getApiModeStatus();
-  
-  if (apiMode.kucoinMode !== 'mock') {
-    try {
-      console.log(`Using PHP proxy for KuCoin API - getCurrentPrice for ${symbol}`);
-      const result = await proxyGetCurrentPrice(symbol);
-      return result;
-    } catch (error) {
-      console.warn(`PHP proxy price fetch failed for ${symbol}, using mock:`, error);
-      networkStatusService.recordError(error as Error);
-    }
+  try {
+    console.log(`Using PHP proxy for KuCoin API - getCurrentPrice for ${symbol}`);
+    const result = await proxyGetCurrentPrice(symbol);
+    return result;
+  } catch (error) {
+    console.error(`Price fetch failed for ${symbol}:`, error);
+    networkStatusService.recordError(error as Error);
+    throw new ProxyError(`Price for ${symbol} not available`);
   }
-  
-  console.log(`Using mock KuCoin API - getCurrentPrice for ${symbol}`);
-  return mockKucoinApi.getCurrentPrice(symbol);
 }
 
 export async function getHistoricalCandles(
@@ -94,40 +79,28 @@ export async function getHistoricalCandles(
   startAt?: number,
   endAt?: number
 ): Promise<Candle[]> {
-  const apiMode = apiModeService.getApiModeStatus();
-  
-  if (apiMode.kucoinMode !== 'mock') {
-    try {
-      console.log(`Using PHP proxy for KuCoin API - getHistoricalCandles for ${symbol}`);
-      const result = await proxyGetHistoricalCandles(symbol, type, startAt, endAt);
-      return result;
-    } catch (error) {
-      console.warn(`PHP proxy candles fetch failed for ${symbol}, using mock:`, error);
-      networkStatusService.recordError(error as Error);
-    }
+  try {
+    console.log(`Using PHP proxy for KuCoin API - getHistoricalCandles for ${symbol}`);
+    const result = await proxyGetHistoricalCandles(symbol, type, startAt, endAt);
+    return result;
+  } catch (error) {
+    console.error(`Candles fetch failed for ${symbol}:`, error);
+    networkStatusService.recordError(error as Error);
+    throw new ProxyError(`Historical data for ${symbol} not available`);
   }
-  
-  console.log(`Using mock KuCoin API - getHistoricalCandles for ${symbol}`);
-  return mockKucoinApi.getHistoricalCandles(symbol, type, startAt, endAt);
 }
 
-// Private endpoints now use proxy
+// Private endpoints use proxy - NO MOCK FALLBACKS
 export async function getAccountBalances(credentials: KuCoinCredentials): Promise<AccountBalance[]> {
-  const apiMode = apiModeService.getApiModeStatus();
-  
-  if (apiMode.kucoinMode !== 'mock') {
-    try {
-      console.log('Using PHP proxy for KuCoin API - getAccountBalances');
-      const result = await proxyGetAccountBalances();
-      return result;
-    } catch (error) {
-      console.warn('PHP proxy account balances failed, using mock:', error);
-      networkStatusService.recordError(error as Error);
-    }
+  try {
+    console.log('Using PHP proxy for KuCoin API - getAccountBalances');
+    const result = await proxyGetAccountBalances();
+    return result;
+  } catch (error) {
+    console.error('Account balances fetch failed:', error);
+    networkStatusService.recordError(error as Error);
+    throw new ProxyError('Account data not available from KuCoin');
   }
-  
-  console.log('Using mock KuCoin API - getAccountBalances');
-  return mockKucoinApi.getAccountBalances();
 }
 
 export async function getPortfolioSummary(credentials: KuCoinCredentials): Promise<{
@@ -138,51 +111,45 @@ export async function getPortfolioSummary(credentials: KuCoinCredentials): Promi
     usdValue: number;
   }>;
 }> {
-  const apiMode = apiModeService.getApiModeStatus();
-  
-  if (apiMode.kucoinMode !== 'mock') {
-    try {
-      console.log('Using PHP proxy for KuCoin API - getPortfolioSummary');
-      const balances = await proxyGetAccountBalances();
-      
-      // Calculate portfolio summary from balances
-      let totalUSDValue = 0;
-      const assets = [];
-      
-      for (const balance of balances) {
-        const balanceNum = parseFloat(balance.balance);
-        if (balanceNum > 0) {
-          let usdValue = 0;
-          
-          if (balance.currency === 'USDT') {
-            usdValue = balanceNum;
-          } else {
-            try {
-              const price = await proxyGetCurrentPrice(`${balance.currency}-USDT`);
-              usdValue = balanceNum * price;
-            } catch (error) {
-              console.warn(`Could not get price for ${balance.currency}:`, error);
-            }
+  try {
+    console.log('Using PHP proxy for KuCoin API - getPortfolioSummary');
+    const balances = await proxyGetAccountBalances();
+    
+    // Calculate portfolio summary from balances
+    let totalUSDValue = 0;
+    const assets = [];
+    
+    for (const balance of balances) {
+      const balanceNum = parseFloat(balance.balance);
+      if (balanceNum > 0) {
+        let usdValue = 0;
+        
+        if (balance.currency === 'USDT') {
+          usdValue = balanceNum;
+        } else {
+          try {
+            const price = await proxyGetCurrentPrice(`${balance.currency}-USDT`);
+            usdValue = balanceNum * price;
+          } catch (error) {
+            console.warn(`Could not get price for ${balance.currency}:`, error);
           }
-          
-          totalUSDValue += usdValue;
-          assets.push({
-            currency: balance.currency,
-            balance: balanceNum,
-            usdValue
-          });
         }
+        
+        totalUSDValue += usdValue;
+        assets.push({
+          currency: balance.currency,
+          balance: balanceNum,
+          usdValue
+        });
       }
-      
-      return { totalUSDValue, assets };
-    } catch (error) {
-      console.warn('PHP proxy portfolio summary failed, using mock:', error);
-      networkStatusService.recordError(error as Error);
     }
+    
+    return { totalUSDValue, assets };
+  } catch (error) {
+    console.error('Portfolio summary fetch failed:', error);
+    networkStatusService.recordError(error as Error);
+    throw new ProxyError('Portfolio data not available from KuCoin');
   }
-  
-  console.log('Using mock KuCoin API - getPortfolioSummary');
-  return mockKucoinApi.getPortfolioSummary();
 }
 
 // Proxy connection test utility
