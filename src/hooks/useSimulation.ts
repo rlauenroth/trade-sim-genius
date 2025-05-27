@@ -61,9 +61,9 @@ export const useSimulation = () => {
       startAISignalGeneration,
       addLogEntry,
       setAiGenerationTimer,
-      simulationState
+      updateSimulationState
     );
-  }, [startSimulationAction, userSettings, initializeSimulation, startAISignalGeneration, addLogEntry, setAiGenerationTimer, simulationState]);
+  }, [startSimulationAction, userSettings, initializeSimulation, startAISignalGeneration, addLogEntry, setAiGenerationTimer, updateSimulationState]);
 
   // Update timer interval - always use 30s for automatic mode
   useEffect(() => {
@@ -103,11 +103,11 @@ export const useSimulation = () => {
     await resumeSimulationAction(
       resumeSimulationState,
       addLogEntry,
-      simulationState,
       startAISignalGeneration,
-      setAiGenerationTimer
+      setAiGenerationTimer,
+      updateSimulationState
     );
-  }, [resumeSimulationAction, resumeSimulationState, addLogEntry, simulationState, startAISignalGeneration, setAiGenerationTimer]);
+  }, [resumeSimulationAction, resumeSimulationState, addLogEntry, startAISignalGeneration, setAiGenerationTimer, updateSimulationState]);
 
   // Accept signal manually (kept for compatibility but simplified)
   const acceptSignal = useCallback(async (signal: Signal) => {

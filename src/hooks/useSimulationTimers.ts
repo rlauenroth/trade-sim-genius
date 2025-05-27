@@ -6,23 +6,25 @@ export const useSimulationTimers = () => {
 
   const updateTimerInterval = useCallback((
     isSimulationActive: boolean,
-    autoMode: boolean, // This parameter is kept for compatibility but ignored
+    autoMode: boolean, // Kept for compatibility but ignored
     simulationState: any,
     startAISignalGeneration: (immediate: boolean, state: any, addLogEntry: any) => Promise<void>,
     addLogEntry: (type: any, message: string) => void
   ) => {
-    if (aiGenerationTimer && isSimulationActive) {
-      // Clear existing timer
+    // Clear existing timer
+    if (aiGenerationTimer) {
       clearInterval(aiGenerationTimer);
-      
-      // Set new interval - always 30s for automatic mode
-      const interval = 30 * 1000;
-      
+      setAiGenerationTimer(null);
+    }
+    
+    // Only start new timer if simulation is active
+    if (isSimulationActive && simulationState?.isActive && !simulationState?.isPaused) {
       const timer = setInterval(async () => {
-        if (simulationState?.isActive && !simulationState?.isPaused) {
-          await startAISignalGeneration(true, simulationState, addLogEntry);
+        const currentState = JSON.parse(localStorage.getItem('kiTradingApp_simulationState') || '{}');
+        if (currentState?.isActive && !currentState?.isPaused) {
+          await startAISignalGeneration(true, currentState, addLogEntry);
         }
-      }, interval);
+      }, 30 * 1000); // Always 30s for automatic mode
       
       setAiGenerationTimer(timer);
     }

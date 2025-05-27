@@ -1,14 +1,9 @@
 
 import { useCallback } from 'react';
 import { Signal, SimulationState } from '@/types/simulation';
-import { useTradeExecution } from './useTradeExecution';
-import { useRiskManagement } from './useRiskManagement';
 import { loggingService } from '@/services/loggingService';
 
 export const useSignalProcessor = () => {
-  const { executeTradeFromSignal } = useTradeExecution();
-  const { validateTradeRisk } = useRiskManagement('balanced');
-
   const processSignal = useCallback(async (
     signal: Signal,
     userSettings: any,
@@ -24,15 +19,27 @@ export const useSignalProcessor = () => {
       return;
     }
 
-    // Always execute automatically in new version
-    if (isSimulationActive && !simulationState?.isPaused) {
-      const success = await executeAutoTrade(signal, simulationState!, updateSimulationState, addLogEntry);
-      if (success) {
-        setCurrentSignal(null);
+    // Set signal for display first
+    setCurrentSignal(signal);
+    
+    // Always execute automatically in the new version
+    if (isSimulationActive && simulationState && !simulationState.isPaused) {
+      addLogEntry('AUTO_TRADE', `Signal wird automatisch ausgeführt: ${signal.signalType} ${signal.assetPair}`);
+      
+      try {
+        const success = await executeAutoTrade(signal, simulationState, updateSimulationState, addLogEntry);
+        if (success) {
+          addLogEntry('AUTO_TRADE', `Trade erfolgreich ausgeführt: ${signal.signalType} ${signal.assetPair}`);
+          setCurrentSignal(null);
+        } else {
+          addLogEntry('ERROR', `Trade fehlgeschlagen: ${signal.signalType} ${signal.assetPair}`);
+        }
+      } catch (error) {
+        addLogEntry('ERROR', `Trade-Ausführung fehlgeschlagen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
       }
     } else {
-      // Just show the signal for information but don't wait for manual action
-      setCurrentSignal(signal);
+      // Just show the signal for information if simulation is not active
+      addLogEntry('INFO', `Signal empfangen (Simulation nicht aktiv): ${signal.signalType} ${signal.assetPair}`);
     }
   }, []);
 

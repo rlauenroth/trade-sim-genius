@@ -11,7 +11,7 @@ export const useSimulationActions = () => {
     startAISignalGeneration: (immediate: boolean, state: SimulationState, addLogEntry: any) => Promise<void>,
     addLogEntry: (type: any, message: string) => void,
     setAiGenerationTimer: (timer: NodeJS.Timeout | null) => void,
-    simulationState: SimulationState | null
+    updateSimulationState: (state: SimulationState) => void
   ) => {
     try {
       loggingService.logEvent('SIM', 'Starting automatic simulation', {
@@ -24,18 +24,18 @@ export const useSimulationActions = () => {
       
       // Initialize simulation state
       const initialState = initializeSimulation(portfolioData);
+      updateSimulationState(initialState);
       
       // Start AI signal generation immediately
       await startAISignalGeneration(true, initialState, addLogEntry);
       
-      // Set up periodic AI signal generation with constant 30s interval for automatic mode
-      const interval = 30 * 1000; // Always 30s for automatic mode
-      
+      // Set up periodic AI signal generation with constant 30s interval
       const timer = setInterval(async () => {
-        if (simulationState?.isActive && !simulationState?.isPaused) {
-          await startAISignalGeneration(true, simulationState, addLogEntry);
+        const currentState = JSON.parse(localStorage.getItem('kiTradingApp_simulationState') || '{}');
+        if (currentState?.isActive && !currentState?.isPaused) {
+          await startAISignalGeneration(true, currentState, addLogEntry);
         }
-      }, interval);
+      }, 30 * 1000);
       
       setAiGenerationTimer(timer);
       
@@ -64,10 +64,8 @@ export const useSimulationActions = () => {
       setAiGenerationTimer(null);
     }
     
-    // Clear current signals
     setCurrentSignal(null);
     setAvailableSignals([]);
-    
     stopSimulationState();
     addLogEntry('SIM', 'Automatische Simulation beendet');
   }, []);
@@ -92,24 +90,26 @@ export const useSimulationActions = () => {
   const resumeSimulation = useCallback(async (
     resumeSimulationState: () => void,
     addLogEntry: (type: any, message: string) => void,
-    simulationState: SimulationState | null,
     startAISignalGeneration: (immediate: boolean, state: SimulationState, addLogEntry: any) => Promise<void>,
-    setAiGenerationTimer: (timer: NodeJS.Timeout | null) => void
+    setAiGenerationTimer: (timer: NodeJS.Timeout | null) => void,
+    updateSimulationState: (state: SimulationState) => void
   ) => {
     loggingService.logEvent('SIM', 'Resuming automatic simulation');
     
     resumeSimulationState();
     addLogEntry('SIM', 'Automatische Simulation fortgesetzt');
     
-    // Restart AI signal generation with 30s interval
-    if (simulationState) {
-      await startAISignalGeneration(true, simulationState, addLogEntry);
+    // Get current simulation state and restart AI generation
+    const currentState = JSON.parse(localStorage.getItem('kiTradingApp_simulationState') || '{}');
+    if (currentState) {
+      await startAISignalGeneration(true, currentState, addLogEntry);
       
       const timer = setInterval(async () => {
-        if (simulationState?.isActive && !simulationState?.isPaused) {
-          await startAISignalGeneration(true, simulationState, addLogEntry);
+        const state = JSON.parse(localStorage.getItem('kiTradingApp_simulationState') || '{}');
+        if (state?.isActive && !state?.isPaused) {
+          await startAISignalGeneration(true, state, addLogEntry);
         }
-      }, 30 * 1000); // Always 30s for automatic mode
+      }, 30 * 1000);
       
       setAiGenerationTimer(timer);
     }
