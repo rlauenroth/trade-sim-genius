@@ -66,7 +66,8 @@ const TradingDashboard = () => {
     getTotalPnL,
     getTotalPnLPercentage,
     getDisplayPortfolioValue,
-    getDisplayStartValue
+    getDisplayStartValue,
+    hasValidSimulation
   } = useTradingDashboardData(simulationState, portfolioData, isSimulationActive);
 
   const { handleStartSimulation, handleOpenSettings } = useTradingDashboardEffects({
@@ -160,6 +161,7 @@ const TradingDashboard = () => {
           startValue={getDisplayStartValue()}
           currentValue={getDisplayPortfolioValue()}
           progressValue={getProgressValue()}
+          isSimulationActive={isSimulationActive}
         />
 
         <ControlCenter 

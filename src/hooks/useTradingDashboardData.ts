@@ -27,8 +27,12 @@ export const useTradingDashboardData = (
     }
   }, [isSimulationActive, simulationState?.startTime]);
 
+  const hasValidSimulation = () => {
+    return simulationState?.startPortfolioValue && simulationState.startPortfolioValue > 0;
+  };
+
   const getProgressValue = () => {
-    if (!simulationState?.startPortfolioValue || !simulationState?.currentPortfolioValue) return 0;
+    if (!hasValidSimulation() || !simulationState?.currentPortfolioValue) return 0;
     
     const targetValue = simulationState.startPortfolioValue * 1.01; // 1% Ziel
     const currentProgress = simulationState.currentPortfolioValue - simulationState.startPortfolioValue;
@@ -38,25 +42,25 @@ export const useTradingDashboardData = (
   };
 
   const getTotalPnL = () => {
-    if (!simulationState?.startPortfolioValue || !simulationState?.currentPortfolioValue) return 0;
+    if (!hasValidSimulation() || !simulationState?.currentPortfolioValue) return 0;
     return simulationState.currentPortfolioValue - simulationState.startPortfolioValue;
   };
 
   const getTotalPnLPercentage = () => {
-    if (!simulationState?.startPortfolioValue || !simulationState?.currentPortfolioValue) return 0;
+    if (!hasValidSimulation() || !simulationState?.currentPortfolioValue) return 0;
     return ((simulationState.currentPortfolioValue - simulationState.startPortfolioValue) / simulationState.startPortfolioValue) * 100;
   };
 
   const getDisplayPortfolioValue = () => {
-    if (simulationState?.currentPortfolioValue) {
+    if (simulationState?.currentPortfolioValue && hasValidSimulation()) {
       return simulationState.currentPortfolioValue;
     }
     return portfolioData?.totalValue || 0;
   };
 
   const getDisplayStartValue = () => {
-    // Return null when no simulation has been started (ever)
-    if (!simulationState?.startPortfolioValue) {
+    // Only return start value if we have a valid simulation that was actually started
+    if (!hasValidSimulation()) {
       return null;
     }
     return simulationState.startPortfolioValue;
@@ -68,6 +72,7 @@ export const useTradingDashboardData = (
     getTotalPnL,
     getTotalPnLPercentage,
     getDisplayPortfolioValue,
-    getDisplayStartValue
+    getDisplayStartValue,
+    hasValidSimulation
   };
 };

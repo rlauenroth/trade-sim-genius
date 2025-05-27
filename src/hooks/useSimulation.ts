@@ -16,7 +16,8 @@ export const useSimulation = () => {
     isSimulationActive,
     setIsSimulationActive,
     loadSimulationState,
-    saveSimulationState
+    saveSimulationState,
+    clearSimulationState
   } = useSimulationState();
 
   const {
@@ -63,7 +64,9 @@ export const useSimulation = () => {
 
   // Load saved state and initialize services on mount
   useEffect(() => {
-    loadSimulationState();
+    // Load with current portfolio value for validation
+    const currentPortfolioValue = livePortfolio?.totalUSDValue;
+    loadSimulationState(currentPortfolioValue);
     loadActivityLog();
     
     // Initialize sim readiness store
@@ -78,7 +81,7 @@ export const useSimulation = () => {
         addLogEntry('INFO', 'API-Modi initialisiert. Live-Daten verfügbar für öffentliche Endpunkte.');
       }
     });
-  }, [loadSimulationState, loadActivityLog, addLogEntry]);
+  }, [loadSimulationState, loadActivityLog, addLogEntry, livePortfolio]);
 
   const startSimulation = useCallback(async () => {
     try {
@@ -94,6 +97,9 @@ export const useSimulation = () => {
       }
 
       addLogEntry('INFO', 'Simulation wird gestartet...');
+      
+      // Clear any existing invalid simulation state
+      clearSimulationState();
       
       // Notify sim readiness store
       simReadinessStore.startSimulation();
@@ -152,7 +158,7 @@ export const useSimulation = () => {
         variant: "destructive"
       });
     }
-  }, [livePortfolio, addLogEntry, saveSimulationState, setIsSimulationActive, startAISignalGeneration, generateMockSignal]);
+  }, [livePortfolio, addLogEntry, saveSimulationState, setIsSimulationActive, startAISignalGeneration, generateMockSignal, clearSimulationState]);
 
   const stopSimulation = useCallback(() => {
     if (!simulationState) return;
