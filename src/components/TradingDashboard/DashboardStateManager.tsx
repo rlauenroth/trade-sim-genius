@@ -1,3 +1,4 @@
+
 import { useCallback } from 'react';
 import { useAppState } from '@/hooks/useAppState';
 import { useSimulation } from '@/hooks/useSimulation';
@@ -58,7 +59,7 @@ export const useDashboardStateManager = () => {
   const { handleStartSimulation: handleStartSimulationFromEffects, handleOpenSettings } = useTradingDashboardEffects({
     isFirstTimeAfterSetup,
     decryptedApiKeys: apiKeys,
-    portfolioData,
+    livePortfolio, // Changed from portfolioData to livePortfolio
     loadPortfolioData,
     completeFirstTimeSetup,
     startSimulation

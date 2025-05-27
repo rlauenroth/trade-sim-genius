@@ -1,12 +1,15 @@
+
 import { useEffect } from 'react';
 import { useActivityLog } from './useActivityLog';
 import { setActivityLogger, testProxyConnection } from '@/utils/kucoinProxyApi';
 import { apiModeService } from '@/services/apiModeService';
+import { useSimGuard } from './useSimGuard';
+import { toast } from '@/hooks/use-toast';
 
 interface TradingDashboardEffectsProps {
   isFirstTimeAfterSetup: boolean;
   decryptedApiKeys: any;
-  portfolioData: any;
+  livePortfolio: any;
   loadPortfolioData: (keys: any) => void;
   completeFirstTimeSetup: () => void;
   startSimulation: (portfolioData: any) => Promise<void>;
@@ -15,7 +18,7 @@ interface TradingDashboardEffectsProps {
 export const useTradingDashboardEffects = ({
   isFirstTimeAfterSetup,
   decryptedApiKeys,
-  portfolioData,
+  livePortfolio,
   loadPortfolioData,
   completeFirstTimeSetup,
   startSimulation
@@ -26,6 +29,8 @@ export const useTradingDashboardEffects = ({
     addKucoinErrorLog, 
     addProxyStatusLog 
   } = useActivityLog();
+
+  const { canStart, isRunningBlocked, reason, state } = useSimGuard();
 
   // Initialize activity logger for kucoinProxyApi
   useEffect(() => {
@@ -63,29 +68,71 @@ export const useTradingDashboardEffects = ({
 
   // Load portfolio data on first mount for new users
   useEffect(() => {
-    if (isFirstTimeAfterSetup && decryptedApiKeys && !portfolioData) {
+    if (isFirstTimeAfterSetup && decryptedApiKeys && !livePortfolio) {
       addLogEntry('INFO', 'App erfolgreich initialisiert nach Einrichtung.');
       addLogEntry('INFO', 'Lade Portfolio-Daten von KuCoin...');
       loadPortfolioData(decryptedApiKeys);
     }
-  }, [isFirstTimeAfterSetup, decryptedApiKeys, portfolioData, loadPortfolioData, addLogEntry]);
+  }, [isFirstTimeAfterSetup, decryptedApiKeys, livePortfolio, loadPortfolioData, addLogEntry]);
 
   // Log successful portfolio load
   useEffect(() => {
-    if (portfolioData && isFirstTimeAfterSetup) {
-      addLogEntry('INFO', `KuCoin Portfolio-Daten erfolgreich geladen. Gesamtwert: $${portfolioData.totalValue.toLocaleString()} USDT.`);
+    if (livePortfolio && isFirstTimeAfterSetup) {
+      addLogEntry('INFO', `KuCoin Portfolio-Daten erfolgreich geladen. Gesamtwert: $${livePortfolio.totalUSDValue.toLocaleString()} USDT.`);
       addLogEntry('INFO', 'App bereit zum Start der ersten Simulation.');
     }
-  }, [portfolioData, isFirstTimeAfterSetup, addLogEntry]);
+  }, [livePortfolio, isFirstTimeAfterSetup, addLogEntry]);
 
   const handleStartSimulation = async () => {
-    if (isFirstTimeAfterSetup) {
-      completeFirstTimeSetup();
-    }
-    addLogEntry('INFO', 'Trading-Simulation gestartet');
+    console.log('🚀 Starting simulation...');
+    console.log('SimGuard state:', { canStart, isRunningBlocked, reason, state });
+    console.log('Live portfolio:', livePortfolio);
     
-    if (portfolioData) {
-      await startSimulation(portfolioData);
+    // Check SimGuard status first
+    if (!canStart) {
+      const errorMessage = `Simulation kann nicht gestartet werden: ${reason}`;
+      addLogEntry('ERROR', errorMessage);
+      toast({
+        title: "Simulation nicht möglich",
+        description: reason,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!livePortfolio) {
+      const errorMessage = 'Keine Portfolio-Daten verfügbar. Bitte Portfolio neu laden.';
+      addLogEntry('ERROR', errorMessage);
+      toast({
+        title: "Portfolio-Daten fehlen",
+        description: errorMessage,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      if (isFirstTimeAfterSetup) {
+        completeFirstTimeSetup();
+      }
+      
+      addLogEntry('INFO', `Trading-Simulation startet mit $${livePortfolio.totalUSDValue} USDT`);
+      
+      await startSimulation(livePortfolio);
+      
+      toast({
+        title: "Simulation gestartet",
+        description: `Portfolio-Wert: $${livePortfolio.totalUSDValue} USDT`
+      });
+      
+    } catch (error) {
+      const errorMessage = `Simulation-Start fehlgeschlagen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`;
+      addLogEntry('ERROR', errorMessage);
+      toast({
+        title: "Simulation-Fehler",
+        description: errorMessage,
+        variant: "destructive"
+      });
     }
   };
 
