@@ -1,5 +1,5 @@
 
-import { kucoinFetch } from '@/utils/kucoinProxyApi';
+import { kucoinFetch, getPrice } from '@/utils/kucoinProxyApi';
 import { PortfolioSnapshot } from '@/types/simReadiness';
 import { ApiError, RateLimitError, ProxyError } from '@/utils/errors';
 
@@ -56,14 +56,10 @@ export class KuCoinService {
               usdValue = balance;
               cashUSDT = balance;
             } else {
-              // For other currencies, try to get current price
+              // For other currencies, try to get current price using the new getPrice function
               try {
-                const priceResponse = await kucoinFetch('/api/v1/market/ticker', 'GET', { 
-                  symbol: `${account.currency}-USDT` 
-                });
-                if (priceResponse.code === '200000' && priceResponse.data?.price) {
-                  usdValue = balance * parseFloat(priceResponse.data.price);
-                }
+                const price = await getPrice(`${account.currency}-USDT`);
+                usdValue = balance * price;
               } catch (priceError) {
                 console.warn(`Could not get price for ${account.currency}:`, priceError);
                 usdValue = 0;

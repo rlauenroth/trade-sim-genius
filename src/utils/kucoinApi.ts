@@ -2,7 +2,7 @@
 // Enhanced KuCoin API utilities with PHP proxy support - NO MOCK FALLBACKS
 import { 
   getMarketTickers as proxyGetMarketTickers,
-  getCurrentPrice as proxyGetCurrentPrice,
+  getPrice as proxyGetPrice,
   getHistoricalCandles as proxyGetHistoricalCandles,
   getAccountBalances as proxyGetAccountBalances,
   testProxyConnection
@@ -63,7 +63,7 @@ export async function getMarketTickers(credentials: KuCoinCredentials): Promise<
 export async function getCurrentPrice(credentials: KuCoinCredentials, symbol: string): Promise<number> {
   try {
     console.log(`Using PHP proxy for KuCoin API - getCurrentPrice for ${symbol}`);
-    const result = await proxyGetCurrentPrice(symbol);
+    const result = await proxyGetPrice(symbol);
     return result;
   } catch (error) {
     console.error(`Price fetch failed for ${symbol}:`, error);
@@ -128,7 +128,7 @@ export async function getPortfolioSummary(credentials: KuCoinCredentials): Promi
           usdValue = balanceNum;
         } else {
           try {
-            const price = await proxyGetCurrentPrice(`${balance.currency}-USDT`);
+            const price = await proxyGetPrice(`${balance.currency}-USDT`);
             usdValue = balanceNum * price;
           } catch (error) {
             console.warn(`Could not get price for ${balance.currency}:`, error);

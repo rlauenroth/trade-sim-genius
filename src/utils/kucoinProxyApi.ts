@@ -1,4 +1,3 @@
-
 import { KUCOIN_PROXY_BASE, getStoredKeys } from '@/config';
 import { signKuCoinRequest } from './kucoinSigner';
 import { 
@@ -157,7 +156,52 @@ export async function kucoinFetch(
   }
 }
 
-// Refactored API methods using the new proxy with correct paths
+// New robust price fetching function with fallback
+export async function getPrice(symbol: string): Promise<number> {
+  // Primary: Use Level 1 Orderbook endpoint
+  try {
+    console.log(`🔍 Fetching price for ${symbol} via Level 1 orderbook...`);
+    const response = await kucoinFetch('/api/v1/market/orderbook/level1', 'GET', { symbol });
+    
+    if (response.code === '200000' && response.data?.price) {
+      const price = parseFloat(response.data.price);
+      globalActivityLogger?.addKucoinSuccessLog('/api/v1/market/orderbook/level1', `Preis für ${symbol}: $${price}`);
+      return price;
+    }
+    
+    throw new ApiError(new Response(JSON.stringify(response), { status: 400 }));
+  } catch (error) {
+    console.log(`⚠️ Level 1 orderbook failed for ${symbol}, trying fallback...`);
+    
+    // Fallback: Use allTickers endpoint
+    if (error instanceof ApiError && (error.status === 404 || error.code === '400001')) {
+      try {
+        console.log(`🔄 Using allTickers fallback for ${symbol}...`);
+        const response = await kucoinFetch('/api/v1/market/allTickers');
+        
+        if (response.code === '200000' && response.data?.ticker) {
+          const ticker = response.data.ticker.find((t: any) => t.symbol === symbol);
+          if (!ticker || !ticker.last) {
+            throw new ProxyError(`Ticker ${symbol} not found in allTickers`);
+          }
+          
+          const price = parseFloat(ticker.last);
+          globalActivityLogger?.addKucoinSuccessLog('/api/v1/market/allTickers', `Fallback-Preis für ${symbol}: $${price}`);
+          return price;
+        }
+        
+        throw new ApiError(new Response(JSON.stringify(response), { status: 400 }));
+      } catch (fallbackError) {
+        console.error(`❌ Both price endpoints failed for ${symbol}:`, fallbackError);
+        throw new ProxyError(`Price for ${symbol} not available from any endpoint`);
+      }
+    }
+    
+    // Re-throw other errors
+    throw error;
+  }
+}
+
 export async function getMarketTickers() {
   const response = await kucoinFetch('/api/v1/market/allTickers');
   
@@ -183,16 +227,9 @@ export async function getMarketTickers() {
   throw new ApiError(new Response(JSON.stringify(response), { status: 400 }));
 }
 
+// Updated getCurrentPrice to use the new getPrice function
 export async function getCurrentPrice(symbol: string): Promise<number> {
-  const response = await kucoinFetch('/api/v1/market/ticker', 'GET', { symbol });
-  
-  if (response.code === '200000' && response.data?.price) {
-    const price = parseFloat(response.data.price);
-    globalActivityLogger?.addKucoinSuccessLog('/api/v1/market/ticker', `Preis für ${symbol}: $${price}`);
-    return price;
-  }
-  
-  throw new ApiError(new Response(JSON.stringify(response), { status: 400 }));
+  return await getPrice(symbol);
 }
 
 export async function getAccountBalances() {
