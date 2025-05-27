@@ -8,7 +8,11 @@ import { useAutoTradeExecution } from './useAutoTradeExecution';
 import { useSimulationActions } from './useSimulationActions';
 import { useSignalProcessor } from './useSignalProcessor';
 import { useSimulationTimers } from './useSimulationTimers';
+import { useExitScreening } from './useExitScreening';
+import { useCircuitBreaker } from './useCircuitBreaker';
+import { usePerformanceMonitoring } from './usePerformanceMonitoring';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useAppState } from './useAppState';
 
 export const useSimulation = () => {
   const {
@@ -32,14 +36,37 @@ export const useSimulation = () => {
 
   const { activityLog, addLogEntry } = useActivityLog();
   const { userSettings } = useSettingsStore();
+  const { apiKeys } = useAppState();
 
   const { executeAutoTrade, autoModeError } = useAutoTradeExecution();
   const { startSimulation: startSimulationAction, stopSimulation: stopSimulationAction, pauseSimulation: pauseSimulationAction, resumeSimulation: resumeSimulationAction } = useSimulationActions();
   const { processSignal, acceptSignal: acceptSignalAction, ignoreSignal: ignoreSignalAction } = useSignalProcessor();
   const { aiGenerationTimer, setAiGenerationTimer, updateTimerInterval } = useSimulationTimers();
+  
+  // New integrated modules
+  const { startExitScreening, stopExitScreening } = useExitScreening();
+  const { enforceRiskLimits, getPortfolioHealthStatus } = useCircuitBreaker();
+  const { trackApiCall, trackSimulationCycle, logPerformanceReport } = usePerformanceMonitoring();
 
-  // Handle signal processing (always automatic now)
+  // Enhanced signal processing with circuit breaker
   const handleProcessSignal = useCallback(async (signal: Signal) => {
+    const cycleStartTime = Date.now();
+    const portfolioValueBefore = simulationState?.currentPortfolioValue || 0;
+
+    // Check risk limits before processing signal
+    if (simulationState && userSettings.tradingStrategy) {
+      const riskLimitReached = enforceRiskLimits(
+        simulationState,
+        userSettings.tradingStrategy,
+        pauseSimulationState,
+        addLogEntry
+      );
+      
+      if (riskLimitReached) {
+        return; // Stop processing if risk limits are breached
+      }
+    }
+
     await processSignal(
       signal,
       userSettings,
@@ -50,9 +77,14 @@ export const useSimulation = () => {
       updateSimulationState,
       addLogEntry
     );
-  }, [processSignal, userSettings, isSimulationActive, simulationState, setCurrentSignal, executeAutoTrade, updateSimulationState, addLogEntry]);
 
-  // Start simulation with automatic mode
+    // Track simulation cycle performance
+    const cycleEndTime = Date.now();
+    const portfolioValueAfter = simulationState?.currentPortfolioValue || portfolioValueBefore;
+    trackSimulationCycle(cycleStartTime, cycleEndTime, portfolioValueBefore, portfolioValueAfter);
+  }, [processSignal, userSettings, isSimulationActive, simulationState, setCurrentSignal, executeAutoTrade, updateSimulationState, addLogEntry, enforceRiskLimits, pauseSimulationState, trackSimulationCycle]);
+
+  // Enhanced start simulation with exit screening
   const startSimulation = useCallback(async (portfolioData: any) => {
     await startSimulationAction(
       portfolioData,
@@ -63,9 +95,24 @@ export const useSimulation = () => {
       setAiGenerationTimer,
       updateSimulationState
     );
-  }, [startSimulationAction, userSettings, initializeSimulation, startAISignalGeneration, addLogEntry, setAiGenerationTimer, updateSimulationState]);
 
-  // Update timer interval - always use 30s for automatic mode
+    // Start exit screening for open positions
+    if (apiKeys?.openRouterApiKey && userSettings.tradingStrategy) {
+      const currentState = JSON.parse(localStorage.getItem('kiTradingApp_simulationState') || '{}');
+      if (currentState && currentState.openPositions?.length > 0) {
+        startExitScreening(
+          currentState,
+          apiKeys.openRouterApiKey,
+          updateSimulationState,
+          addLogEntry
+        );
+      }
+    }
+
+    addLogEntry('SIM', '🔄 Exit-Screening und Risk-Management aktiviert');
+  }, [startSimulationAction, userSettings, initializeSimulation, startAISignalGeneration, addLogEntry, setAiGenerationTimer, updateSimulationState, startExitScreening, apiKeys]);
+
+  // Update timer interval with performance monitoring
   useEffect(() => {
     updateTimerInterval(
       isSimulationActive,
@@ -76,8 +123,9 @@ export const useSimulation = () => {
     );
   }, [updateTimerInterval, isSimulationActive, simulationState, startAISignalGeneration, addLogEntry]);
 
-  // Stop simulation
+  // Enhanced stop simulation
   const stopSimulation = useCallback(() => {
+    stopExitScreening();
     stopSimulationAction(
       aiGenerationTimer,
       setCurrentSignal,
@@ -86,19 +134,21 @@ export const useSimulation = () => {
       addLogEntry,
       setAiGenerationTimer
     );
-  }, [stopSimulationAction, aiGenerationTimer, setCurrentSignal, setAvailableSignals, stopSimulationState, addLogEntry, setAiGenerationTimer]);
+    logPerformanceReport();
+  }, [stopExitScreening, stopSimulationAction, aiGenerationTimer, setCurrentSignal, setAvailableSignals, stopSimulationState, addLogEntry, setAiGenerationTimer, logPerformanceReport]);
 
-  // Pause simulation
+  // Enhanced pause simulation
   const pauseSimulation = useCallback(() => {
+    stopExitScreening();
     pauseSimulationAction(
       aiGenerationTimer,
       pauseSimulationState,
       addLogEntry,
       setAiGenerationTimer
     );
-  }, [pauseSimulationAction, aiGenerationTimer, pauseSimulationState, addLogEntry, setAiGenerationTimer]);
+  }, [stopExitScreening, pauseSimulationAction, aiGenerationTimer, pauseSimulationState, addLogEntry, setAiGenerationTimer]);
 
-  // Resume simulation
+  // Enhanced resume simulation
   const resumeSimulation = useCallback(async () => {
     await resumeSimulationAction(
       resumeSimulationState,
@@ -107,7 +157,20 @@ export const useSimulation = () => {
       setAiGenerationTimer,
       updateSimulationState
     );
-  }, [resumeSimulationAction, resumeSimulationState, addLogEntry, startAISignalGeneration, setAiGenerationTimer, updateSimulationState]);
+
+    // Restart exit screening
+    if (apiKeys?.openRouterApiKey && userSettings.tradingStrategy) {
+      const currentState = JSON.parse(localStorage.getItem('kiTradingApp_simulationState') || '{}');
+      if (currentState && currentState.openPositions?.length > 0) {
+        startExitScreening(
+          currentState,
+          apiKeys.openRouterApiKey,
+          updateSimulationState,
+          addLogEntry
+        );
+      }
+    }
+  }, [resumeSimulationAction, resumeSimulationState, addLogEntry, startAISignalGeneration, setAiGenerationTimer, updateSimulationState, startExitScreening, apiKeys, userSettings]);
 
   // Accept signal manually (kept for compatibility but simplified)
   const acceptSignal = useCallback(async (signal: Signal) => {
@@ -125,6 +188,11 @@ export const useSimulation = () => {
     ignoreSignalAction(signal, addLogEntry, setCurrentSignal);
   }, [ignoreSignalAction, addLogEntry, setCurrentSignal]);
 
+  // Get portfolio health status
+  const portfolioHealthStatus = simulationState && userSettings.tradingStrategy 
+    ? getPortfolioHealthStatus(simulationState, userSettings.tradingStrategy)
+    : 'HEALTHY';
+
   return {
     simulationState,
     isSimulationActive,
@@ -139,6 +207,9 @@ export const useSimulation = () => {
     activityLog,
     candidates,
     autoModeError,
-    processSignal: handleProcessSignal
+    processSignal: handleProcessSignal,
+    portfolioHealthStatus,
+    trackApiCall,
+    logPerformanceReport
   };
 };

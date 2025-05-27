@@ -1,4 +1,3 @@
-
 import React from 'react';
 import ActivityLog from './ActivityLog';
 import SettingsDrawer from './SettingsDrawer';
@@ -6,6 +5,7 @@ import LoadingErrorStates from './sections/LoadingErrorStates';
 import DashboardHeaderSection from './sections/DashboardHeader';
 import DashboardGrids from './sections/DashboardGrids';
 import DashboardTrading from './sections/DashboardTrading';
+import PerformanceMetrics from './PerformanceMetrics';
 
 interface DashboardContentProps {
   // State props
@@ -33,6 +33,7 @@ interface DashboardContentProps {
   simulationDataForLog: any;
   autoTradeCount?: number;
   autoModeError?: string;
+  portfolioHealthStatus?: 'HEALTHY' | 'WARNING' | 'CRITICAL';
   
   // Handlers
   logoutAndClearData: () => void;
@@ -73,6 +74,7 @@ const DashboardContent = ({
   simulationDataForLog,
   autoTradeCount,
   autoModeError,
+  portfolioHealthStatus = 'HEALTHY',
   logoutAndClearData,
   handleManualRefresh,
   handleStartSimulation,
@@ -148,6 +150,11 @@ const DashboardContent = ({
         onAcceptSignal={acceptSignal}
         onIgnoreSignal={ignoreSignal}
       />
+
+      {/* Performance Metrics - Only show during active simulation */}
+      {isSimulationActive && (
+        <PerformanceMetrics portfolioHealthStatus={portfolioHealthStatus} />
+      )}
 
       <ActivityLog 
         activityLog={activityLog}

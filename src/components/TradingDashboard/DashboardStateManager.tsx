@@ -42,7 +42,9 @@ export const useDashboardStateManager = () => {
     currentSignal,
     activityLog,
     candidates,
-    autoModeError
+    autoModeError,
+    portfolioHealthStatus,
+    logPerformanceReport
   } = useSimulation();
 
   const { state: readinessState, isRunningBlocked, reason } = useSimGuard();
@@ -71,16 +73,21 @@ export const useDashboardStateManager = () => {
     handleStartSimulationFromEffects();
   }, [handleStartSimulationFromEffects]);
 
-  // Add handler for manual refresh
+  // Add handler for manual refresh with performance report
   const handleManualRefresh = useCallback(() => {
     console.log('🔄 Manual refresh triggered from Dashboard');
     simReadinessStore.forceRefresh();
+    
+    // Log performance report on manual refresh
+    if (isSimulationActive) {
+      logPerformanceReport();
+    }
     
     toast({
       title: "Daten aktualisiert",
       description: "Portfolio und Marktdaten werden neu geladen",
     });
-  }, []);
+  }, [isSimulationActive, logPerformanceReport]);
 
   // Calculate simulation data for activity log
   const getSimulationDataForLog = () => {
@@ -130,6 +137,7 @@ export const useDashboardStateManager = () => {
     handleStartSimulation,
     handleManualRefresh,
     getSimulationDataForLog,
-    autoModeError
+    autoModeError,
+    portfolioHealthStatus
   };
 };

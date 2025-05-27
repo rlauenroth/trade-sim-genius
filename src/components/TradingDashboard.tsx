@@ -38,7 +38,8 @@ const TradingDashboard = () => {
     getDisplayStartValue,
     handleStartSimulation,
     handleManualRefresh,
-    getSimulationDataForLog
+    getSimulationDataForLog,
+    portfolioHealthStatus
   } = useDashboardStateManager();
 
   // Wrap acceptSignal and ignoreSignal to handle current signal automatically
@@ -82,6 +83,7 @@ const TradingDashboard = () => {
         progressValue={getProgressValue()}
         simulationDataForLog={getSimulationDataForLog()}
         autoTradeCount={simulationState?.autoTradeCount}
+        portfolioHealthStatus={portfolioHealthStatus}
         logoutAndClearData={logoutAndClearData}
         handleManualRefresh={handleManualRefresh}
         handleStartSimulation={handleStartSimulation}
