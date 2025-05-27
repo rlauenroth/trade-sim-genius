@@ -55,10 +55,11 @@ export const useTradingDashboardData = (
   };
 
   const getDisplayStartValue = () => {
-    if (simulationState?.startPortfolioValue) {
-      return simulationState.startPortfolioValue;
+    // Return null when no simulation has been started (ever)
+    if (!simulationState?.startPortfolioValue) {
+      return null;
     }
-    return portfolioData?.totalValue || 0;
+    return simulationState.startPortfolioValue;
   };
 
   return {

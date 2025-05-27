@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { SimulationState } from '@/types/simulation';
@@ -6,6 +5,7 @@ import { useSimulationState } from './useSimulationState';
 import { useActivityLog } from './useActivityLog';
 import { useAISignals } from './useAISignals';
 import { useTradeExecution } from './useTradeExecution';
+import { usePortfolioLive } from './usePortfolioLive';
 import { apiModeService } from '@/services/apiModeService';
 import { simReadinessStore } from '@/stores/simReadinessStore';
 import { useSimGuard } from './useSimGuard';
@@ -38,6 +38,7 @@ export const useSimulation = () => {
   } = useTradeExecution();
 
   const { isRunningBlocked, state: readinessState, reason } = useSimGuard();
+  const { snapshot: livePortfolio } = usePortfolioLive();
 
   // Auto-pause simulation when readiness becomes unstable
   useEffect(() => {
@@ -81,6 +82,17 @@ export const useSimulation = () => {
 
   const startSimulation = useCallback(async () => {
     try {
+      // Ensure we have live portfolio data before starting
+      if (!livePortfolio) {
+        addLogEntry('ERROR', 'Live-Portfolio-Daten nicht verfügbar. Bitte warten Sie, bis die Daten geladen sind.');
+        toast({
+          title: "Fehler",
+          description: "Portfolio-Daten müssen geladen sein, bevor die Simulation gestartet werden kann.",
+          variant: "destructive"
+        });
+        return;
+      }
+
       addLogEntry('INFO', 'Simulation wird gestartet...');
       
       // Notify sim readiness store
@@ -91,18 +103,19 @@ export const useSimulation = () => {
       addLogEntry('INFO', `KuCoin API-Modus: ${apiStatus.kucoinMode}`);
       addLogEntry('INFO', `OpenRouter API-Modus: ${apiStatus.openRouterMode}`);
       
-      const mockPortfolioValue = 10000;
+      // Use actual live portfolio value as start value
+      const actualStartValue = livePortfolio.totalUSDValue;
       
       const newState: SimulationState = {
         isActive: true,
         isPaused: false,
         startTime: Date.now(),
-        startPortfolioValue: mockPortfolioValue,
-        currentPortfolioValue: mockPortfolioValue,
+        startPortfolioValue: actualStartValue,
+        currentPortfolioValue: actualStartValue,
         realizedPnL: 0,
         openPositions: [],
         paperAssets: [
-          { symbol: 'USDT', quantity: mockPortfolioValue }
+          { symbol: 'USDT', quantity: actualStartValue }
         ]
       };
 
@@ -110,7 +123,7 @@ export const useSimulation = () => {
       setIsSimulationActive(true);
       
       addLogEntry('SUCCESS', 'Simulation erfolgreich gestartet');
-      addLogEntry('INFO', `Startkapital: $${mockPortfolioValue.toLocaleString()}`);
+      addLogEntry('INFO', `Startkapital: $${actualStartValue.toLocaleString()}`);
       
       if (apiStatus.corsIssuesDetected) {
         addLogEntry('INFO', 'Verwende Hybrid-Modus: Live-Marktdaten + simulierte Portfolio-Daten');
@@ -127,7 +140,7 @@ export const useSimulation = () => {
 
       toast({
         title: "Simulation gestartet",
-        description: `Paper-Trading aktiv im ${apiStatus.kucoinMode}-Modus. KI-Signalgenerierung startet...`,
+        description: `Paper-Trading aktiv mit $${actualStartValue.toLocaleString()} Startkapital im ${apiStatus.kucoinMode}-Modus.`,
       });
       
     } catch (error) {
@@ -139,7 +152,7 @@ export const useSimulation = () => {
         variant: "destructive"
       });
     }
-  }, [addLogEntry, saveSimulationState, setIsSimulationActive, startAISignalGeneration, generateMockSignal]);
+  }, [livePortfolio, addLogEntry, saveSimulationState, setIsSimulationActive, startAISignalGeneration, generateMockSignal]);
 
   const stopSimulation = useCallback(() => {
     if (!simulationState) return;
