@@ -1,3 +1,4 @@
+
 import React from 'react';
 import DashboardHeader from './DashboardHeader';
 import StrategyInfo from './StrategyInfo';
@@ -38,6 +39,7 @@ interface DashboardContentProps {
   totalPnLPercentage: number;
   progressValue: number;
   simulationDataForLog: any;
+  autoTradeCount?: number;
   
   // Handlers
   logoutAndClearData: () => void;
