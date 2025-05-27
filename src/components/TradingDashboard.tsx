@@ -6,10 +6,12 @@ import { usePortfolioData } from '@/hooks/usePortfolioData';
 import { useTradingDashboardData } from '@/hooks/useTradingDashboardData';
 import { useTradingDashboardEffects } from '@/hooks/useTradingDashboardEffects';
 import { useSimGuard } from '@/hooks/useSimGuard';
+import { usePortfolioLive } from '@/hooks/usePortfolioLive';
 import { simReadinessStore } from '@/stores/simReadinessStore';
 import DashboardHeader from './TradingDashboard/DashboardHeader';
 import StrategyInfo from './TradingDashboard/StrategyInfo';
 import PortfolioOverviewWithStatus from './TradingDashboard/PortfolioOverviewWithStatus';
+import PortfolioTable from './TradingDashboard/PortfolioTable';
 import ProgressTracker from './TradingDashboard/ProgressTracker';
 import ControlCenter from './TradingDashboard/ControlCenter';
 import SignalDisplay from './TradingDashboard/SignalDisplay';
@@ -39,6 +41,9 @@ const TradingDashboard = () => {
     loadPortfolioData, 
     retryLoadPortfolioData 
   } = usePortfolioData();
+
+  // New live portfolio hook
+  const { snapshot: livePortfolio } = usePortfolioLive();
   
   const { 
     simulationState, 
@@ -166,6 +171,14 @@ const TradingDashboard = () => {
           onStopSimulation={stopSimulation}
         />
       </div>
+
+      {/* Live Portfolio Table - only show if we have live data */}
+      {livePortfolio && livePortfolio.positions.length > 0 && (
+        <PortfolioTable 
+          positions={livePortfolio.positions}
+          totalUSDValue={livePortfolio.totalUSDValue}
+        />
+      )}
 
       <SignalDisplay 
         currentSignal={currentSignal}
