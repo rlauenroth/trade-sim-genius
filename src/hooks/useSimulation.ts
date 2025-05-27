@@ -23,7 +23,12 @@ export const useSimulation = () => {
   const {
     activityLog,
     loadActivityLog,
-    addLogEntry
+    addLogEntry,
+    addSimulationStartLog,
+    addSimulationStopLog,
+    addTradeLog,
+    addSignalLog,
+    addPortfolioUpdateLog
   } = useActivityLog();
 
   const {
@@ -128,7 +133,8 @@ export const useSimulation = () => {
       saveSimulationState(newState);
       setIsSimulationActive(true);
       
-      addLogEntry('SUCCESS', 'Simulation erfolgreich gestartet');
+      // Enhanced logging
+      addSimulationStartLog(actualStartValue);
       addLogEntry('INFO', `Startkapital: $${actualStartValue.toLocaleString()}`);
       
       if (apiStatus.corsIssuesDetected) {
@@ -139,8 +145,8 @@ export const useSimulation = () => {
         startAISignalGeneration(
           true,
           newState,
-          addLogEntry,
-          () => generateMockSignal(true, addLogEntry)
+          (type, message) => addLogEntry(type, message),
+          () => generateMockSignal(true, (type, message) => addLogEntry(type, message))
         );
       }, 3000);
 
@@ -158,7 +164,7 @@ export const useSimulation = () => {
         variant: "destructive"
       });
     }
-  }, [livePortfolio, addLogEntry, saveSimulationState, setIsSimulationActive, startAISignalGeneration, generateMockSignal, clearSimulationState]);
+  }, [livePortfolio, addSimulationStartLog, addLogEntry, saveSimulationState, setIsSimulationActive, startAISignalGeneration, generateMockSignal, clearSimulationState]);
 
   const stopSimulation = useCallback(() => {
     if (!simulationState) return;
@@ -190,13 +196,14 @@ export const useSimulation = () => {
     setIsSimulationActive(false);
     setCurrentSignal(null);
     
-    addLogEntry('SUCCESS', `Simulation beendet. Endergebnis: ${totalPnL >= 0 ? '+' : ''}$${totalPnL.toFixed(2)} (${totalPnLPercent.toFixed(2)}%)`);
+    // Enhanced logging
+    addSimulationStopLog(finalValue, totalPnL, totalPnLPercent);
     
     toast({
       title: "Simulation beendet",
       description: `Endergebnis: ${totalPnL >= 0 ? '+' : ''}$${totalPnL.toFixed(2)} (${totalPnLPercent.toFixed(2)}%)`,
     });
-  }, [simulationState, addLogEntry, saveSimulationState, setIsSimulationActive, setCurrentSignal]);
+  }, [simulationState, addLogEntry, addSimulationStopLog, saveSimulationState, setIsSimulationActive, setCurrentSignal]);
 
   const pauseSimulation = useCallback(() => {
     if (!simulationState) return;
@@ -229,7 +236,7 @@ export const useSimulation = () => {
     });
     
     setTimeout(() => {
-      generateMockSignal(true, addLogEntry);
+      generateMockSignal(true, (type, message) => addLogEntry(type, message));
     }, 3000);
   }, [simulationState, addLogEntry, saveSimulationState, setIsSimulationActive, generateMockSignal]);
 
@@ -237,26 +244,30 @@ export const useSimulation = () => {
     executeAcceptSignal(
       signal,
       simulationState,
-      addLogEntry,
+      (type, message) => addLogEntry(type, message),
       saveSimulationState,
       setCurrentSignal,
       () => startAISignalGeneration(
         isSimulationActive,
         simulationState,
-        addLogEntry,
-        () => generateMockSignal(isSimulationActive, addLogEntry)
-      )
+        (type, message) => addLogEntry(type, message),
+        () => generateMockSignal(isSimulationActive, (type, message) => addLogEntry(type, message))
+      ),
+      addTradeLog,
+      addSignalLog,
+      addPortfolioUpdateLog
     );
-  }, [executeAcceptSignal, simulationState, addLogEntry, saveSimulationState, setCurrentSignal, startAISignalGeneration, isSimulationActive, generateMockSignal]);
+  }, [executeAcceptSignal, simulationState, addLogEntry, saveSimulationState, setCurrentSignal, startAISignalGeneration, isSimulationActive, generateMockSignal, addTradeLog, addSignalLog, addPortfolioUpdateLog]);
 
   const ignoreSignal = useCallback((signal: any) => {
     executeIgnoreSignal(
       signal,
-      addLogEntry,
+      (type, message) => addLogEntry(type, message),
       setCurrentSignal,
-      () => generateMockSignal(isSimulationActive, addLogEntry)
+      () => generateMockSignal(isSimulationActive, (type, message) => addLogEntry(type, message)),
+      addSignalLog
     );
-  }, [executeIgnoreSignal, addLogEntry, setCurrentSignal, generateMockSignal, isSimulationActive]);
+  }, [executeIgnoreSignal, addLogEntry, setCurrentSignal, generateMockSignal, isSimulationActive, addSignalLog]);
 
   return {
     simulationState,

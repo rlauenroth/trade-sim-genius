@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAppState } from '@/hooks/useAppState';
 import { useSimulation } from '@/hooks/useSimulation';
@@ -78,6 +77,21 @@ const TradingDashboard = () => {
     completeFirstTimeSetup,
     startSimulation
   });
+
+  // Calculate simulation data for activity log
+  const getSimulationDataForLog = () => {
+    if (!simulationState || !hasValidSimulation()) return undefined;
+    
+    return {
+      startTime: simulationState.startTime,
+      endTime: !simulationState.isActive ? Date.now() : undefined,
+      startValue: simulationState.startPortfolioValue,
+      currentValue: simulationState.currentPortfolioValue,
+      totalPnL: getTotalPnL(),
+      totalPnLPercent: getTotalPnLPercentage(),
+      totalTrades: simulationState.openPositions?.length || 0
+    };
+  };
 
   // Initialize sim readiness store on mount
   useEffect(() => {
@@ -194,6 +208,7 @@ const TradingDashboard = () => {
 
       <ActivityLog 
         activityLog={activityLog}
+        simulationData={getSimulationDataForLog()}
       />
 
       {/* Settings Drawer */}

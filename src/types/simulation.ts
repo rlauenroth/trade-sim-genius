@@ -1,3 +1,4 @@
+
 export interface SimulationState {
   isActive: boolean;
   isPaused: boolean;
@@ -40,7 +41,32 @@ export interface Signal {
 
 export interface ActivityLogEntry {
   timestamp: number;
-  type: 'INFO' | 'AI' | 'TRADE' | 'ERROR' | 'SUCCESS' | 'WARNING';
+  type: 'INFO' | 'AI' | 'TRADE' | 'ERROR' | 'SUCCESS' | 'WARNING' | 'PORTFOLIO_UPDATE' | 'MARKET_DATA' | 'SYSTEM' | 'PERFORMANCE';
   message: string;
   source?: string;
+  details?: {
+    signalData?: Signal;
+    tradeData?: {
+      id: string;
+      assetPair: string;
+      type: 'BUY' | 'SELL';
+      quantity: number;
+      price: number;
+      fee: number;
+      totalValue: number;
+    };
+    portfolioData?: {
+      valueBefore: number;
+      valueAfter: number;
+      change: number;
+      changePercent: number;
+    };
+    performanceData?: {
+      metric: string;
+      value: number;
+      unit: string;
+    };
+  };
+  relatedTradeId?: string;
+  simulationCycleId?: string;
 }
