@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect } from 'react';
 import { Signal, SimulationState } from '@/types/simulation';
 import { useSimulationState } from './useSimulationState';
@@ -6,7 +5,9 @@ import { useAISignals } from './useAISignals';
 import { useActivityLog } from './useActivityLog';
 import { useTradeExecution } from './useTradeExecution';
 import { useRiskManagement } from './useRiskManagement';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { loggingService } from '@/services/loggingService';
+import { toast } from '@/hooks/use-toast';
 
 export const useSimulation = () => {
   const {
@@ -30,22 +31,150 @@ export const useSimulation = () => {
 
   const { activityLog, addLogEntry } = useActivityLog();
   const { executeTradeFromSignal } = useTradeExecution();
-  // Fix: Provide the required strategy argument
   const { validateTradeRisk } = useRiskManagement('balanced');
+  const { userSettings } = useSettingsStore();
 
   const [aiGenerationTimer, setAiGenerationTimer] = useState<NodeJS.Timeout | null>(null);
+  const [autoModeError, setAutoModeError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
-  // Start simulation with portfolio data
-  const startSimulation = useCallback(async (portfolioData: any) => {
+  // Auto-trade execution with retry logic
+  const executeAutoTrade = useCallback(async (signal: Signal): Promise<boolean> => {
+    if (!simulationState) return false;
+
     try {
-      // Fix: Use 'SIM' instead of 'SIMULATION' for loggingService
-      loggingService.logEvent('SIM', 'Starting simulation', {
-        portfolioValue: portfolioData.totalUSDValue,
-        availablePositions: portfolioData.positions.length
+      loggingService.logEvent('AUTO_TRADE', 'Auto-trade execution started', {
+        assetPair: signal.assetPair,
+        signalType: signal.signalType,
+        confidence: signal.confidenceScore
       });
 
-      // Fix: Use 'SIM' instead of 'SIMULATION' for addLogEntry
+      addLogEntry('AUTO_TRADE', `AUTO-TRADE: ${signal.signalType} ${signal.assetPair} wird ausgeführt...`);
+
+      // Validate risk before executing
+      const riskValidation = validateTradeRisk(signal, simulationState);
+      if (!riskValidation.isValid) {
+        addLogEntry('WARNING', `AUTO-TRADE abgelehnt: ${riskValidation.reason}`);
+        return false;
+      }
+
+      // Execute the trade
+      const tradeResult = await executeTradeFromSignal(signal, simulationState);
+
+      if (tradeResult.success) {
+        // Update simulation state with new trade
+        const updatedState = {
+          ...simulationState,
+          openPositions: [...(simulationState.openPositions || []), tradeResult.position],
+          paperAssets: tradeResult.updatedAssets,
+          autoTradeCount: (simulationState.autoTradeCount || 0) + 1,
+          lastAutoTradeTime: Date.now()
+        };
+
+        updateSimulationState(updatedState);
+        
+        addLogEntry('AUTO_TRADE', `AUTO-TRADE erfolgreich: ${signal.signalType} ${tradeResult.position.quantity} ${signal.assetPair}`, 'AutoMode', {
+          tradeData: {
+            id: tradeResult.position.id,
+            assetPair: signal.assetPair,
+            type: signal.signalType as 'BUY' | 'SELL',
+            quantity: tradeResult.position.quantity,
+            price: tradeResult.position.entryPrice,
+            fee: 0,
+            totalValue: tradeResult.position.quantity * tradeResult.position.entryPrice,
+            auto: true
+          }
+        });
+
+        toast({
+          title: "Auto-Trade ausgeführt",
+          description: `${signal.signalType} ${signal.assetPair} automatisch ausgeführt`,
+        });
+
+        // Reset retry count on success
+        setRetryCount(0);
+        setAutoModeError(null);
+        
+        return true;
+      } else {
+        throw new Error(tradeResult.error);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler';
+      
+      loggingService.logError('Auto-trade execution failed', {
+        error: errorMessage,
+        signal: signal.assetPair,
+        retryCount
+      });
+
+      addLogEntry('ERROR', `AUTO-TRADE fehlgeschlagen: ${errorMessage}`);
+
+      // Implement retry logic
+      if (retryCount < 3) {
+        const newRetryCount = retryCount + 1;
+        setRetryCount(newRetryCount);
+        
+        const retryDelay = Math.pow(2, newRetryCount) * 1000; // Exponential backoff
+        
+        setTimeout(() => {
+          executeAutoTrade(signal);
+        }, retryDelay);
+        
+        addLogEntry('WARNING', `AUTO-TRADE Retry ${newRetryCount}/3 in ${retryDelay/1000}s`);
+        
+        return false;
+      } else {
+        // Max retries reached, disable auto mode
+        setAutoModeError(errorMessage);
+        useSettingsStore.getState().saveSettings({ autoMode: false });
+        
+        toast({
+          title: "Automatischer Modus gestoppt",
+          description: `Nach 3 Fehlversuchen: ${errorMessage}`,
+          variant: "destructive"
+        });
+        
+        return false;
+      }
+    }
+  }, [simulationState, validateTradeRisk, executeTradeFromSignal, updateSimulationState, addLogEntry, retryCount]);
+
+  // Handle signal processing (auto or manual)
+  const processSignal = useCallback(async (signal: Signal) => {
+    if (!signal || signal.signalType === 'HOLD' || signal.signalType === 'NO_TRADE') {
+      setCurrentSignal(null);
+      return;
+    }
+
+    const isAutoMode = userSettings.autoMode && isSimulationActive && !simulationState?.isPaused;
+
+    if (isAutoMode) {
+      // Auto mode: execute immediately
+      const success = await executeAutoTrade(signal);
+      if (success) {
+        setCurrentSignal(null);
+      }
+    } else {
+      // Manual mode: show signal for user decision
+      setCurrentSignal(signal);
+    }
+  }, [userSettings.autoMode, isSimulationActive, simulationState?.isPaused, executeAutoTrade]);
+
+  // Start simulation with auto mode support
+  const startSimulation = useCallback(async (portfolioData: any) => {
+    try {
+      loggingService.logEvent('SIM', 'Starting simulation', {
+        portfolioValue: portfolioData.totalUSDValue,
+        availablePositions: portfolioData.positions.length,
+        autoMode: userSettings.autoMode
+      });
+
       addLogEntry('SIM', `Simulation gestartet mit Portfolio-Wert: $${portfolioData.totalUSDValue.toFixed(2)}`);
+      
+      if (userSettings.autoMode) {
+        addLogEntry('SIM', 'Automatischer Modus aktiviert - Signale werden automatisch ausgeführt');
+      }
       
       // Initialize simulation state
       const initialState = initializeSimulation(portfolioData);
@@ -53,12 +182,14 @@ export const useSimulation = () => {
       // Start AI signal generation immediately
       await startAISignalGeneration(true, initialState, addLogEntry);
       
-      // Set up periodic AI signal generation (every 15 minutes)
+      // Set up periodic AI signal generation
+      const interval = userSettings.autoMode ? 30 * 1000 : 15 * 60 * 1000; // 30s for auto, 15min for manual
+      
       const timer = setInterval(async () => {
         if (simulationState?.isActive && !simulationState?.isPaused) {
           await startAISignalGeneration(true, simulationState, addLogEntry);
         }
-      }, 15 * 60 * 1000); // 15 minutes
+      }, interval);
       
       setAiGenerationTimer(timer);
       
@@ -70,7 +201,26 @@ export const useSimulation = () => {
       
       addLogEntry('ERROR', `Simulation-Start fehlgeschlagen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
     }
-  }, [initializeSimulation, startAISignalGeneration, addLogEntry, simulationState]);
+  }, [initializeSimulation, startAISignalGeneration, addLogEntry, simulationState, userSettings.autoMode]);
+
+  // Update timer interval when auto mode changes
+  useEffect(() => {
+    if (aiGenerationTimer && isSimulationActive) {
+      // Clear existing timer
+      clearInterval(aiGenerationTimer);
+      
+      // Set new interval based on auto mode
+      const interval = userSettings.autoMode ? 30 * 1000 : 15 * 60 * 1000;
+      
+      const timer = setInterval(async () => {
+        if (simulationState?.isActive && !simulationState?.isPaused) {
+          await startAISignalGeneration(true, simulationState, addLogEntry);
+        }
+      }, interval);
+      
+      setAiGenerationTimer(timer);
+    }
+  }, [userSettings.autoMode]);
 
   // Stop simulation
   const stopSimulation = useCallback(() => {
@@ -129,23 +279,22 @@ export const useSimulation = () => {
     }
   }, [resumeSimulationState, addLogEntry, simulationState, startAISignalGeneration]);
 
-  // Accept signal and execute trade
+  // Accept signal manually (override auto mode)
   const acceptSignal = useCallback(async (signal: Signal) => {
     if (!simulationState) return;
     
     try {
-      loggingService.logEvent('TRADE', 'Signal accepted', {
+      loggingService.logEvent('TRADE', 'Manual signal accepted', {
         assetPair: signal.assetPair,
         signalType: signal.signalType,
         confidence: signal.confidenceScore
       });
       
-      addLogEntry('TRADE', `Signal akzeptiert: ${signal.signalType} ${signal.assetPair}`);
+      addLogEntry('TRADE', `Signal manuell akzeptiert: ${signal.signalType} ${signal.assetPair}`);
       
       // Validate risk before executing
       const riskValidation = validateTradeRisk(signal, simulationState);
       if (!riskValidation.isValid) {
-        // Fix: Use 'WARNING' instead of 'RISK'
         addLogEntry('WARNING', `Trade abgelehnt: ${riskValidation.reason}`);
         return;
       }
@@ -170,7 +319,7 @@ export const useSimulation = () => {
       setCurrentSignal(null);
       
     } catch (error) {
-      loggingService.logError('Signal acceptance failed', {
+      loggingService.logError('Manual signal acceptance failed', {
         error: error instanceof Error ? error.message : 'unknown',
         signal: signal.assetPair
       });
@@ -211,6 +360,8 @@ export const useSimulation = () => {
     currentSignal,
     availableSignals,
     activityLog,
-    candidates
+    candidates,
+    autoModeError,
+    processSignal
   };
 };

@@ -5,6 +5,7 @@ export interface UserSettings {
   proxyUrl: string;
   theme?: 'light' | 'dark';
   language?: 'de' | 'en';
+  autoMode?: boolean;
   createdAt: number;
 }
 

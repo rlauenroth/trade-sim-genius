@@ -81,6 +81,7 @@ const TradingDashboard = () => {
         totalPnLPercentage={getTotalPnLPercentage()}
         progressValue={getProgressValue()}
         simulationDataForLog={getSimulationDataForLog()}
+        autoTradeCount={simulationState?.autoTradeCount}
         logoutAndClearData={logoutAndClearData}
         handleManualRefresh={handleManualRefresh}
         handleStartSimulation={handleStartSimulation}

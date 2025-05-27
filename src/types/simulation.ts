@@ -1,4 +1,3 @@
-
 export interface SimulationState {
   isActive: boolean;
   isPaused: boolean;
@@ -8,6 +7,9 @@ export interface SimulationState {
   realizedPnL: number;
   openPositions: Position[];
   paperAssets: PaperAsset[];
+  autoMode?: boolean;
+  autoTradeCount?: number;
+  lastAutoTradeTime?: number;
 }
 
 export interface Position {
@@ -41,7 +43,7 @@ export interface Signal {
 
 export interface ActivityLogEntry {
   timestamp: number;
-  type: 'INFO' | 'AI' | 'TRADE' | 'ERROR' | 'SUCCESS' | 'WARNING' | 'PORTFOLIO_UPDATE' | 'MARKET_DATA' | 'SYSTEM' | 'PERFORMANCE' | 'API' | 'SIM' | 'SIMULATION' | 'RISK';
+  type: 'INFO' | 'AI' | 'TRADE' | 'ERROR' | 'SUCCESS' | 'WARNING' | 'PORTFOLIO_UPDATE' | 'MARKET_DATA' | 'SYSTEM' | 'PERFORMANCE' | 'API' | 'SIM' | 'SIMULATION' | 'RISK' | 'AUTO_TRADE';
   message: string;
   source?: string;
   details?: {
@@ -54,6 +56,7 @@ export interface ActivityLogEntry {
       price: number;
       fee: number;
       totalValue: number;
+      auto?: boolean;
     };
     portfolioData?: {
       valueBefore: number;
@@ -66,6 +69,7 @@ export interface ActivityLogEntry {
       value: number;
       unit: string;
     };
+    autoMode?: boolean;
   };
   relatedTradeId?: string;
   simulationCycleId?: string;

@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import { ApiKeys, UserSettings } from '@/types/appState';
 import { KUCOIN_PROXY_BASE, migrateProxyUrl } from '@/config';
@@ -15,6 +14,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   proxyUrl: KUCOIN_PROXY_BASE,
   theme: 'dark',
   language: 'de',
+  autoMode: false,
   createdAt: Date.now()
 };
 
@@ -30,6 +30,7 @@ interface SettingsState {
   clearApiKeys: () => void;
   validateApiKeys: (keys: Partial<ApiKeys>) => string[];
   validateSettings: (settings: Partial<UserSettings>) => string[];
+  toggleAutoMode: () => Promise<boolean>;
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
@@ -190,6 +191,32 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     }
     
     return errors;
+  },
+
+  toggleAutoMode: async (): Promise<boolean> => {
+    const currentSettings = get().userSettings;
+    const newAutoMode = !currentSettings.autoMode;
+    
+    try {
+      const success = await get().saveSettings({ autoMode: newAutoMode });
+      if (success) {
+        toast({
+          title: newAutoMode ? "Automatischer Modus aktiviert" : "Automatischer Modus deaktiviert",
+          description: newAutoMode 
+            ? "KI-Signale werden automatisch als Trades ausgeführt"
+            : "KI-Signale erfordern manuelle Bestätigung"
+        });
+      }
+      return success;
+    } catch (error) {
+      console.error('Error toggling auto mode:', error);
+      toast({
+        title: "Fehler",
+        description: "AutoMode konnte nicht geändert werden",
+        variant: "destructive"
+      });
+      return false;
+    }
   }
 }));
 

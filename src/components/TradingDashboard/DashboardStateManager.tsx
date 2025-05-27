@@ -41,7 +41,8 @@ export const useDashboardStateManager = () => {
     ignoreSignal,
     currentSignal,
     activityLog,
-    candidates
+    candidates,
+    autoModeError
   } = useSimulation();
 
   const { state: readinessState, isRunningBlocked, reason } = useSimGuard();
@@ -128,6 +129,7 @@ export const useDashboardStateManager = () => {
     hasValidSimulation,
     handleStartSimulation,
     handleManualRefresh,
-    getSimulationDataForLog
+    getSimulationDataForLog,
+    autoModeError
   };
 };
