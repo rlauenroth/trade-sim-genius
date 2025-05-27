@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAppState } from '@/hooks/useAppState';
 import { useSimulation } from '@/hooks/useSimulation';
 import { usePortfolioData } from '@/hooks/usePortfolioData';
@@ -78,6 +78,17 @@ const TradingDashboard = () => {
     startSimulation
   });
 
+  // Add handler for manual refresh
+  const handleManualRefresh = useCallback(() => {
+    console.log('🔄 Manual refresh triggered');
+    simReadinessStore.forceRefresh();
+    
+    toast({
+      title: "Daten aktualisiert",
+      description: "Portfolio und Marktdaten werden neu geladen",
+    });
+  }, []);
+
   // Calculate simulation data for activity log
   const getSimulationDataForLog = () => {
     if (!simulationState || !hasValidSimulation()) return undefined;
@@ -136,6 +147,7 @@ const TradingDashboard = () => {
         isPaused={simulationState?.isPaused}
         onLogout={logoutAndClearData}
         onOpenSettings={() => setShowSettings(true)}
+        onRefresh={handleManualRefresh}
       />
 
       {/* Show first-time user info if applicable */}

@@ -1,12 +1,11 @@
-
 import { SimReadinessState, SimReadinessStatus, SimReadinessAction, PortfolioSnapshot } from '@/types/simReadiness';
 import { kucoinService } from '@/services/kucoinService';
 import { retryScheduler } from '@/services/retryScheduler';
 import { RateLimitError, ProxyError, ApiError } from '@/utils/errors';
 
 const SNAPSHOT_TTL = 60 * 1000; // 60 seconds in milliseconds
-const HEALTH_CHECK_INTERVAL = 10 * 1000; // 10 seconds
-const PORTFOLIO_REFRESH_INTERVAL = 30 * 1000; // 30 seconds
+const HEALTH_CHECK_INTERVAL = 30 * 1000; // 30 seconds (reduced from 10s)
+const PORTFOLIO_REFRESH_INTERVAL = 60 * 1000; // 60 seconds (reduced from 30s)
 
 class SimReadinessStore {
   private static instance: SimReadinessStore;
@@ -157,10 +156,10 @@ class SimReadinessStore {
 
   private async fetchPortfolioData(): Promise<void> {
     try {
-      // First ping the API
+      // Use cached ping first
       await kucoinService.ping();
       
-      // Then fetch portfolio
+      // Then fetch portfolio (will use cache if available)
       const portfolio = await kucoinService.fetchPortfolio();
       
       this.dispatch({ type: 'FETCH_SUCCESS', payload: portfolio });
@@ -194,8 +193,9 @@ class SimReadinessStore {
     
     this.healthCheckTimer = setInterval(async () => {
       try {
+        // Use cached ping to reduce API calls
         await kucoinService.ping();
-        console.log('✅ Health check passed');
+        console.log('✅ Health check passed (cached)');
       } catch (error) {
         console.error('❌ Health check failed:', error);
         this.dispatch({ type: 'API_DOWN', payload: 'API health check failed' });
@@ -284,6 +284,21 @@ class SimReadinessStore {
     this.stopAllTimers();
     retryScheduler.clearRetry('sim-readiness');
     this.listeners = [];
+  }
+
+  // Add method to get cache stats
+  getCacheStats(): Record<string, number> {
+    return kucoinService.getCacheStats();
+  }
+
+  // Add method to manually refresh data
+  forceRefresh(): void {
+    console.log('🔄 Forcing cache refresh...');
+    kucoinService.invalidateCache();
+    
+    if (this.status.state === 'READY' || this.status.state === 'SIM_RUNNING') {
+      this.fetchPortfolioData();
+    }
   }
 }
 
