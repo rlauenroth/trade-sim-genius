@@ -5,7 +5,7 @@ import { usePortfolioData } from '@/hooks/usePortfolioData';
 import { useTradingDashboardData } from '@/hooks/useTradingDashboardData';
 import { useTradingDashboardEffects } from '@/hooks/useTradingDashboardEffects';
 import { useSimGuard } from '@/hooks/useSimGuard';
-import { usePortfolioLive } from '@/hooks/usePortfolioLive';
+import { useSimReadinessPortfolio } from '@/hooks/useSimReadinessPortfolio';
 import { simReadinessStore } from '@/stores/simReadinessStore';
 import DashboardHeader from './TradingDashboard/DashboardHeader';
 import StrategyInfo from './TradingDashboard/StrategyInfo';
@@ -24,6 +24,7 @@ import { toast } from '@/hooks/use-toast';
 
 const TradingDashboard = () => {
   const [showSettings, setShowSettings] = useState(false);
+  const [initializationComplete, setInitializationComplete] = useState(false);
   
   const { 
     userSettings, 
@@ -41,8 +42,8 @@ const TradingDashboard = () => {
     retryLoadPortfolioData 
   } = usePortfolioData();
 
-  // New live portfolio hook
-  const { snapshot: livePortfolio } = usePortfolioLive();
+  // Use new centralized portfolio hook instead of usePortfolioLive
+  const { snapshot: livePortfolio, isLoading: livePortfolioLoading, error: livePortfolioError } = useSimReadinessPortfolio();
   
   const { 
     simulationState, 
@@ -80,7 +81,7 @@ const TradingDashboard = () => {
 
   // Add handler for manual refresh
   const handleManualRefresh = useCallback(() => {
-    console.log('🔄 Manual refresh triggered');
+    console.log('🔄 Manual refresh triggered from Dashboard');
     simReadinessStore.forceRefresh();
     
     toast({
@@ -104,19 +105,22 @@ const TradingDashboard = () => {
     };
   };
 
-  // Initialize sim readiness store on mount
+  // Coordinated initialization - only initialize simReadinessStore once
   useEffect(() => {
-    console.log('🔄 Initializing SimReadiness system...');
-    simReadinessStore.initialize();
-    
-    return () => {
-      // Cleanup on unmount
-      simReadinessStore.destroy();
-    };
-  }, []);
+    if (!initializationComplete) {
+      console.log('🔄 Starting coordinated initialization...');
+      simReadinessStore.initialize();
+      setInitializationComplete(true);
+      
+      return () => {
+        // Cleanup on unmount
+        simReadinessStore.destroy();
+      };
+    }
+  }, [initializationComplete]);
 
   // Show loading state while portfolio is being loaded for first-time users
-  if (isFirstTimeAfterSetup && portfolioLoading) {
+  if (isFirstTimeAfterSetup && (portfolioLoading || livePortfolioLoading)) {
     return (
       <div className="container mx-auto px-4 py-6">
         <PortfolioLoadingCard 
@@ -128,12 +132,12 @@ const TradingDashboard = () => {
   }
 
   // Show error state with retry option
-  if (isFirstTimeAfterSetup && portfolioError) {
+  if (isFirstTimeAfterSetup && (portfolioError || livePortfolioError)) {
     return (
       <div className="container mx-auto px-4 py-6">
         <PortfolioLoadingCard 
           isLoading={false}
-          error={portfolioError}
+          error={portfolioError || livePortfolioError}
           onRetry={() => retryLoadPortfolioData(apiKeys)}
         />
       </div>
@@ -151,7 +155,7 @@ const TradingDashboard = () => {
       />
 
       {/* Show first-time user info if applicable */}
-      {isFirstTimeAfterSetup && portfolioData && !isSimulationActive && (
+      {isFirstTimeAfterSetup && (portfolioData || livePortfolio) && !isSimulationActive && (
         <FirstTimeUserInfo 
           onStartSimulation={handleStartSimulation}
           onOpenSettings={() => setShowSettings(true)}
@@ -200,7 +204,7 @@ const TradingDashboard = () => {
         />
       </div>
 
-      {/* Live Portfolio Table - only show if we have live data */}
+      {/* Live Portfolio Table - now using centralized data */}
       {livePortfolio && livePortfolio.positions.length > 0 && (
         <PortfolioTable 
           positions={livePortfolio.positions}

@@ -4,7 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { usePortfolioLive } from '@/hooks/usePortfolioLive';
+import { useSimReadinessPortfolio } from '@/hooks/useSimReadinessPortfolio';
 import { Skeleton } from '@/components/ui/skeleton';
 import PortfolioStatusOverlay from './PortfolioStatusOverlay';
 
@@ -21,7 +21,8 @@ const PortfolioOverviewWithStatus = ({
   totalPnL,
   totalPnLPercentage
 }: PortfolioOverviewWithStatusProps) => {
-  const { snapshot, isLoading, error, refresh } = usePortfolioLive();
+  // Use centralized portfolio hook instead of usePortfolioLive
+  const { snapshot, isLoading, error, refresh } = useSimReadinessPortfolio();
   const isPositive = totalPnL >= 0;
 
   // Use live portfolio value if available, otherwise fallback to passed props
