@@ -1,7 +1,6 @@
 
 // Main entry point for KuCoin Proxy API - refactored into modules
 export { kucoinFetch } from './kucoin/core';
-export { setActivityLogger } from './kucoin/core';
 export { 
   getPrice, 
   getMarketTickers, 
@@ -22,11 +21,11 @@ export {
 import { setMarketDataActivityLogger } from './kucoin/marketData';
 import { setAccountDataActivityLogger } from './kucoin/accountData';
 import { setConnectionActivityLogger } from './kucoin/connection';
+import { setActivityLogger as setCoreActivityLogger } from './kucoin/core';
 import { ActivityLogger } from './kucoin/types';
 
 export function setActivityLogger(logger: ActivityLogger | null) {
-  // This function is re-exported from core, but we also need to set it for other modules
-  const { setActivityLogger: setCoreActivityLogger } = require('./kucoin/core');
+  // Set logger for all modules
   setCoreActivityLogger(logger);
   setMarketDataActivityLogger(logger);
   setAccountDataActivityLogger(logger);
