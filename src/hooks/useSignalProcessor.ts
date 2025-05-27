@@ -36,7 +36,7 @@ export const useSignalProcessor = () => {
       // Manual mode: show signal for user decision
       setCurrentSignal(signal);
     }
-  }, [executeAutoTrade]);
+  }, []);
 
   const acceptSignal = useCallback(async (
     signal: Signal,
