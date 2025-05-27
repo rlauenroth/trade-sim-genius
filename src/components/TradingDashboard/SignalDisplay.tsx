@@ -1,10 +1,9 @@
 
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bot, Clock, TrendingUp, BarChart3 } from 'lucide-react';
+import { Bot, Clock, TrendingUp, BarChart3, CheckCircle } from 'lucide-react';
 import { formatCurrency } from '@/utils/formatters';
 import { useRiskManagement } from '@/hooks/useRiskManagement';
 import { useAppState } from '@/hooks/useAppState';
@@ -32,8 +31,6 @@ interface SignalDisplayProps {
 const SignalDisplay = ({ 
   currentSignal, 
   availableSignals = [], 
-  onAcceptSignal, 
-  onIgnoreSignal, 
   portfolioValue 
 }: SignalDisplayProps) => {
   const { userSettings } = useAppState();
@@ -123,31 +120,23 @@ const SignalDisplay = ({
         </div>
       )}
       
-      <div className="flex space-x-3">
-        <Button 
-          onClick={() => onAcceptSignal(signal)} 
-          className="flex-1 bg-green-600 hover:bg-green-700"
-        >
-          Signal für Simulation annehmen
-        </Button>
-        <Button 
-          onClick={() => onIgnoreSignal(signal)} 
-          variant="outline" 
-          className="flex-1 border-slate-600 text-slate-300"
-        >
-          Signal ignorieren
-        </Button>
+      {/* Automatic execution indicator */}
+      <div className="flex items-center justify-center py-3 bg-green-600/20 rounded-lg">
+        <CheckCircle className="h-5 w-5 text-green-400 mr-2" />
+        <span className="text-green-400 font-medium">
+          Signal wird automatisch ausgeführt
+        </span>
       </div>
     </div>
   );
 
   return (
-    <Card className="bg-slate-800 border-slate-700 border-l-4 border-l-blue-500">
+    <Card className="bg-slate-800 border-slate-700 border-l-4 border-l-green-500">
       <CardHeader>
         <CardTitle className="text-white flex items-center space-x-2">
-          <Bot className="h-5 w-5 text-blue-400" />
-          <span>Echte KI-Signale</span>
-          <Badge className="bg-green-600 text-xs">LIVE</Badge>
+          <Bot className="h-5 w-5 text-green-400" />
+          <span>Automatische KI-Signale</span>
+          <Badge className="bg-green-600 text-xs">AUTOMATISCH</Badge>
           {displaySignals.length > 1 && (
             <Badge variant="outline" className="text-xs">
               {displaySignals.length} Signale

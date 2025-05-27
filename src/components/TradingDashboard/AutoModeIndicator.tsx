@@ -2,10 +2,9 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Settings, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Settings, AlertTriangle } from 'lucide-react';
 
 interface AutoModeIndicatorProps {
-  isAutoMode: boolean;
   isSimulationActive: boolean;
   hasError?: boolean;
   errorMessage?: string;
@@ -13,13 +12,12 @@ interface AutoModeIndicatorProps {
 }
 
 const AutoModeIndicator = ({ 
-  isAutoMode, 
   isSimulationActive, 
   hasError, 
   errorMessage,
   autoTradeCount = 0 
 }: AutoModeIndicatorProps) => {
-  if (!isAutoMode || !isSimulationActive) {
+  if (!isSimulationActive) {
     return null;
   }
 
@@ -35,9 +33,9 @@ const AutoModeIndicator = ({
 
   const getTooltipContent = () => {
     if (hasError) {
-      return `Automatischer Modus gestoppt: ${errorMessage}`;
+      return `Automatischer Modus pausiert: ${errorMessage}`;
     }
-    return `Automatischer Modus aktiv • ${autoTradeCount} Auto-Trades ausgeführt`;
+    return `Automatisch ausgeführt • ${autoTradeCount} Auto-Trades`;
   };
 
   return (
@@ -46,10 +44,10 @@ const AutoModeIndicator = ({
         <TooltipTrigger asChild>
           <Badge 
             variant={getVariant()} 
-            className="flex items-center space-x-1 text-xs"
+            className="flex items-center space-x-1 text-xs bg-green-600"
           >
             {getIcon()}
-            <span>Automatisch</span>
+            <span>Automatisch ausgeführt</span>
           </Badge>
         </TooltipTrigger>
         <TooltipContent>

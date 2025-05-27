@@ -3,7 +3,6 @@ import { useState, useCallback } from 'react';
 import { Signal, SimulationState } from '@/types/simulation';
 import { useTradeExecution } from './useTradeExecution';
 import { useRiskManagement } from './useRiskManagement';
-import { useSettingsStore } from '@/stores/settingsStore';
 import { loggingService } from '@/services/loggingService';
 import { toast } from '@/hooks/use-toast';
 
@@ -29,7 +28,7 @@ export const useAutoTradeExecution = () => {
         confidence: signal.confidenceScore
       });
 
-      addLogEntry('AUTO_TRADE', `AUTO-TRADE: ${signal.signalType} ${signal.assetPair} wird ausgeführt...`);
+      addLogEntry('AUTO_TRADE', `AUTO-TRADE: ${signal.signalType} ${signal.assetPair} wird automatisch ausgeführt...`);
 
       // Validate risk before executing
       const riskValidation = validateTradeRisk(signal, simulationState);
@@ -53,7 +52,7 @@ export const useAutoTradeExecution = () => {
 
         updateSimulationState(updatedState);
         
-        addLogEntry('AUTO_TRADE', `AUTO-TRADE erfolgreich: ${signal.signalType} ${tradeResult.position.quantity} ${signal.assetPair}`, 'AutoMode', {
+        addLogEntry('AUTO_TRADE', `AUTO-TRADE erfolgreich ausgeführt: ${signal.signalType} ${tradeResult.position.quantity} ${signal.assetPair}`, 'AutoMode', {
           tradeData: {
             id: tradeResult.position.id,
             assetPair: signal.assetPair,
@@ -80,14 +79,16 @@ export const useAutoTradeExecution = () => {
         throw new Error(tradeResult.error);
       }
     } catch (error) {
-      return handleAutoTradeError(error, signal, addLogEntry);
+      return handleAutoTradeError(error, signal, addLogEntry, updateSimulationState, simulationState);
     }
   }, [executeTradeFromSignal, validateTradeRisk, retryCount]);
 
   const handleAutoTradeError = useCallback((
     error: unknown,
     signal: Signal,
-    addLogEntry: (type: any, message: string) => void
+    addLogEntry: (type: any, message: string) => void,
+    updateSimulationState: (state: SimulationState) => void,
+    simulationState: SimulationState
   ): boolean => {
     const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler';
     
@@ -106,23 +107,26 @@ export const useAutoTradeExecution = () => {
       
       const retryDelay = Math.pow(2, newRetryCount) * 1000; // Exponential backoff
       
-      setTimeout(() => {
-        // Note: This would need the signal to be re-executed, but we'll handle this in the parent hook
-      }, retryDelay);
-      
       addLogEntry('WARNING', `AUTO-TRADE Retry ${newRetryCount}/3 in ${retryDelay/1000}s`);
       
       return false;
     } else {
-      // Max retries reached, disable auto mode
+      // Max retries reached, pause simulation instead of disabling autoMode
       setAutoModeError(errorMessage);
-      useSettingsStore.getState().saveSettings({ autoMode: false });
+      
+      const pausedState = {
+        ...simulationState,
+        isPaused: true
+      };
+      updateSimulationState(pausedState);
       
       toast({
-        title: "Automatischer Modus gestoppt",
-        description: `Nach 3 Fehlversuchen: ${errorMessage}`,
+        title: "Simulation pausiert",
+        description: `Nach 3 Fehlversuchen pausiert: ${errorMessage}`,
         variant: "destructive"
       });
+      
+      addLogEntry('ERROR', `Simulation wegen wiederholten Fehlern pausiert: ${errorMessage}`);
       
       return false;
     }

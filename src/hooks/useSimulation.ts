@@ -38,7 +38,7 @@ export const useSimulation = () => {
   const { processSignal, acceptSignal: acceptSignalAction, ignoreSignal: ignoreSignalAction } = useSignalProcessor();
   const { aiGenerationTimer, setAiGenerationTimer, updateTimerInterval } = useSimulationTimers();
 
-  // Handle signal processing (auto or manual)
+  // Handle signal processing (always automatic now)
   const handleProcessSignal = useCallback(async (signal: Signal) => {
     await processSignal(
       signal,
@@ -52,7 +52,7 @@ export const useSimulation = () => {
     );
   }, [processSignal, userSettings, isSimulationActive, simulationState, setCurrentSignal, executeAutoTrade, updateSimulationState, addLogEntry]);
 
-  // Start simulation with auto mode support
+  // Start simulation with automatic mode
   const startSimulation = useCallback(async (portfolioData: any) => {
     await startSimulationAction(
       portfolioData,
@@ -65,16 +65,16 @@ export const useSimulation = () => {
     );
   }, [startSimulationAction, userSettings, initializeSimulation, startAISignalGeneration, addLogEntry, setAiGenerationTimer, simulationState]);
 
-  // Update timer interval when auto mode changes
+  // Update timer interval - always use 30s for automatic mode
   useEffect(() => {
     updateTimerInterval(
       isSimulationActive,
-      userSettings.autoMode || false,
+      true, // Always automatic mode
       simulationState,
       startAISignalGeneration,
       addLogEntry
     );
-  }, [userSettings.autoMode, updateTimerInterval, isSimulationActive, simulationState, startAISignalGeneration, addLogEntry]);
+  }, [updateTimerInterval, isSimulationActive, simulationState, startAISignalGeneration, addLogEntry]);
 
   // Stop simulation
   const stopSimulation = useCallback(() => {
@@ -109,7 +109,7 @@ export const useSimulation = () => {
     );
   }, [resumeSimulationAction, resumeSimulationState, addLogEntry, simulationState, startAISignalGeneration, setAiGenerationTimer]);
 
-  // Accept signal manually (override auto mode)
+  // Accept signal manually (kept for compatibility but simplified)
   const acceptSignal = useCallback(async (signal: Signal) => {
     await acceptSignalAction(
       signal,
@@ -120,7 +120,7 @@ export const useSimulation = () => {
     );
   }, [acceptSignalAction, simulationState, updateSimulationState, addLogEntry, setCurrentSignal]);
 
-  // Ignore signal
+  // Ignore signal (kept for compatibility but simplified)
   const ignoreSignal = useCallback((signal: Signal) => {
     ignoreSignalAction(signal, addLogEntry, setCurrentSignal);
   }, [ignoreSignalAction, addLogEntry, setCurrentSignal]);

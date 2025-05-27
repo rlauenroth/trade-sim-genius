@@ -2,12 +2,8 @@
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Play, Pause, Square, Info } from 'lucide-react';
+import { Play, Pause, Square } from 'lucide-react';
 import { useSimGuard } from '@/hooks/useSimGuard';
-import { useSettingsStore } from '@/stores/settingsStore';
 import AutoModeIndicator from './AutoModeIndicator';
 
 interface ControlCenterProps {
@@ -31,8 +27,7 @@ const ControlCenter = ({
   autoTradeCount,
   autoModeError
 }: ControlCenterProps) => {
-  const { canStart, reason, state } = useSimGuard();
-  const { userSettings, toggleAutoMode } = useSettingsStore();
+  const { canStart, reason } = useSimGuard();
 
   const handleStartSimulation = () => {
     if (canStart) {
@@ -46,17 +41,12 @@ const ControlCenter = ({
     }
   };
 
-  const handleAutoModeToggle = async () => {
-    await toggleAutoMode();
-  };
-
   return (
     <Card className="bg-slate-800 border-slate-700">
       <CardHeader>
         <CardTitle className="text-white flex items-center justify-between">
           <span>Kontrolle</span>
           <AutoModeIndicator 
-            isAutoMode={userSettings.autoMode || false}
             isSimulationActive={isSimulationActive}
             hasError={!!autoModeError}
             errorMessage={autoModeError}
@@ -65,31 +55,6 @@ const ControlCenter = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* AutoMode Toggle */}
-        <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-          <div className="flex items-center space-x-2">
-            <Label htmlFor="auto-mode" className="text-sm text-slate-300">
-              Automatischer Modus
-            </Label>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Info className="h-4 w-4 text-slate-400" />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>KI-Signale werden automatisch als Trades ausgeführt</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-          <Switch
-            id="auto-mode"
-            checked={userSettings.autoMode || false}
-            onCheckedChange={handleAutoModeToggle}
-            disabled={isSimulationActive && !isPaused}
-          />
-        </div>
-
         {/* Simulation Controls */}
         {!isSimulationActive ? (
           <div>
@@ -100,7 +65,7 @@ const ControlCenter = ({
               title={!canStart ? reason : undefined}
             >
               <Play className="mr-2 h-4 w-4" />
-              Simulation starten
+              Automatische Simulation starten
             </Button>
             {!canStart && (
               <div className="mt-2 text-xs text-red-400 text-center">
@@ -149,11 +114,9 @@ const ControlCenter = ({
           </div>
         )}
 
-        {userSettings.autoMode && isSimulationActive && (
-          <div className="text-xs text-slate-400 text-center">
-            Signale werden automatisch ausgeführt
-          </div>
-        )}
+        <div className="text-xs text-slate-400 text-center">
+          Alle Signale werden automatisch ausgeführt
+        </div>
       </CardContent>
     </Card>
   );

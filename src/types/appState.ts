@@ -1,11 +1,9 @@
-
 export interface UserSettings {
   tradingStrategy: 'conservative' | 'balanced' | 'aggressive';
   selectedAiModelId: string;
   proxyUrl: string;
   theme?: 'light' | 'dark';
   language?: 'de' | 'en';
-  autoMode?: boolean;
   createdAt: number;
 }
 

@@ -6,7 +6,7 @@ export const useSimulationTimers = () => {
 
   const updateTimerInterval = useCallback((
     isSimulationActive: boolean,
-    autoMode: boolean,
+    autoMode: boolean, // This parameter is kept for compatibility but ignored
     simulationState: any,
     startAISignalGeneration: (immediate: boolean, state: any, addLogEntry: any) => Promise<void>,
     addLogEntry: (type: any, message: string) => void
@@ -15,8 +15,8 @@ export const useSimulationTimers = () => {
       // Clear existing timer
       clearInterval(aiGenerationTimer);
       
-      // Set new interval based on auto mode
-      const interval = autoMode ? 30 * 1000 : 15 * 60 * 1000;
+      // Set new interval - always 30s for automatic mode
+      const interval = 30 * 1000;
       
       const timer = setInterval(async () => {
         if (simulationState?.isActive && !simulationState?.isPaused) {

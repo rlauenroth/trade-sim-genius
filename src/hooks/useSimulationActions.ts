@@ -14,17 +14,13 @@ export const useSimulationActions = () => {
     simulationState: SimulationState | null
   ) => {
     try {
-      loggingService.logEvent('SIM', 'Starting simulation', {
+      loggingService.logEvent('SIM', 'Starting automatic simulation', {
         portfolioValue: portfolioData.totalUSDValue,
-        availablePositions: portfolioData.positions.length,
-        autoMode: userSettings.autoMode
+        availablePositions: portfolioData.positions.length
       });
 
-      addLogEntry('SIM', `Simulation gestartet mit Portfolio-Wert: $${portfolioData.totalUSDValue.toFixed(2)}`);
-      
-      if (userSettings.autoMode) {
-        addLogEntry('SIM', 'Automatischer Modus aktiviert - Signale werden automatisch ausgeführt');
-      }
+      addLogEntry('SIM', `Automatische Simulation gestartet mit Portfolio-Wert: $${portfolioData.totalUSDValue.toFixed(2)}`);
+      addLogEntry('SIM', 'Vollautomatischer Modus - Alle Signale werden automatisch ausgeführt');
       
       // Initialize simulation state
       const initialState = initializeSimulation(portfolioData);
@@ -32,8 +28,8 @@ export const useSimulationActions = () => {
       // Start AI signal generation immediately
       await startAISignalGeneration(true, initialState, addLogEntry);
       
-      // Set up periodic AI signal generation
-      const interval = userSettings.autoMode ? 30 * 1000 : 15 * 60 * 1000; // 30s for auto, 15min for manual
+      // Set up periodic AI signal generation with constant 30s interval for automatic mode
+      const interval = 30 * 1000; // Always 30s for automatic mode
       
       const timer = setInterval(async () => {
         if (simulationState?.isActive && !simulationState?.isPaused) {
@@ -44,7 +40,7 @@ export const useSimulationActions = () => {
       setAiGenerationTimer(timer);
       
     } catch (error) {
-      loggingService.logError('Simulation start failed', {
+      loggingService.logError('Automatic simulation start failed', {
         error: error instanceof Error ? error.message : 'unknown',
         portfolioValue: portfolioData?.totalUSDValue
       });
@@ -61,7 +57,7 @@ export const useSimulationActions = () => {
     addLogEntry: (type: any, message: string) => void,
     setAiGenerationTimer: (timer: NodeJS.Timeout | null) => void
   ) => {
-    loggingService.logEvent('SIM', 'Stopping simulation');
+    loggingService.logEvent('SIM', 'Stopping automatic simulation');
     
     if (aiGenerationTimer) {
       clearInterval(aiGenerationTimer);
@@ -73,7 +69,7 @@ export const useSimulationActions = () => {
     setAvailableSignals([]);
     
     stopSimulationState();
-    addLogEntry('SIM', 'Simulation beendet');
+    addLogEntry('SIM', 'Automatische Simulation beendet');
   }, []);
 
   const pauseSimulation = useCallback((
@@ -82,7 +78,7 @@ export const useSimulationActions = () => {
     addLogEntry: (type: any, message: string) => void,
     setAiGenerationTimer: (timer: NodeJS.Timeout | null) => void
   ) => {
-    loggingService.logEvent('SIM', 'Pausing simulation');
+    loggingService.logEvent('SIM', 'Pausing automatic simulation');
     
     if (aiGenerationTimer) {
       clearInterval(aiGenerationTimer);
@@ -90,7 +86,7 @@ export const useSimulationActions = () => {
     }
     
     pauseSimulationState();
-    addLogEntry('SIM', 'Simulation pausiert');
+    addLogEntry('SIM', 'Automatische Simulation pausiert');
   }, []);
 
   const resumeSimulation = useCallback(async (
@@ -100,12 +96,12 @@ export const useSimulationActions = () => {
     startAISignalGeneration: (immediate: boolean, state: SimulationState, addLogEntry: any) => Promise<void>,
     setAiGenerationTimer: (timer: NodeJS.Timeout | null) => void
   ) => {
-    loggingService.logEvent('SIM', 'Resuming simulation');
+    loggingService.logEvent('SIM', 'Resuming automatic simulation');
     
     resumeSimulationState();
-    addLogEntry('SIM', 'Simulation fortgesetzt');
+    addLogEntry('SIM', 'Automatische Simulation fortgesetzt');
     
-    // Restart AI signal generation
+    // Restart AI signal generation with 30s interval
     if (simulationState) {
       await startAISignalGeneration(true, simulationState, addLogEntry);
       
@@ -113,7 +109,7 @@ export const useSimulationActions = () => {
         if (simulationState?.isActive && !simulationState?.isPaused) {
           await startAISignalGeneration(true, simulationState, addLogEntry);
         }
-      }, 15 * 60 * 1000);
+      }, 30 * 1000); // Always 30s for automatic mode
       
       setAiGenerationTimer(timer);
     }
