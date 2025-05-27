@@ -41,7 +41,7 @@ export interface Signal {
 
 export interface ActivityLogEntry {
   timestamp: number;
-  type: 'INFO' | 'AI' | 'TRADE' | 'ERROR' | 'SUCCESS' | 'WARNING' | 'PORTFOLIO_UPDATE' | 'MARKET_DATA' | 'SYSTEM' | 'PERFORMANCE';
+  type: 'INFO' | 'AI' | 'TRADE' | 'ERROR' | 'SUCCESS' | 'WARNING' | 'PORTFOLIO_UPDATE' | 'MARKET_DATA' | 'SYSTEM' | 'PERFORMANCE' | 'API' | 'SIM';
   message: string;
   source?: string;
   details?: {
@@ -69,4 +69,5 @@ export interface ActivityLogEntry {
   };
   relatedTradeId?: string;
   simulationCycleId?: string;
+  meta?: Record<string, any>;
 }
