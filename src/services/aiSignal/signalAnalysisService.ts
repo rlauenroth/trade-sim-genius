@@ -5,6 +5,8 @@ import { getHistoricalCandles, getCurrentPrice } from '@/utils/kucoinApi';
 import { calculateAllIndicators } from '@/utils/technicalIndicators';
 import { SignalGenerationParams, GeneratedSignal, CandleData, DetailedMarketData, PortfolioData } from '@/types/aiSignal';
 import { safeJsonParse } from '@/utils/aiResponseValidator';
+import { AI_SIGNAL_CONFIG, getAssetCategory } from '@/config/aiSignalConfig';
+import { loggingService } from '@/services/loggingService';
 
 export class SignalAnalysisService {
   private params: SignalGenerationParams;
@@ -26,7 +28,11 @@ export class SignalAnalysisService {
   }
 
   async generateDetailedSignal(assetPair: string): Promise<GeneratedSignal | null> {
-    console.log(`🤖 Generating detailed signal for ${assetPair}...`);
+    loggingService.logEvent('AI', 'Starting detailed signal analysis', {
+      assetPair,
+      strategy: this.params.strategy,
+      category: getAssetCategory(assetPair)
+    });
     
     try {
       // Get historical data
@@ -42,9 +48,18 @@ export class SignalAnalysisService {
       );
       
       if (candles.length === 0) {
-        console.log(`⚠️ No candle data for ${assetPair}`);
+        loggingService.logEvent('AI', 'No candle data available', {
+          assetPair,
+          reason: 'no_historical_data'
+        });
         return null;
       }
+      
+      loggingService.logEvent('AI', 'Historical data retrieved', {
+        assetPair,
+        candleCount: candles.length,
+        timeRange: `${new Date(startTime * 1000).toISOString()} - ${new Date(endTime * 1000).toISOString()}`
+      });
       
       // Convert candle data for technical indicators
       const candleData: CandleData[] = candles.map(candle => ({
@@ -57,6 +72,15 @@ export class SignalAnalysisService {
       
       // Calculate technical indicators
       const technicalIndicators = calculateAllIndicators(candleData);
+      
+      loggingService.logEvent('AI', 'Technical indicators calculated', {
+        assetPair,
+        indicators: Object.keys(technicalIndicators),
+        priceRange: {
+          high: Math.max(...candleData.map(c => c.high)),
+          low: Math.min(...candleData.map(c => c.low))
+        }
+      });
       
       // Get current price
       const currentPrice = await getCurrentPrice(this.params.kucoinCredentials, assetPair);
@@ -86,10 +110,25 @@ export class SignalAnalysisService {
         portfolioData
       );
       
-      // Send to AI for detailed analysis
-      const aiResponse = await sendAIRequest(this.params.openRouterApiKey, analysisPrompt);
+      loggingService.logEvent('AI', 'Sending detailed analysis request', {
+        assetPair,
+        currentPrice,
+        portfolioValue: this.params.simulatedPortfolioValue,
+        availableUSDT: this.params.availableUSDT
+      });
       
-      console.log('Raw AI signal response:', aiResponse);
+      // Send to AI for detailed analysis
+      const aiResponse = await sendAIRequest(
+        this.params.openRouterApiKey, 
+        analysisPrompt,
+        'detail',
+        assetPair
+      );
+      
+      loggingService.logEvent('AI', 'OpenRouter detailed analysis response received', {
+        assetPair,
+        responseLength: aiResponse.length
+      });
       
       // Parse AI response with validation and fallback
       const fallbackSignal = {
@@ -105,9 +144,7 @@ export class SignalAnalysisService {
       
       const signal = safeJsonParse(aiResponse, fallbackSignal);
       
-      console.log(`✅ Signal generated for ${assetPair}:`, signal.signal_type);
-      
-      return {
+      const generatedSignal: GeneratedSignal = {
         assetPair: signal.asset_pair,
         signalType: this.validateSignalType(signal.signal_type),
         entryPriceSuggestion: signal.entry_price_suggestion,
@@ -119,8 +156,23 @@ export class SignalAnalysisService {
         isDemoMode: false
       };
       
+      loggingService.logSuccess('Detailed signal generated', {
+        assetPair,
+        signalType: generatedSignal.signalType,
+        confidenceScore: generatedSignal.confidenceScore,
+        category: getAssetCategory(assetPair),
+        hasReasoning: !!generatedSignal.reasoning
+      });
+      
+      return generatedSignal;
+      
     } catch (error) {
-      console.error(`❌ Signal generation failed for ${assetPair}:`, error);
+      loggingService.logError('Detailed signal generation failed', {
+        assetPair,
+        error: error instanceof Error ? error.message : 'unknown',
+        stage: 'detail_analysis'
+      });
+      
       if (error instanceof OpenRouterError && error.status === 401) {
         throw error; // Re-throw to let the main service handle demo mode
       }

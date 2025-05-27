@@ -1,12 +1,14 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bot, Clock } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Bot, Clock, TrendingUp, BarChart3 } from 'lucide-react';
 import { formatCurrency } from '@/utils/formatters';
 import { useRiskManagement } from '@/hooks/useRiskManagement';
 import { useAppState } from '@/hooks/useAppState';
+import { getAssetCategory } from '@/config/aiSignalConfig';
 
 interface Signal {
   assetPair: string;
@@ -21,16 +23,28 @@ interface Signal {
 
 interface SignalDisplayProps {
   currentSignal: Signal | null;
+  availableSignals?: Signal[];
   onAcceptSignal: (signal: Signal) => void;
   onIgnoreSignal: (signal: Signal) => void;
   portfolioValue?: number;
 }
 
-const SignalDisplay = ({ currentSignal, onAcceptSignal, onIgnoreSignal, portfolioValue }: SignalDisplayProps) => {
+const SignalDisplay = ({ 
+  currentSignal, 
+  availableSignals = [], 
+  onAcceptSignal, 
+  onIgnoreSignal, 
+  portfolioValue 
+}: SignalDisplayProps) => {
   const { userSettings } = useAppState();
   const { getTradeDisplayInfo } = useRiskManagement(userSettings.tradingStrategy || 'balanced');
+  const [selectedSignalIndex, setSelectedSignalIndex] = useState(0);
 
-  if (!currentSignal) {
+  // Use available signals if provided, otherwise fall back to current signal
+  const displaySignals = availableSignals.length > 0 ? availableSignals : (currentSignal ? [currentSignal] : []);
+  const activeSignal = displaySignals[selectedSignalIndex] || currentSignal;
+
+  if (!activeSignal && displaySignals.length === 0) {
     return (
       <Card className="bg-slate-800 border-slate-700">
         <CardHeader>
@@ -53,71 +67,121 @@ const SignalDisplay = ({ currentSignal, onAcceptSignal, onIgnoreSignal, portfoli
 
   const displayInfo = portfolioValue ? getTradeDisplayInfo(portfolioValue, userSettings.tradingStrategy || 'balanced') : null;
 
+  // Render single signal view
+  const renderSignalCard = (signal: Signal, isMultiple: boolean = false) => (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div>
+          <div className="text-sm text-slate-400">Asset</div>
+          <div className="font-bold text-white flex items-center space-x-2">
+            <span>{signal.assetPair}</span>
+            <Badge variant="outline" className="text-xs">
+              {getAssetCategory(signal.assetPair)}
+            </Badge>
+          </div>
+        </div>
+        <div>
+          <div className="text-sm text-slate-400">Aktion</div>
+          <Badge className={signal.signalType === 'BUY' ? 'bg-green-600' : 'bg-red-600'}>
+            {signal.signalType === 'BUY' ? 'KAUFEN' : 'VERKAUFEN'}
+          </Badge>
+        </div>
+        <div>
+          <div className="text-sm text-slate-400">Ziel</div>
+          <div className="text-white">{formatCurrency(signal.takeProfitPrice)}</div>
+        </div>
+        <div>
+          <div className="text-sm text-slate-400">Stop-Loss</div>
+          <div className="text-white">{formatCurrency(signal.stopLossPrice)}</div>
+        </div>
+      </div>
+
+      {signal.confidenceScore && (
+        <div className="flex items-center space-x-2">
+          <BarChart3 className="h-4 w-4 text-blue-400" />
+          <span className="text-sm text-slate-400">Konfidenz:</span>
+          <span className="text-white font-medium">{Math.round(signal.confidenceScore * 100)}%</span>
+        </div>
+      )}
+
+      {displayInfo && (
+        <div className="bg-slate-700/50 rounded-lg p-3">
+          <div className="text-sm text-slate-400 mb-1">Geplante Positionsgröße:</div>
+          <div className="text-lg font-bold text-white">
+            ${displayInfo.idealSize} USDT ({displayInfo.percentage}% des Portfolios)
+          </div>
+          <div className="text-xs text-slate-500">
+            Minimum für Trade: ${displayInfo.minimum} USDT
+          </div>
+        </div>
+      )}
+      
+      {signal.reasoning && (
+        <div className="bg-slate-700/50 rounded-lg p-3">
+          <div className="text-sm text-slate-400 mb-1">KI-Begründung:</div>
+          <div className="text-sm text-slate-200">{signal.reasoning}</div>
+        </div>
+      )}
+      
+      <div className="flex space-x-3">
+        <Button 
+          onClick={() => onAcceptSignal(signal)} 
+          className="flex-1 bg-green-600 hover:bg-green-700"
+        >
+          Signal für Simulation annehmen
+        </Button>
+        <Button 
+          onClick={() => onIgnoreSignal(signal)} 
+          variant="outline" 
+          className="flex-1 border-slate-600 text-slate-300"
+        >
+          Signal ignorieren
+        </Button>
+      </div>
+    </div>
+  );
+
   return (
     <Card className="bg-slate-800 border-slate-700 border-l-4 border-l-blue-500">
       <CardHeader>
         <CardTitle className="text-white flex items-center space-x-2">
           <Bot className="h-5 w-5 text-blue-400" />
-          <span>Echtes KI-Signal</span>
+          <span>Echte KI-Signale</span>
           <Badge className="bg-green-600 text-xs">LIVE</Badge>
+          {displaySignals.length > 1 && (
+            <Badge variant="outline" className="text-xs">
+              {displaySignals.length} Signale
+            </Badge>
+          )}
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div>
-            <div className="text-sm text-slate-400">Asset</div>
-            <div className="font-bold text-white">{currentSignal.assetPair}</div>
-          </div>
-          <div>
-            <div className="text-sm text-slate-400">Aktion</div>
-            <Badge className={currentSignal.signalType === 'BUY' ? 'bg-green-600' : 'bg-red-600'}>
-              {currentSignal.signalType === 'BUY' ? 'KAUFEN' : 'VERKAUFEN'}
-            </Badge>
-          </div>
-          <div>
-            <div className="text-sm text-slate-400">Ziel</div>
-            <div className="text-white">{formatCurrency(currentSignal.takeProfitPrice)}</div>
-          </div>
-          <div>
-            <div className="text-sm text-slate-400">Stop-Loss</div>
-            <div className="text-white">{formatCurrency(currentSignal.stopLossPrice)}</div>
-          </div>
-        </div>
-
-        {displayInfo && (
-          <div className="bg-slate-700/50 rounded-lg p-3">
-            <div className="text-sm text-slate-400 mb-1">Geplante Positionsgröße:</div>
-            <div className="text-lg font-bold text-white">
-              ${displayInfo.idealSize} USDT ({displayInfo.percentage}% des Portfolios)
-            </div>
-            <div className="text-xs text-slate-500">
-              Minimum für Trade: ${displayInfo.minimum} USDT
-            </div>
-          </div>
+      <CardContent>
+        {displaySignals.length > 1 ? (
+          <Tabs value={selectedSignalIndex.toString()} onValueChange={(value) => setSelectedSignalIndex(parseInt(value))}>
+            <TabsList className="grid w-full grid-cols-3 mb-4 bg-slate-700">
+              {displaySignals.slice(0, 3).map((signal, index) => (
+                <TabsTrigger 
+                  key={index} 
+                  value={index.toString()}
+                  className="text-xs data-[state=active]:bg-slate-600"
+                >
+                  <div className="flex items-center space-x-1">
+                    <TrendingUp className="h-3 w-3" />
+                    <span>{signal.assetPair.replace('-USDT', '')}</span>
+                  </div>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            
+            {displaySignals.slice(0, 3).map((signal, index) => (
+              <TabsContent key={index} value={index.toString()}>
+                {renderSignalCard(signal, true)}
+              </TabsContent>
+            ))}
+          </Tabs>
+        ) : (
+          activeSignal && renderSignalCard(activeSignal)
         )}
-        
-        {currentSignal.reasoning && (
-          <div className="bg-slate-700/50 rounded-lg p-3">
-            <div className="text-sm text-slate-400 mb-1">KI-Begründung:</div>
-            <div className="text-sm text-slate-200">{currentSignal.reasoning}</div>
-          </div>
-        )}
-        
-        <div className="flex space-x-3">
-          <Button 
-            onClick={() => onAcceptSignal(currentSignal)} 
-            className="flex-1 bg-green-600 hover:bg-green-700"
-          >
-            Signal für Simulation annehmen
-          </Button>
-          <Button 
-            onClick={() => onIgnoreSignal(currentSignal)} 
-            variant="outline" 
-            className="flex-1 border-slate-600 text-slate-300"
-          >
-            Signal ignorieren
-          </Button>
-        </div>
       </CardContent>
     </Card>
   );

@@ -4,6 +4,8 @@ import { sendAIRequest, createScreeningPrompt, OpenRouterError } from '@/utils/o
 import { getMarketTickers } from '@/utils/kucoinApi';
 import { SignalGenerationParams, MarketDataPoint } from '@/types/aiSignal';
 import { safeJsonParse } from '@/utils/aiResponseValidator';
+import { AI_SIGNAL_CONFIG } from '@/config/aiSignalConfig';
+import { loggingService } from '@/services/loggingService';
 
 export class MarketScreeningService {
   private params: SignalGenerationParams;
@@ -13,18 +15,31 @@ export class MarketScreeningService {
   }
 
   async performMarketScreening(): Promise<string[]> {
-    console.log('🔍 Starting market screening...');
+    loggingService.logEvent('AI', 'Starting comprehensive market screening', {
+      topX: AI_SIGNAL_CONFIG.SCREENING_TOP_X,
+      minVolume: AI_SIGNAL_CONFIG.SCREENING_MIN_VOLUME,
+      strategy: this.params.strategy
+    });
     
     try {
       // Get market data from KuCoin
       const tickers = await getMarketTickers(this.params.kucoinCredentials);
       
+      loggingService.logEvent('AI', 'Market data retrieved', {
+        totalTickers: tickers.length
+      });
+      
       // Filter for USDT pairs and sort by volume
       const usdtPairs = tickers
         .filter(ticker => ticker.symbol.endsWith('-USDT'))
-        .filter(ticker => parseFloat(ticker.volValue) > 100000)
+        .filter(ticker => parseFloat(ticker.volValue) > AI_SIGNAL_CONFIG.SCREENING_MIN_VOLUME)
         .sort((a, b) => parseFloat(b.volValue) - parseFloat(a.volValue))
-        .slice(0, 50);
+        .slice(0, AI_SIGNAL_CONFIG.SCREENING_TOP_X);
+      
+      loggingService.logEvent('AI', 'Market filtering completed', {
+        filteredPairs: usdtPairs.length,
+        topPairs: usdtPairs.slice(0, 5).map(t => t.symbol)
+      });
       
       // Prepare data for AI screening
       const marketData: MarketDataPoint[] = usdtPairs.map(ticker => ({
@@ -38,26 +53,56 @@ export class MarketScreeningService {
       
       // Send to AI for screening
       const screeningPrompt = createScreeningPrompt(this.params.strategy, marketData);
-      const aiResponse = await sendAIRequest(this.params.openRouterApiKey, screeningPrompt);
       
-      console.log('Raw AI screening response:', aiResponse);
+      loggingService.logEvent('AI', 'Sending screening request to OpenRouter', {
+        pairsToAnalyze: marketData.length,
+        strategy: this.params.strategy
+      });
+      
+      const aiResponse = await sendAIRequest(
+        this.params.openRouterApiKey, 
+        screeningPrompt,
+        'screening'
+      );
+      
+      loggingService.logEvent('AI', 'OpenRouter screening response received', {
+        responseLength: aiResponse.length
+      });
       
       // Parse AI response with validation
-      const fallbackResponse = { selected_pairs: ['BTC-USDT', 'ETH-USDT', 'SOL-USDT'] };
+      const fallbackResponse = { 
+        selected_pairs: usdtPairs.slice(0, 3).map(t => t.symbol)
+      };
       const parsed = safeJsonParse(aiResponse, fallbackResponse);
       
-      console.log('📊 Market screening completed:', parsed.selected_pairs);
+      const selectedPairs = parsed.selected_pairs || fallbackResponse.selected_pairs;
       
-      return parsed.selected_pairs || ['BTC-USDT', 'ETH-USDT', 'SOL-USDT'];
+      loggingService.logSuccess('Market screening completed', {
+        selectedPairs,
+        totalAnalyzed: marketData.length,
+        aiRecommendations: selectedPairs.length
+      });
+      
+      return selectedPairs;
       
     } catch (error) {
-      console.error('❌ Market screening failed:', error);
+      loggingService.logError('Market screening failed', {
+        error: error instanceof Error ? error.message : 'unknown',
+        stage: 'screening'
+      });
+      
       if (error instanceof OpenRouterError && error.status === 401) {
-        console.log('🔄 Switching to demo mode due to authentication error');
         throw error; // Re-throw to let the main service handle demo mode
       }
+      
       // Fallback to popular pairs
-      return ['BTC-USDT', 'ETH-USDT', 'SOL-USDT'];
+      const fallbackPairs = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT'];
+      loggingService.logEvent('AI', 'Using fallback pairs', {
+        fallbackPairs,
+        reason: 'screening_error'
+      });
+      
+      return fallbackPairs;
     }
   }
 }
