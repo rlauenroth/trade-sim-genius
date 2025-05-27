@@ -15,12 +15,19 @@ export interface OpenRouterRequest {
   response_format?: { type: 'json_object' };
 }
 
+export interface OpenRouterUsage {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+}
+
 export interface OpenRouterResponse {
   choices: {
     message: {
       content: string;
     };
   }[];
+  usage?: OpenRouterUsage;
 }
 
 export class OpenRouterError extends Error {
