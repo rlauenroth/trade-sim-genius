@@ -10,17 +10,22 @@ export const useTradeExecution = () => {
     addLogEntry: (type: any, message: string) => void,
     saveSimulationState: (state: SimulationState) => void,
     setCurrentSignal: (signal: Signal | null) => void,
-    startAISignalGeneration: () => void
+    startAISignalGeneration: () => void,
+    addTradeLog: (tradeData: any) => void,
+    addSignalLog: (signal: Signal, action: 'generated' | 'accepted' | 'ignored') => void,
+    addPortfolioUpdateLog: (valueBefore: number, valueAfter: number, reason: string) => void
   ) => {
     if (!simulationState || !signal) return;
 
     if (signal.signalType !== 'BUY' && signal.signalType !== 'SELL') {
       addLogEntry('INFO', `Signal ${signal.signalType} für ${signal.assetPair} ist nicht handelbar`);
+      addSignalLog(signal, 'ignored');
       setCurrentSignal(null);
       return;
     }
 
     addLogEntry('TRADE', `Signal angenommen: ${signal.signalType} ${signal.assetPair}`);
+    addSignalLog(signal, 'accepted');
     
     try {
       let currentPrice: number;
@@ -61,6 +66,7 @@ export const useTradeExecution = () => {
         openTimestamp: Date.now()
       };
 
+      const portfolioValueBefore = simulationState.currentPortfolioValue;
       const updatedAssets = simulationState.paperAssets.map(asset => {
         if (asset.symbol === 'USDT') {
           return { ...asset, quantity: asset.quantity - actualPositionSize - tradingFee };
@@ -81,15 +87,29 @@ export const useTradeExecution = () => {
         });
       }
 
+      const portfolioValueAfter = simulationState.currentPortfolioValue - tradingFee;
       const updatedState = {
         ...simulationState,
         openPositions: [...simulationState.openPositions, newPosition],
         paperAssets: updatedAssets,
-        currentPortfolioValue: simulationState.currentPortfolioValue - tradingFee
+        currentPortfolioValue: portfolioValueAfter
       };
 
       saveSimulationState(updatedState);
       setCurrentSignal(null);
+      
+      // Enhanced logging
+      addTradeLog({
+        id: newPosition.id,
+        assetPair: signal.assetPair,
+        type: signal.signalType,
+        quantity,
+        price: currentPrice,
+        fee: tradingFee,
+        totalValue: actualPositionSize
+      });
+      
+      addPortfolioUpdateLog(portfolioValueBefore, portfolioValueAfter, `Trade ausgeführt: ${signal.signalType} ${signal.assetPair}`);
       
       addLogEntry('SUCCESS', `Position eröffnet: ${quantity.toFixed(6)} ${assetSymbol} @ $${currentPrice.toFixed(2)}`);
       addLogEntry('INFO', `Handelsgröße: $${actualPositionSize.toFixed(2)}, Gebühr: $${tradingFee.toFixed(2)}`);
@@ -114,9 +134,11 @@ export const useTradeExecution = () => {
     signal: Signal,
     addLogEntry: (type: any, message: string) => void,
     setCurrentSignal: (signal: Signal | null) => void,
-    generateMockSignal: () => void
+    generateMockSignal: () => void,
+    addSignalLog: (signal: Signal, action: 'generated' | 'accepted' | 'ignored') => void
   ) => {
     addLogEntry('INFO', `Signal ignoriert: ${signal.signalType} ${signal.assetPair}`);
+    addSignalLog(signal, 'ignored');
     setCurrentSignal(null);
     
     toast({
