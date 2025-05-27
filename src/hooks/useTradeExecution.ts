@@ -1,4 +1,3 @@
-
 import { useCallback } from 'react';
 import { Signal, SimulationState, Position } from '@/types/simulation';
 import { toast } from '@/hooks/use-toast';
@@ -19,7 +18,7 @@ export const useTradeExecution = () => {
   ) => {
     if (!simulationState || !signal) return;
 
-    const { calculatePositionSize } = useRiskManagement(strategy);
+    const { calculatePositionSize, getTradeDisplayInfo } = useRiskManagement(strategy);
 
     if (signal.signalType !== 'BUY' && signal.signalType !== 'SELL') {
       addLogEntry('INFO', `Signal ${signal.signalType} für ${signal.assetPair} ist nicht handelbar`);
@@ -118,15 +117,14 @@ export const useTradeExecution = () => {
       
       addPortfolioUpdateLog(portfolioValueBefore, portfolioValueAfter, `Trade ausgeführt: ${signal.signalType} ${signal.assetPair}`);
       
-      const { getTradeDisplayInfo } = useRiskManagement(strategy);
       const displayInfo = getTradeDisplayInfo(simulationState.currentPortfolioValue, strategy);
       
       addLogEntry('SUCCESS', `Position eröffnet: ${quantity.toFixed(6)} ${assetSymbol} @ $${currentPrice.toFixed(2)}`);
-      addLogEntry('INFO', `Handelsgröße: $${actualPositionSize.toFixed(2)} (${displayInfo.percentage}% des Portfolios), Gebühr: $${tradingFee.toFixed(2)}`);
+      addLogEntry('INFO', `Handelsgröße: $${actualPositionSize.toFixed(2)} (max(${displayInfo.percentage}% Portfolio, $${displayInfo.minimum})), Gebühr: $${tradingFee.toFixed(2)}`);
       
       toast({
         title: "Position eröffnet",
-        description: `${signal.signalType} ${signal.assetPair} für $${actualPositionSize.toFixed(2)} (${displayInfo.percentage}% Portfolio)`,
+        description: `${signal.signalType} ${signal.assetPair} für $${actualPositionSize.toFixed(2)}`,
       });
 
       setTimeout(() => {

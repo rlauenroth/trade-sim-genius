@@ -1,5 +1,5 @@
 
-import { calcTradeSize, getStrategyConfig, StrategyConfig } from '@/config/strategy';
+import { calcTradeSize, getStrategyConfig, StrategyConfig, MINIMUM_TRADE_USDT } from '@/config/strategy';
 
 export const useRiskManagement = (strategy: string) => {
   const getRiskParameters = (): StrategyConfig => {
@@ -23,13 +23,12 @@ export const useRiskManagement = (strategy: string) => {
     strategy: string
   ): { size: number; isValid: boolean; reason?: string } => {
     const actualSize = calcTradeSize(portfolioValue, availableUSDT, strategy);
-    const config = getStrategyConfig(strategy);
     
     if (actualSize === 0) {
       return {
         size: 0,
         isValid: false,
-        reason: `Nicht genügend USDT für Minimum-Trade (${config.minimumMeaningfulTradeSize} USDT benötigt, ${availableUSDT.toFixed(2)} USDT verfügbar)`
+        reason: `Nicht genügend USDT für Trade. Benötigt: $${MINIMUM_TRADE_USDT}, verfügbar: $${availableUSDT.toFixed(2)}`
       };
     }
     
@@ -49,13 +48,13 @@ export const useRiskManagement = (strategy: string) => {
 
   const getTradeDisplayInfo = (portfolioValue: number, strategy: string) => {
     const config = getStrategyConfig(strategy);
-    const idealSize = portfolioValue * config.tradeFraction;
+    const idealSize = Math.max(portfolioValue * config.tradeFraction, MINIMUM_TRADE_USDT);
     const percentage = (config.tradeFraction * 100).toFixed(1);
     
     return {
       idealSize: idealSize.toFixed(2),
       percentage,
-      minimum: config.minimumMeaningfulTradeSize
+      minimum: MINIMUM_TRADE_USDT
     };
   };
 

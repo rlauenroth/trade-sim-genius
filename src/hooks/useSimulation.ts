@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { SimulationState } from '@/types/simulation';
@@ -11,7 +10,8 @@ import { useAppState } from './useAppState';
 import { apiModeService } from '@/services/apiModeService';
 import { simReadinessStore } from '@/stores/simReadinessStore';
 import { useSimGuard } from './useSimGuard';
-import { calcTradeSize, getStrategyConfig } from '@/config/strategy';
+import { getStrategyConfig, MINIMUM_TRADE_USDT } from '@/config/strategy';
+import { useRiskManagement } from './useRiskManagement';
 
 export const useSimulation = () => {
   const {
@@ -128,16 +128,12 @@ export const useSimulation = () => {
         return;
       }
 
-      // Check if portfolio value is sufficient for strategy
-      const strategy = userSettings.tradingStrategy || 'balanced';
-      const config = getStrategyConfig(strategy);
-      const minimumPortfolioValue = config.minimumMeaningfulTradeSize / config.tradeFraction;
-      
-      if (livePortfolio.totalUSDValue < minimumPortfolioValue) {
-        addLogEntry('ERROR', `Portfolio-Wert zu niedrig für ${strategy} Strategie. Minimum: $${minimumPortfolioValue.toFixed(2)}`);
+      // Only check if portfolio has at least minimum trade size
+      if (livePortfolio.totalUSDValue < MINIMUM_TRADE_USDT) {
+        addLogEntry('ERROR', `Portfolio-Wert zu niedrig. Minimum: $${MINIMUM_TRADE_USDT}`);
         toast({
           title: "Portfolio zu klein",
-          description: `Für ${strategy} Strategie benötigen Sie mindestens $${minimumPortfolioValue.toFixed(2)}`,
+          description: `Mindestens $${MINIMUM_TRADE_USDT} für Trading benötigt`,
           variant: "destructive"
         });
         return;
@@ -178,7 +174,13 @@ export const useSimulation = () => {
       
       addSimulationStartLog(actualStartValue);
       addLogEntry('INFO', `Echtes Startkapital: $${actualStartValue.toLocaleString()}`);
-      addLogEntry('INFO', `Strategie: ${strategy} (${(config.tradeFraction * 100).toFixed(1)}% pro Trade, Min: $${config.minimumMeaningfulTradeSize})`);
+      
+      const strategy = userSettings.tradingStrategy || 'balanced';
+      const config = getStrategyConfig(strategy);
+      const { getTradeDisplayInfo } = useRiskManagement(strategy);
+      const displayInfo = getTradeDisplayInfo(actualStartValue, strategy);
+      
+      addLogEntry('INFO', `Strategie: ${strategy} (${displayInfo.percentage}% pro Trade, Min: $${displayInfo.minimum})`);
       
       if (apiStatus.corsIssuesDetected) {
         addLogEntry('INFO', 'Verwende Hybrid-Modus: Live-Marktdaten + simulierte Portfolio-Daten');
