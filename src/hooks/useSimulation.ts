@@ -97,12 +97,12 @@ export const useSimulation = () => {
     );
 
     // Start exit screening for open positions
-    if (apiKeys?.openRouterApiKey && userSettings.tradingStrategy) {
+    if (apiKeys?.encryptedOpenRouterKey && userSettings.tradingStrategy) {
       const currentState = JSON.parse(localStorage.getItem('kiTradingApp_simulationState') || '{}');
       if (currentState && currentState.openPositions?.length > 0) {
         startExitScreening(
           currentState,
-          apiKeys.openRouterApiKey,
+          apiKeys.encryptedOpenRouterKey,
           updateSimulationState,
           addLogEntry
         );
@@ -159,12 +159,12 @@ export const useSimulation = () => {
     );
 
     // Restart exit screening
-    if (apiKeys?.openRouterApiKey && userSettings.tradingStrategy) {
+    if (apiKeys?.encryptedOpenRouterKey && userSettings.tradingStrategy) {
       const currentState = JSON.parse(localStorage.getItem('kiTradingApp_simulationState') || '{}');
       if (currentState && currentState.openPositions?.length > 0) {
         startExitScreening(
           currentState,
-          apiKeys.openRouterApiKey,
+          apiKeys.encryptedOpenRouterKey,
           updateSimulationState,
           addLogEntry
         );

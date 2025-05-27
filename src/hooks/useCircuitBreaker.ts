@@ -15,7 +15,7 @@ export const useCircuitBreaker = () => {
     // Use 2x stop loss as portfolio drawdown limit (e.g., -4% for balanced strategy)
     const drawdownLimit = config.defaultStopLossPercent * 2;
     
-    loggingService.logEvent('CIRCUIT_BREAKER', 'Checking drawdown limit', {
+    loggingService.logEvent('SIM', 'Checking drawdown limit', {
       strategy,
       currentValue: simulationState.currentPortfolioValue,
       startValue: simulationState.startPortfolioValue,
@@ -43,7 +43,7 @@ export const useCircuitBreaker = () => {
     const openPositions = simulationState.openPositions.length;
 
     if (openPositions >= config.maxOpenPositions) {
-      loggingService.logEvent('CIRCUIT_BREAKER', 'Position limit reached', {
+      loggingService.logEvent('SIM', 'Position limit reached', {
         strategy,
         openPositions,
         maxPositions: config.maxOpenPositions
@@ -83,7 +83,7 @@ export const useCircuitBreaker = () => {
     };
 
     if (shouldPause) {
-      loggingService.logEvent('CIRCUIT_BREAKER', 'Risk limits breached - pausing simulation', {
+      loggingService.logEvent('SIM', 'Risk limits breached - pausing simulation', {
         strategy,
         reasons,
         metrics
@@ -110,7 +110,7 @@ export const useCircuitBreaker = () => {
       
       addLogEntry('RISK', '🛑 Simulation automatisch pausiert - Risiko-Limits erreicht');
       
-      loggingService.logEvent('CIRCUIT_BREAKER', 'Simulation paused by circuit breaker', {
+      loggingService.logEvent('SIM', 'Simulation paused by circuit breaker', {
         strategy,
         reasons: riskCheck.reasons,
         metrics: riskCheck.metrics

@@ -1,12 +1,12 @@
 
 import { useCallback, useRef } from 'react';
-import { Position, SimulationState, Signal } from '@/types/simulation';
+import { Position, SimulationState } from '@/types/simulation';
 import { AISignalService } from '@/services/aiSignal';
 import { loggingService } from '@/services/loggingService';
-import { useAppState } from './useAppState';
+import { useSettingsStore } from '@/stores/settingsStore';
 
 export const useExitScreening = () => {
-  const { userSettings } = useAppState();
+  const { userSettings } = useSettingsStore();
   const exitScreeningTimer = useRef<NodeJS.Timeout | null>(null);
 
   const analyzePositionForExit = useCallback(async (
@@ -14,7 +14,7 @@ export const useExitScreening = () => {
     openRouterApiKey: string
   ): Promise<'SELL' | 'HOLD'> => {
     try {
-      loggingService.logEvent('EXIT_SCREENING', 'Analyzing position for exit', {
+      loggingService.logEvent('AI', 'Analyzing position for exit', {
         positionId: position.id,
         assetPair: position.assetPair,
         entryPrice: position.entryPrice,
@@ -25,14 +25,13 @@ export const useExitScreening = () => {
         strategy: userSettings.tradingStrategy || 'balanced',
         simulatedPortfolioValue: 1000, // Not relevant for exit analysis
         availableUSDT: 0, // Not relevant for exit analysis
-        openRouterApiKey,
-        modelName: userSettings.aiModel || 'claude-3-haiku'
+        openRouterApiKey
       });
 
       const signal = await aiService.generateDetailedSignal(position.assetPair);
       
       if (!signal) {
-        loggingService.logEvent('EXIT_SCREENING', 'No signal generated, holding position', {
+        loggingService.logEvent('AI', 'No signal generated, holding position', {
           positionId: position.id,
           assetPair: position.assetPair
         });
@@ -47,7 +46,7 @@ export const useExitScreening = () => {
 
       const decision = shouldExit ? 'SELL' : 'HOLD';
 
-      loggingService.logEvent('EXIT_SCREENING', 'Exit analysis completed', {
+      loggingService.logEvent('AI', 'Exit analysis completed', {
         positionId: position.id,
         assetPair: position.assetPair,
         positionType: position.type,
@@ -77,7 +76,7 @@ export const useExitScreening = () => {
       return;
     }
 
-    loggingService.logEvent('EXIT_SCREENING', 'Starting exit screening cycle', {
+    loggingService.logEvent('AI', 'Starting exit screening cycle', {
       openPositions: simulationState.openPositions.length,
       positions: simulationState.openPositions.map(p => ({
         id: p.id,
@@ -189,7 +188,7 @@ export const useExitScreening = () => {
   ) => {
     stopExitScreening();
 
-    loggingService.logEvent('EXIT_SCREENING', 'Starting exit screening timer', {
+    loggingService.logEvent('AI', 'Starting exit screening timer', {
       interval: '5 minutes',
       openPositions: simulationState.openPositions.length
     });
@@ -208,7 +207,7 @@ export const useExitScreening = () => {
     if (exitScreeningTimer.current) {
       clearInterval(exitScreeningTimer.current);
       exitScreeningTimer.current = null;
-      loggingService.logEvent('EXIT_SCREENING', 'Exit screening timer stopped');
+      loggingService.logEvent('AI', 'Exit screening timer stopped');
     }
   }, []);
 

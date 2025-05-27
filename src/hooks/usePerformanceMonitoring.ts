@@ -1,3 +1,4 @@
+
 import { useCallback, useRef } from 'react';
 import { loggingService } from '@/services/loggingService';
 
@@ -42,7 +43,7 @@ export const usePerformanceMonitoring = () => {
 
     // Log slow requests (> 200ms as per concept)
     if (duration > 200) {
-      loggingService.logEvent('PERFORMANCE', 'Slow API request detected', {
+      loggingService.logEvent('API', 'Slow API request detected', {
         endpoint,
         duration,
         threshold: 200
@@ -51,7 +52,7 @@ export const usePerformanceMonitoring = () => {
 
     // Log very slow requests (> 1000ms)
     if (duration > 1000) {
-      loggingService.logEvent('PERFORMANCE', 'Very slow API request', {
+      loggingService.logEvent('API', 'Very slow API request', {
         endpoint,
         duration,
         severity: 'WARNING'
@@ -79,7 +80,7 @@ export const usePerformanceMonitoring = () => {
       performanceData.current.simulationCycles = performanceData.current.simulationCycles.slice(-50);
     }
 
-    loggingService.logEvent('PERFORMANCE', 'Simulation cycle completed', {
+    loggingService.logEvent('SIM', 'Simulation cycle completed', {
       duration,
       portfolioChange,
       portfolioValueBefore,
@@ -95,7 +96,7 @@ export const usePerformanceMonitoring = () => {
         exceeded: portfolioChange - 1.0
       });
     } else if (portfolioChange < 0) {
-      loggingService.logEvent('PERFORMANCE', 'Negative cycle performance', {
+      loggingService.logEvent('SIM', 'Negative cycle performance', {
         portfolioChange,
         severity: 'WARNING'
       });
@@ -144,7 +145,7 @@ export const usePerformanceMonitoring = () => {
   const logPerformanceReport = useCallback(() => {
     const metrics = getPerformanceMetrics();
     
-    loggingService.logEvent('PERFORMANCE', 'Performance report', {
+    loggingService.logEvent('SIM', 'Performance report', {
       metrics,
       timestamp: Date.now(),
       reportType: 'periodic'
@@ -152,7 +153,7 @@ export const usePerformanceMonitoring = () => {
 
     // Check for performance issues
     if (metrics.averageResponseTime > 200) {
-      loggingService.logEvent('PERFORMANCE', 'Average response time exceeds target', {
+      loggingService.logEvent('API', 'Average response time exceeds target', {
         current: metrics.averageResponseTime,
         target: 200,
         severity: 'WARNING'
@@ -160,7 +161,7 @@ export const usePerformanceMonitoring = () => {
     }
 
     if (metrics.successRate < 95) {
-      loggingService.logEvent('PERFORMANCE', 'Success rate below target', {
+      loggingService.logEvent('API', 'Success rate below target', {
         current: metrics.successRate,
         target: 95,
         severity: 'WARNING'
@@ -176,7 +177,7 @@ export const usePerformanceMonitoring = () => {
       simulationCycles: []
     };
     
-    loggingService.logEvent('PERFORMANCE', 'Performance data cleared');
+    loggingService.logEvent('SIM', 'Performance data cleared');
   }, []);
 
   return {
