@@ -13,6 +13,18 @@ export class SignalAnalysisService {
     this.params = params;
   }
 
+  // Helper method to validate and cast signal type
+  private validateSignalType(signalType: string): 'BUY' | 'SELL' | 'HOLD' | 'NO_TRADE' {
+    const validTypes = ['BUY', 'SELL', 'HOLD', 'NO_TRADE'];
+    const upperSignalType = signalType.toUpperCase();
+    
+    if (validTypes.includes(upperSignalType)) {
+      return upperSignalType as 'BUY' | 'SELL' | 'HOLD' | 'NO_TRADE';
+    }
+    
+    return 'NO_TRADE';
+  }
+
   async generateDetailedSignal(assetPair: string): Promise<GeneratedSignal | null> {
     console.log(`🤖 Generating detailed signal for ${assetPair}...`);
     
@@ -97,7 +109,7 @@ export class SignalAnalysisService {
       
       return {
         assetPair: signal.asset_pair,
-        signalType: signal.signal_type,
+        signalType: this.validateSignalType(signal.signal_type),
         entryPriceSuggestion: signal.entry_price_suggestion,
         takeProfitPrice: signal.take_profit_price || 0,
         stopLossPrice: signal.stop_loss_price || 0,
