@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Wifi, WifiOff, AlertTriangle, CheckCircle } from 'lucide-react';
+import { CheckCircle, AlertTriangle } from 'lucide-react';
 import { apiModeService } from '@/services/apiModeService';
 import { NetworkStatusBadge } from './NetworkStatusBadge';
 
@@ -14,7 +14,6 @@ const LiveStatusIndicator = () => {
       setApiStatus(apiModeService.getApiModeStatus());
     };
 
-    // Check status every 30 seconds
     const interval = setInterval(checkStatus, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -26,14 +25,14 @@ const LiveStatusIndicator = () => {
           color: 'bg-green-600', 
           icon: <CheckCircle className="h-3 w-3" />, 
           text: 'KI Live',
-          description: 'Echte KI-Analyse'
+          description: 'Echte KI-Analyse aktiv'
         };
       case 'demo':
         return { 
-          color: 'bg-blue-600', 
+          color: 'bg-red-600', 
           icon: <AlertTriangle className="h-3 w-3" />, 
-          text: 'KI Demo',
-          description: 'Simulierte KI-Signale'
+          text: 'KI Fehler',
+          description: 'Keine echte KI-Analyse möglich'
         };
     }
   };
@@ -57,6 +56,9 @@ const LiveStatusIndicator = () => {
         <div className="mt-2 text-xs text-slate-500">
           <div>KuCoin: Live-API via PHP-Proxy</div>
           <div>{openRouterInfo.description}</div>
+          <div className="text-xs text-slate-600 mt-1">
+            Nur echte KI-Signale werden angezeigt
+          </div>
         </div>
       </CardContent>
     </Card>

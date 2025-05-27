@@ -1,7 +1,6 @@
 
-// AI Signal Service exports
+// AI Signal Service exports - REALISM MODE ONLY
 export { AISignalService } from './aiSignalService';
-export { DemoSignalGenerator } from './demoSignalGenerator';
 export { MarketScreeningService } from './marketScreeningService';
 export { SignalAnalysisService } from './signalAnalysisService';
 export type { 

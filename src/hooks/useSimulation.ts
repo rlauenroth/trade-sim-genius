@@ -1,3 +1,4 @@
+
 import { useCallback, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { SimulationState } from '@/types/simulation';
@@ -6,9 +7,11 @@ import { useActivityLog } from './useActivityLog';
 import { useAISignals } from './useAISignals';
 import { useTradeExecution } from './useTradeExecution';
 import { usePortfolioLive } from './usePortfolioLive';
+import { useAppState } from './useAppState';
 import { apiModeService } from '@/services/apiModeService';
 import { simReadinessStore } from '@/stores/simReadinessStore';
 import { useSimGuard } from './useSimGuard';
+import { calcTradeSize, getStrategyConfig } from '@/config/strategy';
 
 export const useSimulation = () => {
   const {
@@ -34,7 +37,6 @@ export const useSimulation = () => {
   const {
     currentSignal,
     setCurrentSignal,
-    generateMockSignal,
     startAISignalGeneration
   } = useAISignals();
 
@@ -45,6 +47,7 @@ export const useSimulation = () => {
 
   const { isRunningBlocked, state: readinessState, reason } = useSimGuard();
   const { snapshot: livePortfolio } = usePortfolioLive();
+  const { userSettings } = useAppState();
 
   // Auto-pause simulation when readiness becomes unstable
   useEffect(() => {
@@ -53,12 +56,10 @@ export const useSimulation = () => {
       
       addLogEntry('WARNING', `Simulation automatisch pausiert: ${reason}`);
       
-      // Update simulation state to paused
       const updatedState = { ...simulationState, isPaused: true };
       saveSimulationState(updatedState);
       setIsSimulationActive(false);
       
-      // Show toast notification
       toast({
         title: "Simulation pausiert",
         description: `System nicht bereit: ${reason}`,
@@ -67,17 +68,33 @@ export const useSimulation = () => {
     }
   }, [isSimulationActive, isRunningBlocked, simulationState, reason, saveSimulationState, setIsSimulationActive, addLogEntry]);
 
-  // Load saved state and initialize services on mount
+  // Load saved state and migrate old data
   useEffect(() => {
-    // Load with current portfolio value for validation
     const currentPortfolioValue = livePortfolio?.totalUSDValue;
+    
+    // Clean up old demo simulation states
+    try {
+      const saved = localStorage.getItem('kiTradingApp_simulationState');
+      if (saved) {
+        const state = JSON.parse(saved);
+        // Remove old hardcoded 10000 start values
+        if (state.startPortfolioValue === 10000) {
+          console.log('🗑️ Removing old demo simulation state with 10000 start value');
+          localStorage.removeItem('kiTradingApp_simulationState');
+        }
+      }
+    } catch (error) {
+      console.error('Error cleaning old simulation state:', error);
+    }
+
+    // Remove demo mode flag
+    localStorage.removeItem('demoModeEnabled');
+    
     loadSimulationState(currentPortfolioValue);
     loadActivityLog();
     
-    // Initialize sim readiness store
     simReadinessStore.initialize();
     
-    // Initialize API modes detection
     apiModeService.initializeApiModes().then(() => {
       const status = apiModeService.getApiModeStatus();
       if (status.corsIssuesDetected) {
@@ -90,7 +107,6 @@ export const useSimulation = () => {
 
   const startSimulation = useCallback(async () => {
     try {
-      // Ensure we have live portfolio data before starting
       if (!livePortfolio) {
         addLogEntry('ERROR', 'Live-Portfolio-Daten nicht verfügbar. Bitte warten Sie, bis die Daten geladen sind.');
         toast({
@@ -101,22 +117,51 @@ export const useSimulation = () => {
         return;
       }
 
-      addLogEntry('INFO', 'Simulation wird gestartet...');
+      // Validate portfolio has meaningful value
+      if (livePortfolio.totalUSDValue === 0 || livePortfolio.positions.length === 0) {
+        addLogEntry('ERROR', 'Portfolio leer – Simulation nicht möglich');
+        toast({
+          title: "Portfolio leer",
+          description: "Simulation nicht möglich mit leerem Portfolio.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Check if portfolio value is sufficient for strategy
+      const strategy = userSettings.tradingStrategy || 'balanced';
+      const config = getStrategyConfig(strategy);
+      const minimumPortfolioValue = config.minimumMeaningfulTradeSize / config.tradeFraction;
       
-      // Clear any existing invalid simulation state
+      if (livePortfolio.totalUSDValue < minimumPortfolioValue) {
+        addLogEntry('ERROR', `Portfolio-Wert zu niedrig für ${strategy} Strategie. Minimum: $${minimumPortfolioValue.toFixed(2)}`);
+        toast({
+          title: "Portfolio zu klein",
+          description: `Für ${strategy} Strategie benötigen Sie mindestens $${minimumPortfolioValue.toFixed(2)}`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      addLogEntry('INFO', 'Realistische Simulation wird gestartet...');
+      
       clearSimulationState();
-      
-      // Notify sim readiness store
       simReadinessStore.startSimulation();
       
-      // Check API status before starting
       const apiStatus = apiModeService.getApiModeStatus();
       addLogEntry('INFO', `KuCoin API-Modus: ${apiStatus.kucoinMode}`);
       addLogEntry('INFO', `OpenRouter API-Modus: ${apiStatus.openRouterMode}`);
       
-      // Use actual live portfolio value as start value
+      // Use exact live portfolio value as start value
       const actualStartValue = livePortfolio.totalUSDValue;
       
+      // Create paper assets matching live portfolio structure
+      const paperAssets = livePortfolio.positions.map(pos => ({
+        symbol: pos.currency,
+        quantity: pos.balance,
+        entryPrice: pos.currency === 'USDT' ? 1 : undefined
+      }));
+
       const newState: SimulationState = {
         isActive: true,
         isPaused: false,
@@ -125,17 +170,15 @@ export const useSimulation = () => {
         currentPortfolioValue: actualStartValue,
         realizedPnL: 0,
         openPositions: [],
-        paperAssets: [
-          { symbol: 'USDT', quantity: actualStartValue }
-        ]
+        paperAssets
       };
 
       saveSimulationState(newState);
       setIsSimulationActive(true);
       
-      // Enhanced logging
       addSimulationStartLog(actualStartValue);
-      addLogEntry('INFO', `Startkapital: $${actualStartValue.toLocaleString()}`);
+      addLogEntry('INFO', `Echtes Startkapital: $${actualStartValue.toLocaleString()}`);
+      addLogEntry('INFO', `Strategie: ${strategy} (${(config.tradeFraction * 100).toFixed(1)}% pro Trade, Min: $${config.minimumMeaningfulTradeSize})`);
       
       if (apiStatus.corsIssuesDetected) {
         addLogEntry('INFO', 'Verwende Hybrid-Modus: Live-Marktdaten + simulierte Portfolio-Daten');
@@ -145,14 +188,13 @@ export const useSimulation = () => {
         startAISignalGeneration(
           true,
           newState,
-          (type, message) => addLogEntry(type, message),
-          () => generateMockSignal(true, (type, message) => addLogEntry(type, message))
+          (type, message) => addLogEntry(type, message)
         );
       }, 3000);
 
       toast({
-        title: "Simulation gestartet",
-        description: `Paper-Trading aktiv mit $${actualStartValue.toLocaleString()} Startkapital im ${apiStatus.kucoinMode}-Modus.`,
+        title: "Realistische Simulation gestartet",
+        description: `Paper-Trading aktiv mit $${actualStartValue.toLocaleString()} echtem Startkapital (${strategy} Strategie).`,
       });
       
     } catch (error) {
@@ -164,12 +206,11 @@ export const useSimulation = () => {
         variant: "destructive"
       });
     }
-  }, [livePortfolio, addSimulationStartLog, addLogEntry, saveSimulationState, setIsSimulationActive, startAISignalGeneration, generateMockSignal, clearSimulationState]);
+  }, [livePortfolio, userSettings.tradingStrategy, addSimulationStartLog, addLogEntry, saveSimulationState, setIsSimulationActive, startAISignalGeneration, clearSimulationState]);
 
   const stopSimulation = useCallback(() => {
     if (!simulationState) return;
 
-    // Notify sim readiness store
     simReadinessStore.stopSimulation();
 
     addLogEntry('INFO', 'Simulation wird beendet...');
@@ -196,7 +237,6 @@ export const useSimulation = () => {
     setIsSimulationActive(false);
     setCurrentSignal(null);
     
-    // Enhanced logging
     addSimulationStopLog(finalValue, totalPnL, totalPnLPercent);
     
     toast({
@@ -222,7 +262,6 @@ export const useSimulation = () => {
   const resumeSimulation = useCallback(() => {
     if (!simulationState) return;
 
-    // Notify sim readiness store that simulation is running again
     simReadinessStore.startSimulation();
 
     const updatedState = { ...simulationState, isPaused: false };
@@ -236,11 +275,16 @@ export const useSimulation = () => {
     });
     
     setTimeout(() => {
-      generateMockSignal(true, (type, message) => addLogEntry(type, message));
+      startAISignalGeneration(
+        true,
+        updatedState,
+        (type, message) => addLogEntry(type, message)
+      );
     }, 3000);
-  }, [simulationState, addLogEntry, saveSimulationState, setIsSimulationActive, generateMockSignal]);
+  }, [simulationState, addLogEntry, saveSimulationState, setIsSimulationActive, startAISignalGeneration]);
 
   const acceptSignal = useCallback((signal: any) => {
+    const strategy = userSettings.tradingStrategy || 'balanced';
     executeAcceptSignal(
       signal,
       simulationState,
@@ -250,24 +294,28 @@ export const useSimulation = () => {
       () => startAISignalGeneration(
         isSimulationActive,
         simulationState,
-        (type, message) => addLogEntry(type, message),
-        () => generateMockSignal(isSimulationActive, (type, message) => addLogEntry(type, message))
+        (type, message) => addLogEntry(type, message)
       ),
       addTradeLog,
       addSignalLog,
-      addPortfolioUpdateLog
+      addPortfolioUpdateLog,
+      strategy
     );
-  }, [executeAcceptSignal, simulationState, addLogEntry, saveSimulationState, setCurrentSignal, startAISignalGeneration, isSimulationActive, generateMockSignal, addTradeLog, addSignalLog, addPortfolioUpdateLog]);
+  }, [executeAcceptSignal, simulationState, addLogEntry, saveSimulationState, setCurrentSignal, startAISignalGeneration, isSimulationActive, addTradeLog, addSignalLog, addPortfolioUpdateLog, userSettings.tradingStrategy]);
 
   const ignoreSignal = useCallback((signal: any) => {
     executeIgnoreSignal(
       signal,
       (type, message) => addLogEntry(type, message),
       setCurrentSignal,
-      () => generateMockSignal(isSimulationActive, (type, message) => addLogEntry(type, message)),
+      () => startAISignalGeneration(
+        isSimulationActive,
+        simulationState,
+        (type, message) => addLogEntry(type, message)
+      ),
       addSignalLog
     );
-  }, [executeIgnoreSignal, addLogEntry, setCurrentSignal, generateMockSignal, isSimulationActive, addSignalLog]);
+  }, [executeIgnoreSignal, addLogEntry, setCurrentSignal, startAISignalGeneration, isSimulationActive, simulationState, addSignalLog]);
 
   return {
     simulationState,

@@ -1,51 +1,9 @@
 
-// Risk management parameters based on trading strategies
-interface RiskParameters {
-  minimumTradeSize: number; // USDT
-  maxOpenPositions: number;
-  portfolioDrawdownLimit: number; // Percentage
-  defaultStopLossPercent: number;
-  defaultTakeProfitPercent: number;
-  positionSizePercent: number;
-}
-
-interface StrategyConfig {
-  conservative: RiskParameters;
-  balanced: RiskParameters;
-  aggressive: RiskParameters;
-}
-
-const STRATEGY_CONFIG: StrategyConfig = {
-  conservative: {
-    minimumTradeSize: 100,
-    maxOpenPositions: 2,
-    portfolioDrawdownLimit: -2,
-    defaultStopLossPercent: -1,
-    defaultTakeProfitPercent: 2,
-    positionSizePercent: 2
-  },
-  balanced: {
-    minimumTradeSize: 75,
-    maxOpenPositions: 4,
-    portfolioDrawdownLimit: -4,
-    defaultStopLossPercent: -2,
-    defaultTakeProfitPercent: 4,
-    positionSizePercent: 5
-  },
-  aggressive: {
-    minimumTradeSize: 50,
-    maxOpenPositions: 6,
-    portfolioDrawdownLimit: -6,
-    defaultStopLossPercent: -3,
-    defaultTakeProfitPercent: 8,
-    positionSizePercent: 8
-  }
-};
+import { calcTradeSize, getStrategyConfig, StrategyConfig } from '@/config/strategy';
 
 export const useRiskManagement = (strategy: string) => {
-  const getRiskParameters = (): RiskParameters => {
-    const strategyKey = strategy.toLowerCase() as keyof StrategyConfig;
-    return STRATEGY_CONFIG[strategyKey] || STRATEGY_CONFIG.balanced;
+  const getRiskParameters = (): StrategyConfig => {
+    return getStrategyConfig(strategy);
   };
 
   const checkDrawdownLimit = (
@@ -55,24 +13,30 @@ export const useRiskManagement = (strategy: string) => {
   ): boolean => {
     const params = getRiskParameters();
     const drawdownPercent = ((currentValue - startValue) / startValue) * 100;
-    return drawdownPercent <= params.portfolioDrawdownLimit;
+    // Using defaultStopLossPercent as drawdown limit (it's negative)
+    return drawdownPercent >= params.defaultStopLossPercent * 2; // 2x stop loss as portfolio limit
   };
 
   const calculatePositionSize = (
     portfolioValue: number,
     availableUSDT: number,
     strategy: string
-  ): number => {
-    const params = getRiskParameters();
-    const idealSize = (portfolioValue * params.positionSizePercent) / 100;
-    const actualSize = Math.min(idealSize, availableUSDT);
+  ): { size: number; isValid: boolean; reason?: string } => {
+    const actualSize = calcTradeSize(portfolioValue, availableUSDT, strategy);
+    const config = getStrategyConfig(strategy);
     
-    // Check minimum trade size
-    if (actualSize < params.minimumTradeSize) {
-      return 0; // Cannot trade
+    if (actualSize === 0) {
+      return {
+        size: 0,
+        isValid: false,
+        reason: `Nicht genügend USDT für Minimum-Trade (${config.minimumMeaningfulTradeSize} USDT benötigt, ${availableUSDT.toFixed(2)} USDT verfügbar)`
+      };
     }
     
-    return actualSize;
+    return {
+      size: actualSize,
+      isValid: true
+    };
   };
 
   const canOpenNewPosition = (
@@ -83,10 +47,23 @@ export const useRiskManagement = (strategy: string) => {
     return currentOpenPositions < params.maxOpenPositions;
   };
 
+  const getTradeDisplayInfo = (portfolioValue: number, strategy: string) => {
+    const config = getStrategyConfig(strategy);
+    const idealSize = portfolioValue * config.tradeFraction;
+    const percentage = (config.tradeFraction * 100).toFixed(1);
+    
+    return {
+      idealSize: idealSize.toFixed(2),
+      percentage,
+      minimum: config.minimumMeaningfulTradeSize
+    };
+  };
+
   return {
     getRiskParameters,
     checkDrawdownLimit,
     calculatePositionSize,
-    canOpenNewPosition
+    canOpenNewPosition,
+    getTradeDisplayInfo
   };
 };

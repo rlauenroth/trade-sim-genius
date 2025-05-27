@@ -2,6 +2,7 @@
 import { useCallback } from 'react';
 import { Signal, SimulationState, Position } from '@/types/simulation';
 import { toast } from '@/hooks/use-toast';
+import { useRiskManagement } from './useRiskManagement';
 
 export const useTradeExecution = () => {
   const acceptSignal = useCallback(async (
@@ -13,9 +14,12 @@ export const useTradeExecution = () => {
     startAISignalGeneration: () => void,
     addTradeLog: (tradeData: any) => void,
     addSignalLog: (signal: Signal, action: 'generated' | 'accepted' | 'ignored') => void,
-    addPortfolioUpdateLog: (valueBefore: number, valueAfter: number, reason: string) => void
+    addPortfolioUpdateLog: (valueBefore: number, valueAfter: number, reason: string) => void,
+    strategy: string = 'balanced'
   ) => {
     if (!simulationState || !signal) return;
+
+    const { calculatePositionSize } = useRiskManagement(strategy);
 
     if (signal.signalType !== 'BUY' && signal.signalType !== 'SELL') {
       addLogEntry('INFO', `Signal ${signal.signalType} für ${signal.assetPair} ist nicht handelbar`);
@@ -39,18 +43,21 @@ export const useTradeExecution = () => {
         currentPrice = signal.assetPair.includes('BTC') ? 60000 : 3000;
       }
       
-      const idealPositionPercent = signal.suggestedPositionSizePercent || 3.0;
-      const idealPositionSize = (simulationState.currentPortfolioValue * idealPositionPercent) / 100;
       const availableUSDT = simulationState.paperAssets.find(asset => asset.symbol === 'USDT')?.quantity || 0;
-      const actualPositionSize = Math.min(idealPositionSize, availableUSDT);
+      const positionResult = calculatePositionSize(simulationState.currentPortfolioValue, availableUSDT, strategy);
       
-      const minTradeSize = 50;
-      if (actualPositionSize < minTradeSize) {
-        addLogEntry('WARNING', `Nicht genügend USDT für Trade. Benötigt: $${minTradeSize}, Verfügbar: $${availableUSDT.toFixed(2)}`);
+      if (!positionResult.isValid) {
+        addLogEntry('WARNING', positionResult.reason || 'Trade nicht möglich');
         setCurrentSignal(null);
+        toast({
+          title: "Trade nicht möglich",
+          description: positionResult.reason,
+          variant: "destructive"
+        });
         return;
       }
       
+      const actualPositionSize = positionResult.size;
       const quantity = actualPositionSize / currentPrice;
       const tradingFee = actualPositionSize * 0.001;
       
@@ -111,12 +118,15 @@ export const useTradeExecution = () => {
       
       addPortfolioUpdateLog(portfolioValueBefore, portfolioValueAfter, `Trade ausgeführt: ${signal.signalType} ${signal.assetPair}`);
       
+      const { getTradeDisplayInfo } = useRiskManagement(strategy);
+      const displayInfo = getTradeDisplayInfo(simulationState.currentPortfolioValue, strategy);
+      
       addLogEntry('SUCCESS', `Position eröffnet: ${quantity.toFixed(6)} ${assetSymbol} @ $${currentPrice.toFixed(2)}`);
-      addLogEntry('INFO', `Handelsgröße: $${actualPositionSize.toFixed(2)}, Gebühr: $${tradingFee.toFixed(2)}`);
+      addLogEntry('INFO', `Handelsgröße: $${actualPositionSize.toFixed(2)} (${displayInfo.percentage}% des Portfolios), Gebühr: $${tradingFee.toFixed(2)}`);
       
       toast({
         title: "Position eröffnet",
-        description: `${signal.signalType} ${signal.assetPair} für $${actualPositionSize.toFixed(2)}`,
+        description: `${signal.signalType} ${signal.assetPair} für $${actualPositionSize.toFixed(2)} (${displayInfo.percentage}% Portfolio)`,
       });
 
       setTimeout(() => {
@@ -134,7 +144,7 @@ export const useTradeExecution = () => {
     signal: Signal,
     addLogEntry: (type: any, message: string) => void,
     setCurrentSignal: (signal: Signal | null) => void,
-    generateMockSignal: () => void,
+    startAISignalGeneration: () => void,
     addSignalLog: (signal: Signal, action: 'generated' | 'accepted' | 'ignored') => void
   ) => {
     addLogEntry('INFO', `Signal ignoriert: ${signal.signalType} ${signal.assetPair}`);
@@ -147,7 +157,7 @@ export const useTradeExecution = () => {
     });
 
     setTimeout(() => {
-      generateMockSignal();
+      startAISignalGeneration();
     }, 15000);
   }, []);
 

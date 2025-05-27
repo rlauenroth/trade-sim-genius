@@ -5,66 +5,16 @@ import { AISignalService } from '@/services/aiSignal';
 
 export const useAISignals = () => {
   const [currentSignal, setCurrentSignal] = useState<Signal | null>(null);
-  const [isDemoMode, setIsDemoMode] = useState(false);
-
-  const generateMockSignal = useCallback((isActive: boolean, addLogEntry: (type: any, message: string) => void) => {
-    if (!isActive) return;
-
-    addLogEntry('AI', 'Generiere Demo-Signal...');
-    
-    setTimeout(() => {
-      const mockSignals: Signal[] = [
-        {
-          assetPair: 'BTC/USDT',
-          signalType: 'BUY',
-          entryPriceSuggestion: 'MARKET',
-          takeProfitPrice: 62000,
-          stopLossPrice: 59500,
-          confidenceScore: 0.75,
-          reasoning: 'Demo-Signal: RSI zeigt überverkauft, MACD bullisches Momentum, Preis prallt von Support ab',
-          suggestedPositionSizePercent: 5
-        },
-        {
-          assetPair: 'ETH/USDT',
-          signalType: 'BUY',
-          entryPriceSuggestion: 'MARKET',
-          takeProfitPrice: 3200,
-          stopLossPrice: 2950,
-          confidenceScore: 0.68,
-          reasoning: 'Demo-Signal: Durchbruch über Widerstand bei 3050, hohe Volumen-Bestätigung',
-          suggestedPositionSizePercent: 3
-        },
-        {
-          assetPair: 'SOL/USDT',
-          signalType: 'BUY',
-          entryPriceSuggestion: 'MARKET',
-          takeProfitPrice: 160,
-          stopLossPrice: 145,
-          confidenceScore: 0.72,
-          reasoning: 'Demo-Signal: Starke Aufwärtsbewegung, hohe Aktivität im Solana-Ökosystem',
-          suggestedPositionSizePercent: 4
-        }
-      ];
-
-      const signal = mockSignals[Math.floor(Math.random() * mockSignals.length)];
-      setCurrentSignal(signal);
-      setIsDemoMode(true);
-      
-      addLogEntry('AI', `Demo-Signal für ${signal.assetPair}: ${signal.signalType} (Konfidenz: ${Math.round((signal.confidenceScore || 0) * 100)}%)`);
-      addLogEntry('INFO', 'Läuft im Demo-Modus - keine echten KI-Analysen');
-    }, 2000);
-  }, []);
 
   const startAISignalGeneration = useCallback(async (
     isActive: boolean, 
     simulationState: any, 
-    addLogEntry: (type: any, message: string) => void,
-    generateMockSignalFallback: () => void
+    addLogEntry: (type: any, message: string) => void
   ) => {
     if (!isActive) return;
     
     try {
-      addLogEntry('AI', 'Starte KI-Marktanalyse...');
+      addLogEntry('AI', 'Starte echte KI-Marktanalyse...');
       
       // Get API keys from localStorage
       const storedKeys = JSON.parse(localStorage.getItem('kiTradingApp_apiKeys') || '{}');
@@ -75,7 +25,6 @@ export const useAISignals = () => {
       
       if (!portfolioValue || !availableUSDT) {
         addLogEntry('ERROR', 'Portfolio-Daten nicht verfügbar für KI-Analyse');
-        setTimeout(() => generateMockSignalFallback(), 3000);
         return;
       }
       
@@ -91,16 +40,15 @@ export const useAISignals = () => {
         availableUSDT: availableUSDT
       });
       
-      // Check if we'll be using demo mode
-      const willUseDemoMode = await aiService.shouldUseDemoMode();
-      setIsDemoMode(willUseDemoMode);
-      
-      if (willUseDemoMode) {
-        addLogEntry('INFO', 'OpenRouter API-Schlüssel ungültig oder nicht vorhanden');
-        addLogEntry('INFO', 'Läuft im Demo-Modus mit simulierten KI-Signalen');
-      } else {
-        addLogEntry('INFO', 'Verwende echte KI-Analyse über OpenRouter API');
+      // Check if API is properly configured
+      const isValidConfig = await aiService.isApiConfigurationValid();
+      if (!isValidConfig) {
+        addLogEntry('ERROR', 'OpenRouter API-Schlüssel ungültig oder nicht konfiguriert');
+        addLogEntry('INFO', 'Keine Demo-Signale verfügbar - nur echte KI-Analyse');
+        return;
       }
+
+      addLogEntry('INFO', 'Verwende echte KI-Analyse über OpenRouter API');
       
       const signals = await aiService.generateSignals();
       
@@ -108,35 +56,24 @@ export const useAISignals = () => {
         const signal = signals[0];
         setCurrentSignal(signal);
         
-        const modeText = signal.isDemoMode ? 'Demo-Signal' : 'KI-Signal';
-        addLogEntry('AI', `${modeText} generiert: ${signal.signalType} ${signal.assetPair}`);
+        addLogEntry('AI', `KI-Signal generiert: ${signal.signalType} ${signal.assetPair}`);
         
         if (signal.reasoning) {
-          const reasoningPrefix = signal.isDemoMode ? 'Demo-Begründung' : 'KI-Begründung';
-          addLogEntry('AI', `${reasoningPrefix}: ${signal.reasoning}`);
+          addLogEntry('AI', `KI-Begründung: ${signal.reasoning}`);
         }
       } else {
-        addLogEntry('AI', 'Keine handelswerten Signale gefunden. Verwende Fallback...');
-        setTimeout(() => generateMockSignalFallback(), 5000);
+        addLogEntry('INFO', 'No tradable signals this cycle');
       }
       
     } catch (error) {
       console.error('AI signal generation error:', error);
-      addLogEntry('INFO', 'KI-Service Fehler, verwende Demo-Signale...');
-      setIsDemoMode(true);
-      
-      // Fallback to mock signals
-      setTimeout(() => {
-        generateMockSignalFallback();
-      }, 3000);
+      addLogEntry('ERROR', `KI-Service Fehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
     }
   }, []);
 
   return {
     currentSignal,
     setCurrentSignal,
-    generateMockSignal,
-    startAISignalGeneration,
-    isDemoMode
+    startAISignalGeneration
   };
 };
