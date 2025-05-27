@@ -1,7 +1,7 @@
 
 import { create } from 'zustand';
 import { ApiKeys, UserSettings } from '@/types/appState';
-import { KUCOIN_PROXY_BASE } from '@/config';
+import { KUCOIN_PROXY_BASE, migrateProxyUrl } from '@/config';
 import { toast } from '@/hooks/use-toast';
 
 const STORAGE_KEYS = {
@@ -45,11 +45,24 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       const storedKeys = localStorage.getItem(STORAGE_KEYS.API_KEYS);
       const apiKeys = storedKeys ? JSON.parse(storedKeys) : null;
       
-      // Load user settings
+      // Load user settings with migration
       const storedSettings = localStorage.getItem(STORAGE_KEYS.USER_SETTINGS);
-      const userSettings = storedSettings 
+      let userSettings = storedSettings 
         ? { ...DEFAULT_SETTINGS, ...JSON.parse(storedSettings) }
         : DEFAULT_SETTINGS;
+      
+      // Migrate proxy URL if needed
+      const migratedProxyUrl = migrateProxyUrl(userSettings.proxyUrl);
+      if (migratedProxyUrl !== userSettings.proxyUrl) {
+        userSettings = { ...userSettings, proxyUrl: migratedProxyUrl };
+        // Save the migrated settings immediately
+        localStorage.setItem(STORAGE_KEYS.USER_SETTINGS, JSON.stringify(userSettings));
+        
+        toast({
+          title: "Proxy-URL aktualisiert",
+          description: "Die Proxy-URL wurde auf den neuen Server aktualisiert.",
+        });
+      }
       
       set({ 
         apiKeys, 

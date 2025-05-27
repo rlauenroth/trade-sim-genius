@@ -1,5 +1,5 @@
 
-export const KUCOIN_PROXY_BASE = 'https://astra1623.startdedicated.de/images/kucoin-proxy.php?path=';
+export const KUCOIN_PROXY_BASE = 'https://t3h.online/kucoin-proxy.php?path=';
 
 // Memory cache for API keys with TTL
 interface ApiKeyCache {
@@ -50,4 +50,19 @@ export const getStoredKeys = () => {
   }
   
   return null;
+};
+
+// Migration helper for old proxy URLs
+export const migrateProxyUrl = (currentUrl: string): string => {
+  const oldUrls = [
+    'https://astra1623.startdedicated.de/images/kucoin-proxy.php?path=',
+    'https://astra1623.startdedicated.de/images/kucoin-proxy.php'
+  ];
+  
+  if (oldUrls.some(oldUrl => currentUrl.includes('astra1623.startdedicated.de'))) {
+    console.log('🔄 Migrating old proxy URL to new one');
+    return KUCOIN_PROXY_BASE;
+  }
+  
+  return currentUrl;
 };
