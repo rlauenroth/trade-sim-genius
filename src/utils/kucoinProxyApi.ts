@@ -11,6 +11,7 @@ import {
 } from './errors';
 import { networkStatusService } from '@/services/networkStatusService';
 import { cacheService, CACHE_TTL } from '@/services/cacheService';
+import { loggingService } from '@/services/loggingService';
 
 // Global activity logger - will be set by the component that uses this
 let globalActivityLogger: {
@@ -74,9 +75,30 @@ export async function kucoinFetch(
   query: Record<string, string | number | undefined> = {},
   body?: unknown,
 ) {
+  const startTime = Date.now();
   const keys = getStoredKeys();
+  
+  // Log API call start
+  loggingService.logEvent('API', `CALL ${method} ${path}`, {
+    endpoint: path,
+    method,
+    query,
+    body: body ? JSON.stringify(body) : undefined,
+    hasKeys: !!keys
+  });
+  
   if (!keys) {
     const error = new ProxyError('No API keys available');
+    const duration = Date.now() - startTime;
+    
+    loggingService.logError(`API FAIL ${method} ${path}`, {
+      endpoint: path,
+      method,
+      error: error.message,
+      duration,
+      reason: 'no_api_keys'
+    });
+    
     globalActivityLogger?.addKucoinErrorLog(path, error);
     networkStatusService.recordError(error, path);
     throw error;
@@ -121,14 +143,34 @@ export async function kucoinFetch(
       body: body ? JSON.stringify(body) : undefined,
     });
 
+    const duration = Date.now() - startTime;
+
     if (res.status === 429) {
       const error = new RateLimitError(res);
+      
+      loggingService.logError(`API ERROR ${method} ${signaturePath}`, {
+        endpoint: signaturePath,
+        method,
+        status: res.status,
+        duration,
+        error: 'rate_limit',
+        retryAfter: error.retryAfter
+      });
+      
       globalActivityLogger?.addKucoinErrorLog(signaturePath, error);
       networkStatusService.recordError(error, signaturePath);
       throw error;
     }
     
     if (!res.ok) {
+      loggingService.logError(`API ERROR ${method} ${signaturePath}`, {
+        endpoint: signaturePath,
+        method,
+        status: res.status,
+        duration,
+        payload: signaturePayload
+      });
+      
       await parseKuCoinError(res, signaturePath, signaturePayload);
     }
 
@@ -136,23 +178,65 @@ export async function kucoinFetch(
     
     // Check for KuCoin API-level errors (even with 200 status)
     if (result.code && result.code !== '200000') {
+      loggingService.logError(`API ERROR ${method} ${signaturePath}`, {
+        endpoint: signaturePath,
+        method,
+        status: res.status,
+        duration,
+        kucoinCode: result.code,
+        kucoinMessage: result.msg,
+        payload: signaturePayload
+      });
+      
       const mockResponse = new Response(JSON.stringify(result), { status: 400 });
       await parseKuCoinError(mockResponse, signaturePath, signaturePayload);
     }
     
     // Log successful call
+    loggingService.logEvent('API', `SUCCESS ${method} ${signaturePath}`, {
+      endpoint: signaturePath,
+      method,
+      status: res.status,
+      duration,
+      responseSize: JSON.stringify(result).length,
+      kucoinCode: result.code
+    });
+    
     console.log(`✅ KuCoin API Success: ${method} ${signaturePath}`);
     globalActivityLogger?.addKucoinSuccessLog(signaturePath, `${method} ${signaturePath}`);
     networkStatusService.recordSuccessfulCall(signaturePath);
     
     return result;
   } catch (error) {
+    const duration = Date.now() - startTime;
+    
     if (error instanceof TypeError && error.message.includes('fetch')) {
       const proxyError = new ProxyError('Proxy not reachable - network error');
+      
+      loggingService.logError(`API FAIL ${method} ${signaturePath}`, {
+        endpoint: signaturePath,
+        method,
+        duration,
+        error: 'network_error',
+        details: error.message
+      });
+      
       globalActivityLogger?.addKucoinErrorLog(signaturePath, proxyError);
       networkStatusService.recordError(proxyError, signaturePath);
       throw proxyError;
     }
+    
+    // Log other errors if not already logged
+    if (!(error instanceof RateLimitError || error instanceof ApiError || error instanceof ProxyError)) {
+      loggingService.logError(`API FAIL ${method} ${signaturePath}`, {
+        endpoint: signaturePath,
+        method,
+        duration,
+        error: error instanceof Error ? error.message : 'unknown_error',
+        details: error
+      });
+    }
+    
     throw error;
   }
 }
@@ -162,6 +246,11 @@ export async function getPrice(symbol: string): Promise<number> {
   // Check cache first
   const cachedPrice = cacheService.get<number>('prices', symbol);
   if (cachedPrice) {
+    loggingService.logEvent('API', `PRICE CACHE HIT ${symbol}`, {
+      symbol,
+      price: cachedPrice,
+      source: 'cache'
+    });
     return cachedPrice;
   }
 
@@ -175,6 +264,13 @@ export async function getPrice(symbol: string): Promise<number> {
       
       // Cache the price
       cacheService.set('prices', price, CACHE_TTL.PRICE, symbol);
+      
+      loggingService.logSuccess(`PRICE FETCHED ${symbol}`, {
+        symbol,
+        price,
+        source: 'level1_orderbook',
+        cached: true
+      });
       
       globalActivityLogger?.addKucoinSuccessLog('/api/v1/market/orderbook/level1', `Preis für ${symbol}: $${price}`);
       return price;
@@ -213,10 +309,25 @@ export async function getPrice(symbol: string): Promise<number> {
         // Cache the price from fallback
         cacheService.set('prices', price, CACHE_TTL.PRICE, symbol);
         
+        loggingService.logSuccess(`PRICE FETCHED ${symbol}`, {
+          symbol,
+          price,
+          source: 'allTickers_fallback',
+          cached: true
+        });
+        
         globalActivityLogger?.addKucoinSuccessLog('/api/v1/market/allTickers', `Fallback-Preis für ${symbol}: $${price}`);
         return price;
       } catch (fallbackError) {
         console.error(`❌ Both price endpoints failed for ${symbol}:`, fallbackError);
+        
+        loggingService.logError(`PRICE FETCH FAILED ${symbol}`, {
+          symbol,
+          error: 'all_endpoints_failed',
+          primaryError: error instanceof Error ? error.message : 'unknown',
+          fallbackError: fallbackError instanceof Error ? fallbackError.message : 'unknown'
+        });
+        
         throw new ProxyError(`Price for ${symbol} not available from any endpoint`);
       }
     }

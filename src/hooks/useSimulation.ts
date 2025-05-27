@@ -1,3 +1,4 @@
+
 import { useCallback, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { SimulationState } from '@/types/simulation';
@@ -12,6 +13,7 @@ import { simReadinessStore } from '@/stores/simReadinessStore';
 import { useSimGuard } from './useSimGuard';
 import { getStrategyConfig, MINIMUM_TRADE_USDT } from '@/config/strategy';
 import { useRiskManagement } from './useRiskManagement';
+import { loggingService } from '@/services/loggingService';
 
 export const useSimulation = () => {
   const {
@@ -54,6 +56,14 @@ export const useSimulation = () => {
     if (isSimulationActive && isRunningBlocked && simulationState && !simulationState.isPaused) {
       console.log('🚨 Auto-pausing simulation due to system instability:', reason);
       
+      loggingService.logEvent('SIM', 'Auto-pause triggered', {
+        reason,
+        from: 'SIM_RUNNING',
+        to: 'PAUSED',
+        portfolioValue: simulationState.currentPortfolioValue,
+        openPositions: simulationState.openPositions.length
+      });
+      
       addLogEntry('WARNING', `Simulation automatisch pausiert: ${reason}`);
       
       const updatedState = { ...simulationState, isPaused: true };
@@ -80,11 +90,18 @@ export const useSimulation = () => {
         // Remove old hardcoded 10000 start values
         if (state.startPortfolioValue === 10000) {
           console.log('🗑️ Removing old demo simulation state with 10000 start value');
+          loggingService.logEvent('SIM', 'Cleanup old demo state', {
+            oldStartValue: 10000,
+            action: 'remove_demo_state'
+          });
           localStorage.removeItem('kiTradingApp_simulationState');
         }
       }
     } catch (error) {
       console.error('Error cleaning old simulation state:', error);
+      loggingService.logError('Failed to cleanup old simulation state', {
+        error: error instanceof Error ? error.message : 'unknown'
+      });
     }
 
     // Remove demo mode flag
@@ -97,6 +114,13 @@ export const useSimulation = () => {
     
     apiModeService.initializeApiModes().then(() => {
       const status = apiModeService.getApiModeStatus();
+      
+      loggingService.logEvent('SIM', 'API modes initialized', {
+        kucoinMode: status.kucoinMode,
+        openRouterMode: status.openRouterMode,
+        corsIssuesDetected: status.corsIssuesDetected
+      });
+      
       if (status.corsIssuesDetected) {
         addLogEntry('INFO', 'CORS-Beschränkungen erkannt. App läuft im Hybrid-Modus mit simulierten privaten Daten.');
       } else {
@@ -107,7 +131,16 @@ export const useSimulation = () => {
 
   const startSimulation = useCallback(async () => {
     try {
+      loggingService.logEvent('SIM', 'Start simulation requested', {
+        hasLivePortfolio: !!livePortfolio,
+        portfolioValue: livePortfolio?.totalUSDValue,
+        portfolioPositions: livePortfolio?.positions.length
+      });
+      
       if (!livePortfolio) {
+        loggingService.logError('Simulation start failed - no portfolio', {
+          reason: 'no_live_portfolio'
+        });
         addLogEntry('ERROR', 'Live-Portfolio-Daten nicht verfügbar. Bitte warten Sie, bis die Daten geladen sind.');
         toast({
           title: "Fehler",
@@ -119,6 +152,11 @@ export const useSimulation = () => {
 
       // Validate portfolio has meaningful value
       if (livePortfolio.totalUSDValue === 0 || livePortfolio.positions.length === 0) {
+        loggingService.logError('Simulation start failed - empty portfolio', {
+          reason: 'empty_portfolio',
+          totalValue: livePortfolio.totalUSDValue,
+          positionCount: livePortfolio.positions.length
+        });
         addLogEntry('ERROR', 'Portfolio leer – Simulation nicht möglich');
         toast({
           title: "Portfolio leer",
@@ -130,6 +168,11 @@ export const useSimulation = () => {
 
       // Only check if portfolio has at least minimum trade size
       if (livePortfolio.totalUSDValue < MINIMUM_TRADE_USDT) {
+        loggingService.logError('Simulation start failed - portfolio too small', {
+          reason: 'portfolio_too_small',
+          currentValue: livePortfolio.totalUSDValue,
+          minimumRequired: MINIMUM_TRADE_USDT
+        });
         addLogEntry('ERROR', `Portfolio-Wert zu niedrig. Minimum: $${MINIMUM_TRADE_USDT}`);
         toast({
           title: "Portfolio zu klein",
@@ -169,6 +212,15 @@ export const useSimulation = () => {
         paperAssets
       };
 
+      loggingService.logEvent('SIM', 'Simulation started', {
+        from: 'IDLE',
+        to: 'SIM_RUNNING',
+        startValue: actualStartValue,
+        strategy: userSettings.tradingStrategy || 'balanced',
+        paperAssets: paperAssets.length,
+        apiMode: apiStatus.corsIssuesDetected ? 'hybrid' : 'live'
+      });
+
       saveSimulationState(newState);
       setIsSimulationActive(true);
       
@@ -201,6 +253,12 @@ export const useSimulation = () => {
       
     } catch (error) {
       console.error('Error starting simulation:', error);
+      
+      loggingService.logError('Simulation start error', {
+        error: error instanceof Error ? error.message : 'unknown',
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      
       addLogEntry('ERROR', 'Fehler beim Starten der Simulation');
       toast({
         title: "Fehler",
@@ -226,6 +284,17 @@ export const useSimulation = () => {
     const totalPnL = finalValue - simulationState.startPortfolioValue;
     const totalPnLPercent = (totalPnL / simulationState.startPortfolioValue) * 100;
 
+    loggingService.logEvent('SIM', 'Simulation stopped', {
+      from: 'SIM_RUNNING',
+      to: 'IDLE',
+      startValue: simulationState.startPortfolioValue,
+      finalValue,
+      totalPnL,
+      totalPnLPercent,
+      duration: Date.now() - simulationState.startTime,
+      openPositions: simulationState.openPositions.length
+    });
+
     const updatedState: SimulationState = {
       ...simulationState,
       isActive: false,
@@ -250,6 +319,14 @@ export const useSimulation = () => {
   const pauseSimulation = useCallback(() => {
     if (!simulationState) return;
 
+    loggingService.logEvent('SIM', 'Simulation paused', {
+      from: 'SIM_RUNNING',
+      to: 'PAUSED',
+      portfolioValue: simulationState.currentPortfolioValue,
+      openPositions: simulationState.openPositions.length,
+      trigger: 'manual'
+    });
+
     const updatedState = { ...simulationState, isPaused: true };
     saveSimulationState(updatedState);
     setIsSimulationActive(false);
@@ -265,6 +342,13 @@ export const useSimulation = () => {
     if (!simulationState) return;
 
     simReadinessStore.startSimulation();
+
+    loggingService.logEvent('SIM', 'Simulation resumed', {
+      from: 'PAUSED',
+      to: 'SIM_RUNNING',
+      portfolioValue: simulationState.currentPortfolioValue,
+      openPositions: simulationState.openPositions.length
+    });
 
     const updatedState = { ...simulationState, isPaused: false };
     saveSimulationState(updatedState);

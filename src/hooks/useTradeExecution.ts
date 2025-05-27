@@ -1,7 +1,9 @@
+
 import { useCallback } from 'react';
 import { Signal, SimulationState, Position } from '@/types/simulation';
 import { toast } from '@/hooks/use-toast';
 import { useRiskManagement } from './useRiskManagement';
+import { loggingService } from '@/services/loggingService';
 
 export const useTradeExecution = () => {
   const acceptSignal = useCallback(async (
@@ -18,9 +20,23 @@ export const useTradeExecution = () => {
   ) => {
     if (!simulationState || !signal) return;
 
+    loggingService.logEvent('TRADE', 'Signal acceptance started', {
+      signalType: signal.signalType,
+      assetPair: signal.assetPair,
+      entryPrice: signal.entryPriceSuggestion,
+      strategy,
+      portfolioValue: simulationState.currentPortfolioValue
+    });
+
     const { calculatePositionSize, getTradeDisplayInfo } = useRiskManagement(strategy);
 
     if (signal.signalType !== 'BUY' && signal.signalType !== 'SELL') {
+      loggingService.logEvent('TRADE', 'Signal rejected - not tradable', {
+        signalType: signal.signalType,
+        assetPair: signal.assetPair,
+        reason: 'signal_type_not_tradable'
+      });
+      
       addLogEntry('INFO', `Signal ${signal.signalType} für ${signal.assetPair} ist nicht handelbar`);
       addSignalLog(signal, 'ignored');
       setCurrentSignal(null);
@@ -40,12 +56,32 @@ export const useTradeExecution = () => {
       } catch (error) {
         console.log('Using mock price due to API limitation');
         currentPrice = signal.assetPair.includes('BTC') ? 60000 : 3000;
+        
+        loggingService.logEvent('TRADE', 'Using mock price', {
+          assetPair: signal.assetPair,
+          mockPrice: currentPrice,
+          reason: 'api_limitation'
+        });
       }
       
       const availableUSDT = simulationState.paperAssets.find(asset => asset.symbol === 'USDT')?.quantity || 0;
       const positionResult = calculatePositionSize(simulationState.currentPortfolioValue, availableUSDT, strategy);
       
+      loggingService.logEvent('TRADE', 'Position size calculated', {
+        portfolioValue: simulationState.currentPortfolioValue,
+        availableUSDT,
+        strategy,
+        positionResult
+      });
+      
       if (!positionResult.isValid) {
+        loggingService.logEvent('TRADE', 'Trade rejected - invalid position size', {
+          reason: positionResult.reason,
+          portfolioValue: simulationState.currentPortfolioValue,
+          availableUSDT,
+          strategy
+        });
+        
         addLogEntry('WARNING', positionResult.reason || 'Trade nicht möglich');
         setCurrentSignal(null);
         toast({
@@ -101,6 +137,19 @@ export const useTradeExecution = () => {
         currentPortfolioValue: portfolioValueAfter
       };
 
+      loggingService.logEvent('TRADE', 'Trade executed successfully', {
+        positionId: newPosition.id,
+        assetPair: signal.assetPair,
+        type: signal.signalType,
+        quantity,
+        price: currentPrice,
+        fee: tradingFee,
+        totalValue: actualPositionSize,
+        portfolioValueBefore,
+        portfolioValueAfter,
+        openPositionsCount: updatedState.openPositions.length
+      });
+
       saveSimulationState(updatedState);
       setCurrentSignal(null);
       
@@ -133,6 +182,14 @@ export const useTradeExecution = () => {
 
     } catch (error) {
       console.error('Error executing trade:', error);
+      
+      loggingService.logError('Trade execution failed', {
+        signalType: signal.signalType,
+        assetPair: signal.assetPair,
+        error: error instanceof Error ? error.message : 'unknown',
+        portfolioValue: simulationState.currentPortfolioValue
+      });
+      
       addLogEntry('ERROR', 'Fehler bei der Trade-Ausführung');
       setCurrentSignal(null);
     }
@@ -145,6 +202,12 @@ export const useTradeExecution = () => {
     startAISignalGeneration: () => void,
     addSignalLog: (signal: Signal, action: 'generated' | 'accepted' | 'ignored') => void
   ) => {
+    loggingService.logEvent('TRADE', 'Signal ignored', {
+      signalType: signal.signalType,
+      assetPair: signal.assetPair,
+      reason: 'user_choice'
+    });
+    
     addLogEntry('INFO', `Signal ignoriert: ${signal.signalType} ${signal.assetPair}`);
     addSignalLog(signal, 'ignored');
     setCurrentSignal(null);
