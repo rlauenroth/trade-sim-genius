@@ -81,12 +81,6 @@ export class KuCoinService {
           }
         }
 
-        // Ensure minimum portfolio value for simulation
-        if (totalValue < 1000) {
-          totalValue = 10000;
-          cashUSDT = 10000;
-        }
-
         const snapshot: PortfolioSnapshot = {
           positions,
           cashUSDT,
