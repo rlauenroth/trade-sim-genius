@@ -1,4 +1,3 @@
-
 import { useCallback } from 'react';
 import { useAppState } from '@/hooks/useAppState';
 import { useSimulation } from '@/hooks/useSimulation';

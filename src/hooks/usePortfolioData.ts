@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 import { getAccountBalances, getCurrentPrice } from '@/utils/kucoinApi';
 import { toast } from '@/hooks/use-toast';
@@ -126,9 +127,16 @@ export const usePortfolioData = () => {
     }
   }, [retryCount]);
 
-  const retryLoadPortfolioData = useCallback(async (credentials: any) => {
+  // Fix the retry function signature to match expected () => void
+  const retryLoadPortfolioData = useCallback(() => {
     console.log(`Portfolio-Daten werden erneut geladen (Versuch ${retryCount + 1})...`);
-    await loadPortfolioData(credentials, true);
+    // Get credentials from storage or context - this should be handled by the caller
+    const storedCredentials = JSON.parse(localStorage.getItem('kiTradingApp_apiKeys') || '{}');
+    if (storedCredentials && storedCredentials.kucoin) {
+      loadPortfolioData(storedCredentials, true);
+    } else {
+      setError('Keine API-Schlüssel verfügbar');
+    }
   }, [loadPortfolioData, retryCount]);
 
   const clearPortfolioData = useCallback(() => {
