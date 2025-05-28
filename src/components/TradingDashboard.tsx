@@ -10,7 +10,7 @@ const TradingDashboard = () => {
   
   const {
     userSettings,
-    logoutAndClearData,
+    logoutAndClearData: originalLogoutAndClearData,
     isFirstTimeAfterSetup,
     apiKeys,
     portfolioData,
@@ -41,6 +41,11 @@ const TradingDashboard = () => {
     getSimulationDataForLog,
     portfolioHealthStatus
   } = useDashboardStateManager();
+
+  // Wrap logoutAndClearData to match expected signature
+  const logoutAndClearData = () => {
+    originalLogoutAndClearData();
+  };
 
   // Wrap acceptSignal and ignoreSignal to handle current signal automatically
   const handleAcceptSignal = () => {
