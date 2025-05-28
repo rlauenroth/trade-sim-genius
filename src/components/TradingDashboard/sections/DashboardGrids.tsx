@@ -1,4 +1,3 @@
-
 import React from 'react';
 import PortfolioOverviewWithStatus from '../PortfolioOverviewWithStatus';
 import ControlCenter from '../ControlCenter';
@@ -15,7 +14,6 @@ interface DashboardGridsProps {
   totalPnL: number;
   totalPnLPercentage: number;
   progressValue: number;
-  timeElapsed: string;
   portfolioHealthStatus: string;
   simulationState: any;
   isSimulationActive: boolean;
@@ -42,7 +40,6 @@ const DashboardGrids = ({
   totalPnL,
   totalPnLPercentage,
   progressValue,
-  timeElapsed,
   portfolioHealthStatus,
   simulationState,
   isSimulationActive,
@@ -85,7 +82,6 @@ const DashboardGrids = ({
         
         <ProgressTracker
           progressValue={progressValue}
-          timeElapsed={timeElapsed}
           portfolioHealthStatus={portfolioHealthStatus}
         />
       </div>
@@ -103,7 +99,7 @@ const DashboardGrids = ({
           onIgnoreSignal={onIgnoreSignal}
         />
         
-        <PerformanceMetrics simulationState={simulationState} />
+        <PerformanceMetrics />
       </div>
 
       {/* Right Column */}

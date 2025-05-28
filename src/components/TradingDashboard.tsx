@@ -55,6 +55,10 @@ const TradingDashboard = () => {
     }
   };
 
+  const handleLogout = () => {
+    logoutAndClearData();
+  };
+
   return (
     <>
       <DashboardInitializer 
@@ -84,7 +88,7 @@ const TradingDashboard = () => {
         simulationDataForLog={getSimulationDataForLog()}
         autoTradeCount={simulationState?.autoTradeCount}
         portfolioHealthStatus={portfolioHealthStatus}
-        logoutAndClearData={logoutAndClearData}
+        logoutAndClearData={handleLogout}
         handleManualRefresh={handleManualRefresh}
         handleStartSimulation={handleStartSimulation}
         pauseSimulation={pauseSimulation}

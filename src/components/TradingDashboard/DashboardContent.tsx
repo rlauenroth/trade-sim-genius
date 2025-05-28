@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Container } from '@/components/ui/container';
 import DashboardHeaderSection from './sections/DashboardHeader';
@@ -109,7 +108,6 @@ const DashboardContent = ({
         totalPnL={totalPnL}
         totalPnLPercentage={totalPnLPercentage}
         progressValue={progressValue}
-        timeElapsed={timeElapsed}
         portfolioHealthStatus={portfolioHealthStatus}
         simulationState={simulationState}
         isSimulationActive={isSimulationActive}
