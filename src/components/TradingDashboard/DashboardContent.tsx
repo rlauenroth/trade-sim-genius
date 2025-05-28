@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Container } from '@/components/ui/container';
 import DashboardHeaderSection from './sections/DashboardHeader';
@@ -140,7 +141,6 @@ const DashboardContent = ({
       <SettingsDrawer
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
-        apiKeys={apiKeys}
       />
     </Container>
   );

@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import PortfolioOverviewWithStatus from '../PortfolioOverviewWithStatus';
 import ControlCenter from '../ControlCenter';
@@ -60,6 +61,15 @@ const DashboardGrids = ({
   userSettings,
   apiKeys
 }: DashboardGridsProps) => {
+  // Ensure portfolioHealthStatus matches the expected type
+  const normalizeHealthStatus = (status: string): 'HEALTHY' | 'WARNING' | 'CRITICAL' => {
+    const upperStatus = status.toUpperCase();
+    if (upperStatus === 'HEALTHY' || upperStatus === 'WARNING' || upperStatus === 'CRITICAL') {
+      return upperStatus as 'HEALTHY' | 'WARNING' | 'CRITICAL';
+    }
+    return 'HEALTHY'; // Default fallback
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
       {/* Left Column */}
@@ -102,7 +112,7 @@ const DashboardGrids = ({
           onIgnoreSignal={onIgnoreSignal}
         />
         
-        <PerformanceMetrics portfolioHealthStatus={portfolioHealthStatus} />
+        <PerformanceMetrics portfolioHealthStatus={normalizeHealthStatus(portfolioHealthStatus)} />
       </div>
 
       {/* Right Column */}

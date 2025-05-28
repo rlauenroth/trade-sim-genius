@@ -55,6 +55,7 @@ const TradingDashboard = () => {
     }
   };
 
+  // Create a wrapper function that doesn't expect parameters
   const handleLogout = () => {
     logoutAndClearData();
   };
