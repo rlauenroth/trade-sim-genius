@@ -35,8 +35,8 @@ export const useAppState = () => {
     resetApp
   } = useAppReset();
 
-  // Logout function that clears all API keys - ensure correct signature with explicit typing
-  const logoutAndClearData = useCallback((): void => {
+  // Logout function that clears all API keys - explicit function signature
+  const logoutAndClearData: () => void = useCallback(() => {
     clearApiKeysFromManager();
     // Trigger a setup status check to redirect to setup
     setTimeout(() => {

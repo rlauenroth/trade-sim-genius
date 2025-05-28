@@ -13,7 +13,7 @@ import { toast } from '@/hooks/use-toast';
 export const useDashboardStateManager = () => {
   const { 
     userSettings, 
-    logoutAndClearData: logoutFromAppState, 
+    logoutAndClearData, 
     isFirstTimeAfterSetup, 
     completeFirstTimeSetup, 
     apiKeys 
@@ -73,11 +73,6 @@ export const useDashboardStateManager = () => {
     handleStartSimulationFromEffects();
   }, [handleStartSimulationFromEffects]);
 
-  // Ensure explicit typing for logout function to prevent signature mismatch
-  const logoutAndClearData = useCallback((): void => {
-    logoutFromAppState();
-  }, [logoutFromAppState]);
-
   // Add handler for manual refresh with performance report
   const handleManualRefresh = useCallback(() => {
     console.log('🔄 Manual refresh triggered from Dashboard');
@@ -111,7 +106,7 @@ export const useDashboardStateManager = () => {
 
   return {
     userSettings,
-    logoutAndClearData,
+    logoutAndClearData: logoutAndClearData as () => void,
     isFirstTimeAfterSetup,
     apiKeys,
     portfolioData,
