@@ -94,12 +94,13 @@ const DashboardContent = ({
       />
 
       <LoadingErrorStates
+        isFirstTimeAfterSetup={isFirstTimeAfterSetup}
         portfolioLoading={portfolioLoading}
         livePortfolioLoading={livePortfolioLoading}
         portfolioError={portfolioError}
         livePortfolioError={livePortfolioError}
-        onRetryPortfolio={retryLoadPortfolioData}
-        onRetryLive={handleManualRefresh}
+        apiKeys={apiKeys}
+        onRetry={retryLoadPortfolioData}
       />
 
       <DashboardGrids
@@ -129,14 +130,16 @@ const DashboardContent = ({
       />
 
       <DashboardTrading
+        currentSignal={currentSignal}
+        candidates={candidates}
         simulationState={simulationState}
-        livePortfolio={livePortfolio}
+        onAcceptSignal={acceptSignal}
+        onIgnoreSignal={ignoreSignal}
       />
 
       <SettingsDrawer
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
-        userSettings={userSettings}
         apiKeys={apiKeys}
       />
     </Container>

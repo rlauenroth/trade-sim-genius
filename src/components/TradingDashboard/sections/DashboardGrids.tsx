@@ -1,3 +1,4 @@
+
 import React from 'react';
 import PortfolioOverviewWithStatus from '../PortfolioOverviewWithStatus';
 import ControlCenter from '../ControlCenter';
@@ -81,8 +82,10 @@ const DashboardGrids = ({
         />
         
         <ProgressTracker
+          startValue={displayStartValue}
+          currentValue={displayPortfolioValue}
           progressValue={progressValue}
-          portfolioHealthStatus={portfolioHealthStatus}
+          isSimulationActive={isSimulationActive}
         />
       </div>
 
@@ -99,7 +102,7 @@ const DashboardGrids = ({
           onIgnoreSignal={onIgnoreSignal}
         />
         
-        <PerformanceMetrics />
+        <PerformanceMetrics portfolioHealthStatus={portfolioHealthStatus} />
       </div>
 
       {/* Right Column */}
