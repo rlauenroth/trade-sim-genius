@@ -55,11 +55,6 @@ const TradingDashboard = () => {
     }
   };
 
-  // Create a wrapper function that doesn't expect parameters
-  const handleLogout = () => {
-    logoutAndClearData();
-  };
-
   return (
     <>
       <DashboardInitializer 
@@ -89,7 +84,7 @@ const TradingDashboard = () => {
         simulationDataForLog={getSimulationDataForLog()}
         autoTradeCount={simulationState?.autoTradeCount}
         portfolioHealthStatus={portfolioHealthStatus}
-        logoutAndClearData={handleLogout}
+        logoutAndClearData={logoutAndClearData}
         handleManualRefresh={handleManualRefresh}
         handleStartSimulation={handleStartSimulation}
         pauseSimulation={pauseSimulation}
