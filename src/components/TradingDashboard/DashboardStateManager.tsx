@@ -106,7 +106,7 @@ export const useDashboardStateManager = () => {
 
   return {
     userSettings,
-    logoutAndClearData: logoutAndClearData as () => void,
+    logoutAndClearData,
     isFirstTimeAfterSetup,
     apiKeys,
     portfolioData,
