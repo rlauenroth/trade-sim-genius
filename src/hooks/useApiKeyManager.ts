@@ -67,8 +67,8 @@ export const useApiKeyManager = () => {
     return apiKeys;
   }, [apiKeys]);
 
-  // Fix signature to match expected interface - no parameters, void return
-  const clearApiKeys = useCallback(() => {
+  // Fix signature to match expected interface - explicit typing
+  const clearApiKeys = useCallback((): void => {
     storeClearApiKeys();
   }, [storeClearApiKeys]);
 

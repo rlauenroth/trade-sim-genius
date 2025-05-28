@@ -28,21 +28,21 @@ export const useAppState = () => {
     isLoading,
     saveApiKeys,
     loadApiKeys,
-    clearApiKeys
+    clearApiKeys: clearApiKeysFromManager
   } = useApiKeyManager();
 
   const {
     resetApp
   } = useAppReset();
 
-  // Logout function that clears all API keys - ensure correct signature
+  // Logout function that clears all API keys - ensure correct signature with explicit typing
   const logoutAndClearData = useCallback((): void => {
-    clearApiKeys();
+    clearApiKeysFromManager();
     // Trigger a setup status check to redirect to setup
     setTimeout(() => {
       checkSetupStatus();
     }, 100);
-  }, [clearApiKeys, checkSetupStatus]);
+  }, [clearApiKeysFromManager, checkSetupStatus]);
 
   // Complete first time setup
   const completeFirstTimeSetup = useCallback(() => {
@@ -74,7 +74,7 @@ export const useAppState = () => {
     isLoading,
     saveApiKeys,
     loadApiKeys,
-    clearApiKeys,
+    clearApiKeys: clearApiKeysFromManager,
     logoutAndClearData,
     
     // First time setup state
