@@ -35,7 +35,7 @@ export const useAppState = () => {
     resetApp
   } = useAppReset();
 
-  // Logout function that clears all API keys - updated to not require parameters
+  // Logout function that clears all API keys - fix signature to not require parameters
   const logoutAndClearData = useCallback(() => {
     clearApiKeys();
     // Trigger a setup status check to redirect to setup
