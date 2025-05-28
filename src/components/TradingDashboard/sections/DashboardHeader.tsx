@@ -2,6 +2,8 @@
 import React from 'react';
 import DashboardHeader from '../DashboardHeader';
 import FirstTimeUserInfo from '../FirstTimeUserInfo';
+import TradingModeIndicator from '../TradingModeIndicator';
+import { useSettingsStore } from '@/stores/settingsStore';
 
 interface DashboardHeaderSectionProps {
   isSimulationActive: boolean;
@@ -26,15 +28,25 @@ const DashboardHeaderSection = ({
   onStartSimulation,
   onOpenSettings
 }: DashboardHeaderSectionProps) => {
+  const { userSettings: storeSettings } = useSettingsStore();
+
   return (
     <>
-      <DashboardHeader 
-        isSimulationActive={isSimulationActive}
-        isPaused={isPaused}
-        onLogout={onLogout}
-        onOpenSettings={onOpenSettings}
-        onRefresh={onRefresh}
-      />
+      <div className="flex items-center justify-between mb-4">
+        <DashboardHeader 
+          isSimulationActive={isSimulationActive}
+          isPaused={isPaused}
+          onLogout={onLogout}
+          onOpenSettings={onOpenSettings}
+          onRefresh={onRefresh}
+        />
+        
+        {/* Trading Mode Indicator */}
+        <TradingModeIndicator 
+          mode={storeSettings.tradingMode} 
+          className="ml-4"
+        />
+      </div>
 
       {/* Show first-time user info if applicable */}
       {isFirstTimeAfterSetup && livePortfolio && !isSimulationActive && (
