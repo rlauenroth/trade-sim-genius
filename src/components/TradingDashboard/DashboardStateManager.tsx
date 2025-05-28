@@ -13,7 +13,7 @@ import { toast } from '@/hooks/use-toast';
 export const useDashboardStateManager = () => {
   const { 
     userSettings, 
-    logoutAndClearData, 
+    logoutAndClearData: originalLogoutAndClearData, 
     isFirstTimeAfterSetup, 
     completeFirstTimeSetup, 
     apiKeys 
@@ -58,6 +58,11 @@ export const useDashboardStateManager = () => {
     getDisplayStartValue,
     hasValidSimulation
   } = useTradingDashboardData(simulationState, portfolioData, isSimulationActive);
+
+  // Wrap logoutAndClearData to match expected signature
+  const logoutAndClearData = useCallback(() => {
+    originalLogoutAndClearData();
+  }, [originalLogoutAndClearData]);
 
   const { handleStartSimulation: handleStartSimulationFromEffects, handleOpenSettings } = useTradingDashboardEffects({
     isFirstTimeAfterSetup,
