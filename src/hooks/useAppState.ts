@@ -22,13 +22,13 @@ export const useAppState = () => {
     saveUserSettings
   } = useSettingsManager();
 
-  // Use the new Zustand store for API keys
-  const { apiKeys, clearApiKeys } = useSettingsStore();
-
+  // Use the API key manager for proper function signatures
   const {
+    apiKeys,
     isLoading,
     saveApiKeys,
-    loadApiKeys
+    loadApiKeys,
+    clearApiKeys
   } = useApiKeyManager();
 
   const {
@@ -69,7 +69,7 @@ export const useAppState = () => {
     loadUserSettings,
     saveUserSettings,
     
-    // API Keys state (now from Zustand store)
+    // API Keys state (now from API key manager with proper signatures)
     apiKeys,
     isLoading,
     saveApiKeys,
