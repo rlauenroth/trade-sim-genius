@@ -1,7 +1,7 @@
 
 import { ApiKeys, TradeOrder, OrderResponse, RiskLimits } from '@/types/appState';
 import { createOrder, getOrderStatus, getAllOrders } from '@/utils/kucoin/trading';
-import { addLogEntry } from '@/hooks/useActivityLog';
+import { loggingService } from '@/services/loggingService';
 
 interface KuCoinCredentials {
   kucoinApiKey: string;
@@ -47,12 +47,12 @@ class RealTradingService {
 
       // Execute the trade
       console.log('Executing real trade:', trade);
-      addLogEntry('INFO', `Executing real trade: ${trade.side} ${trade.size} ${trade.symbol}`);
+      loggingService.logEvent('TRADE', `Executing real trade: ${trade.side} ${trade.size} ${trade.symbol}`);
 
       const orderResponse = await createOrder(credentials, trade);
       
       if (orderResponse) {
-        addLogEntry('SUCCESS', `Real trade executed successfully. Order ID: ${orderResponse.orderId}`);
+        loggingService.logSuccess(`Real trade executed successfully. Order ID: ${orderResponse.orderId}`);
         
         // Start order status monitoring
         this.monitorOrderStatus(credentials, orderResponse.orderId);
@@ -64,7 +64,7 @@ class RealTradingService {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('Real trade execution failed:', error);
-      addLogEntry('ERROR', `Real trade failed: ${errorMessage}`);
+      loggingService.logError(`Real trade failed: ${errorMessage}`);
       throw error;
     }
   }
@@ -90,16 +90,16 @@ class RealTradingService {
         console.log(`Order ${orderId} status:`, status);
         
         if (status?.status === 'done') {
-          addLogEntry('SUCCESS', `Order ${orderId} completed successfully`);
+          loggingService.logSuccess(`Order ${orderId} completed successfully`);
         } else if (status?.status === 'cancelled' || status?.status === 'failed') {
-          addLogEntry('ERROR', `Order ${orderId} ${status.status}`);
+          loggingService.logError(`Order ${orderId} ${status.status}`);
         } else {
           // Continue monitoring
           setTimeout(checkStatus, 5000);
         }
       } catch (error) {
         console.error('Error checking order status:', error);
-        addLogEntry('ERROR', `Failed to check order status: ${orderId}`);
+        loggingService.logError(`Failed to check order status: ${orderId}`);
       }
     };
 
@@ -130,11 +130,11 @@ class RealTradingService {
     try {
       // Implementation for canceling orders would go here
       console.log('Canceling order:', orderId);
-      addLogEntry('INFO', `Canceling order: ${orderId}`);
+      loggingService.logEvent('TRADE', `Canceling order: ${orderId}`);
       return true;
     } catch (error) {
       console.error('Error canceling order:', error);
-      addLogEntry('ERROR', `Failed to cancel order: ${orderId}`);
+      loggingService.logError(`Failed to cancel order: ${orderId}`);
       return false;
     }
   }

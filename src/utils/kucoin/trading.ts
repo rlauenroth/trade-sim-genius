@@ -1,6 +1,6 @@
 
 import { TradeOrder, OrderResponse } from '@/types/appState';
-import { makeKucoinRequest } from './core';
+import { kucoinFetch } from './core';
 
 interface KuCoinCredentials {
   kucoinApiKey: string;
@@ -24,12 +24,7 @@ export const createOrder = async (
 
     console.log('Creating KuCoin order:', orderData);
 
-    const response = await makeKucoinRequest({
-      method: 'POST',
-      endpoint: '/api/v1/orders',
-      credentials,
-      data: orderData
-    });
+    const response = await kucoinFetch('/api/v1/orders', 'POST', {}, orderData);
 
     if (response?.data?.orderId) {
       return {
@@ -58,11 +53,7 @@ export const getOrderStatus = async (
   try {
     console.log('Fetching order status for:', orderId);
 
-    const response = await makeKucoinRequest({
-      method: 'GET',
-      endpoint: `/api/v1/orders/${orderId}`,
-      credentials
-    });
+    const response = await kucoinFetch(`/api/v1/orders/${orderId}`, 'GET');
 
     if (response?.data) {
       const orderData = response.data;
@@ -94,12 +85,7 @@ export const getAllOrders = async (
   try {
     console.log('Fetching all orders with status:', status);
 
-    const response = await makeKucoinRequest({
-      method: 'GET',
-      endpoint: '/api/v1/orders',
-      credentials,
-      params: { status }
-    });
+    const response = await kucoinFetch('/api/v1/orders', 'GET', { status });
 
     if (response?.data?.items) {
       return response.data.items.map((order: any) => ({
@@ -130,11 +116,7 @@ export const cancelOrder = async (
   try {
     console.log('Canceling order:', orderId);
 
-    const response = await makeKucoinRequest({
-      method: 'DELETE',
-      endpoint: `/api/v1/orders/${orderId}`,
-      credentials
-    });
+    const response = await kucoinFetch(`/api/v1/orders/${orderId}`, 'DELETE');
 
     return response?.data?.cancelledOrderIds?.includes(orderId) || false;
   } catch (error) {
