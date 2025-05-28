@@ -91,7 +91,7 @@ export const RealTradingWarningModal = ({
               <Checkbox 
                 id="read-warning"
                 checked={hasReadWarning}
-                onCheckedChange={setHasReadWarning}
+                onCheckedChange={(checked) => setHasReadWarning(checked === true)}
               />
               <label htmlFor="read-warning" className="text-sm text-slate-300">
                 Ich habe alle Warnungen und Risiken gelesen und verstanden
@@ -102,7 +102,7 @@ export const RealTradingWarningModal = ({
               <Checkbox 
                 id="acknowledge-risk"
                 checked={acknowledgeRisk}
-                onCheckedChange={setAcknowledgeRisk}
+                onCheckedChange={(checked) => setAcknowledgeRisk(checked === true)}
               />
               <label htmlFor="acknowledge-risk" className="text-sm text-slate-300">
                 Ich bestätige, dass ich die Risiken verstehe und auf eigene Verantwortung handle
@@ -226,7 +226,7 @@ export const TradeConfirmationModal = ({
             <Checkbox 
               id="dont-ask-again"
               checked={dontAskAgain}
-              onCheckedChange={setDontAskAgain}
+              onCheckedChange={(checked) => setDontAskAgain(checked === true)}
             />
             <label htmlFor="dont-ask-again" className="text-sm text-slate-300">
               Nicht mehr nachfragen (kann in Einstellungen geändert werden)

@@ -89,6 +89,7 @@ export const storageUtils = {
         proxyUrl: parsed.proxyUrl || '/images/kucoin-proxy.php?path=',
         theme: parsed.theme || 'dark',
         language: parsed.language || 'de',
+        tradingMode: parsed.tradingMode || 'simulation',
         createdAt: parsed.createdAt || Date.now()
       };
     } catch (error) {
