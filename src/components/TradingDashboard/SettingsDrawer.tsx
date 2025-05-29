@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -60,6 +61,10 @@ const SettingsDrawer = ({ isOpen, onClose, userSettings, onSaveSettings }: Setti
   const confirmRealTrading = () => {
     setIsRealTradingEnabled(true);
     setIsRealTradingWarningOpen(false);
+  };
+
+  const handleTradingStrategyChange = (value: string) => {
+    setTradingStrategy(value as 'conservative' | 'balanced' | 'aggressive');
   };
 
   return (
@@ -148,7 +153,7 @@ const SettingsDrawer = ({ isOpen, onClose, userSettings, onSaveSettings }: Setti
               <div className="grid gap-4">
                 <div className="flex flex-col space-y-1.5">
                   <Label htmlFor="trading-strategy">Trading Strategie</Label>
-                  <Select value={tradingStrategy} onValueChange={setTradingStrategy}>
+                  <Select value={tradingStrategy} onValueChange={handleTradingStrategyChange}>
                     <SelectTrigger id="trading-strategy">
                       <SelectValue placeholder="Wähle eine Strategie" />
                     </SelectTrigger>

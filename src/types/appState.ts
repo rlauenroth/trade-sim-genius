@@ -2,10 +2,15 @@
 export interface UserSettings {
   tradingStrategy: 'conservative' | 'balanced' | 'aggressive';
   selectedAiModelId: string;
+  openRouterApiKey?: string; // Add back for legacy support
   proxyUrl: string;
   theme?: 'light' | 'dark';
   language?: 'de' | 'en';
   tradingMode: 'simulation' | 'real';
+  isRealTradingEnabled?: boolean; // Add back for legacy support
+  maxConcurrentTrades?: number; // Add back for legacy support
+  tradeAllBalance?: boolean; // Add back for legacy support
+  maxUsdPerTrade?: number; // Add back for legacy support
   createdAt: number;
 }
 

@@ -141,7 +141,7 @@ export const createSettingsV2Actions = (
   },
 
   canSave: () => {
-    const { blocks } = get();
+    const { blocks }: { blocks: Record<string, SettingsBlock> } = get();
     return Object.values(blocks).every(block => block.verified);
   },
 
