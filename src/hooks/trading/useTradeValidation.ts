@@ -5,7 +5,7 @@ import { useRiskManagement } from '../useRiskManagement';
 import { loggingService } from '@/services/loggingService';
 
 export const useTradeValidation = () => {
-  const isTradeableSignal = useCallback((signal: Signal): boolean => {
+  const isTradeableSignal = useCallback((signal: Signal): signal is Signal & { signalType: 'BUY' | 'SELL' } => {
     return signal.signalType === 'BUY' || signal.signalType === 'SELL';
   }, []);
 
@@ -46,7 +46,7 @@ export const useTradeValidation = () => {
       const newPosition: Position = {
         id: `pos_${Date.now()}`,
         assetPair: signal.assetPair,
-        type: signal.signalType, // This is now guaranteed to be 'BUY' | 'SELL'
+        type: signal.signalType, // This is now guaranteed to be 'BUY' | 'SELL' due to type guard
         entryPrice: currentPrice,
         quantity,
         takeProfit: signal.takeProfitPrice,
