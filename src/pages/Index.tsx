@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import TradingDashboard from '@/components/TradingDashboard';
 import { Loader2 } from 'lucide-react';
 import SettingsManagerV2 from '@/components/settingsV2/SettingsManagerV2';
-import { useSettingsV2Store } from '@/stores/settingsV2Store';
+import { useSettingsV2Store } from '@/stores/settingsV2';
 
 const Index = () => {
   const { canSave, isLoading, settings } = useSettingsV2Store();

@@ -34,9 +34,12 @@ export function useSimGuard() {
     }
   }
 
+  // Be more lenient with data age - only show unstable if data is very old (5+ minutes)
+  const isDataTooOld = status.snapshotAge > 300000; // 5 minutes instead of 60 seconds
+
   return {
     canStart,
-    isRunningBlocked,
+    isRunningBlocked: isRunningBlocked && isDataTooOld, // Only block if data is actually too old
     reason,
     snapshotAge: status.snapshotAge,
     state: status.state,

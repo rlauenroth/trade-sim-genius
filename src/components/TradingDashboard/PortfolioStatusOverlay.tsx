@@ -18,8 +18,10 @@ const PortfolioStatusOverlay = () => {
     );
   }
 
-  if (state === 'UNSTABLE') {
-    const ageSeconds = Math.floor(snapshotAge / 1000);
+  // Only show unstable overlay if data is actually problematic (older than 5 minutes)
+  const isDataTooOld = snapshotAge > 300000; // 5 minutes
+  if (state === 'UNSTABLE' && isDataTooOld) {
+    const ageMinutes = Math.floor(snapshotAge / 60000);
     
     return (
       <div className="absolute inset-0 bg-red-900/80 backdrop-blur-sm flex items-center justify-center rounded-lg">
@@ -32,7 +34,7 @@ const PortfolioStatusOverlay = () => {
           {snapshotAge > 0 && (
             <div className="flex items-center justify-center space-x-1 text-red-300 text-xs">
               <Clock className="h-3 w-3" />
-              <span>Letzte Aktualisierung vor {ageSeconds}s</span>
+              <span>Letzte Aktualisierung vor {ageMinutes} Min</span>
             </div>
           )}
         </div>

@@ -1,11 +1,10 @@
-
 import React from 'react';
 import { Container } from '@/components/ui/container';
 import DashboardHeaderSection from './sections/DashboardHeader';
 import LoadingErrorStates from './sections/LoadingErrorStates';
 import DashboardGrids from './sections/DashboardGrids';
 import DashboardTrading from './sections/DashboardTrading';
-import SettingsDrawer from './SettingsDrawer';
+import SettingsManagerV2 from '@/components/settingsV2/SettingsManagerV2';
 
 interface DashboardContentProps {
   userSettings: any;
@@ -138,7 +137,7 @@ const DashboardContent = ({
         onIgnoreSignal={ignoreSignal}
       />
 
-      <SettingsDrawer
+      <SettingsManagerV2
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
       />

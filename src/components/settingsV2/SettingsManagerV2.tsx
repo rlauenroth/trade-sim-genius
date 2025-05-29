@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { useSettingsV2Store } from '@/stores/settingsV2Store';
+import { useSettingsV2Store } from '@/stores/settingsV2';
 import SettingsDrawerV2 from './SettingsDrawerV2';
 
 interface SettingsManagerV2Props {

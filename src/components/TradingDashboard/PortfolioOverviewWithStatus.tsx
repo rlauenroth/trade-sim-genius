@@ -22,7 +22,7 @@ const PortfolioOverviewWithStatus = ({
   totalPnLPercentage
 }: PortfolioOverviewWithStatusProps) => {
   // Use centralized portfolio hook instead of usePortfolioLive
-  const { snapshot, isLoading, error, refresh } = useSimReadinessPortfolio();
+  const { snapshot, isLoading, error, refresh, isStale } = useSimReadinessPortfolio();
   const isPositive = totalPnL >= 0;
 
   // Use live portfolio value if available, otherwise fallback to passed props
@@ -44,7 +44,8 @@ const PortfolioOverviewWithStatus = ({
     );
   }
 
-  if (error) {
+  // Only show error state for actual errors, not just stale data
+  if (error && !snapshot) {
     return (
       <Card className="bg-red-900/20 border-red-600/50 relative">
         <CardHeader>
@@ -97,8 +98,16 @@ const PortfolioOverviewWithStatus = ({
               ${displayValue.toLocaleString()}
             </div>
             {snapshot && (
-              <div className="text-xs text-slate-500">
-                Live-Daten • {new Date(snapshot.fetchedAt).toLocaleTimeString()}
+              <div className="text-xs text-slate-500 flex items-center space-x-2">
+                <span>Live-Daten</span>
+                <span>•</span>
+                <span>{new Date(snapshot.fetchedAt).toLocaleTimeString()}</span>
+                {isStale && (
+                  <>
+                    <span>•</span>
+                    <span className="text-yellow-400">Wird aktualisiert...</span>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -145,7 +154,7 @@ const PortfolioOverviewWithStatus = ({
           )}
         </CardContent>
         
-        {/* Status overlay */}
+        {/* Status overlay - now only shows when data is actually problematic */}
         <PortfolioStatusOverlay />
       </Card>
     </TooltipProvider>

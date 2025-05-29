@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Settings, Key, Bot, Wifi, Shield, DollarSign } from 'lucide-react';
-import { useSettingsV2Store } from '@/stores/settingsV2Store';
+import { useSettingsV2Store } from '@/stores/settingsV2';
 import { useKucoinVerification } from '@/hooks/useKucoinVerification';
 import { useOpenRouterVerification } from '@/hooks/useOpenRouterVerification';
 import { useModelVerification } from '@/hooks/useModelVerification';
