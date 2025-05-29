@@ -1,7 +1,6 @@
-
 interface LogEntry {
   timestamp: number;
-  type: 'API' | 'SIM' | 'AI' | 'TRADE' | 'INFO' | 'SUCCESS' | 'ERROR' | 'AUTO_TRADE';
+  type: 'API' | 'SIM' | 'AI' | 'TRADE' | 'INFO' | 'SUCCESS' | 'ERROR' | 'AUTO_TRADE' | 'PORTFOLIO_UPDATE' | 'SYSTEM';
   message: string;
   meta?: Record<string, any>;
 }
@@ -111,7 +110,7 @@ class LoggingService {
     });
   }
 
-  logEvent(type: 'API' | 'SIM' | 'AI' | 'TRADE' | 'AUTO_TRADE', message: string, meta?: Record<string, any>): void {
+  logEvent(type: 'API' | 'SIM' | 'AI' | 'TRADE' | 'AUTO_TRADE' | 'PORTFOLIO_UPDATE' | 'SYSTEM', message: string, meta?: Record<string, any>): void {
     this.addEntry({
       timestamp: Date.now(),
       type,

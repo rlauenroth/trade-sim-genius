@@ -112,7 +112,7 @@ export class PortfolioEvaluationService {
       }
 
       const totalUnrealizedPnL = positionEvaluations.reduce(
-        (sum, eval) => sum + eval.unrealizedPnL,
+        (sum, evaluation) => sum + evaluation.unrealizedPnL,
         0
       );
 

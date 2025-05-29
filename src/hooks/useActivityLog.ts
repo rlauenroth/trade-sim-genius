@@ -127,7 +127,7 @@ export const useActivityLog = () => {
     const change = valueAfter - valueBefore;
     const changePercent = valueBefore > 0 ? (change / valueBefore) * 100 : 0;
     
-    addLogEntry('PORTFOLIO_UPDATE', `Portfolio aktualisiert: ${change >= 0 ? '+' : ''}${change.toFixed(2)} USDT (${reason})`, 'Portfolio Manager', {
+    addLogEntry('INFO', `Portfolio aktualisiert: ${change >= 0 ? '+' : ''}${change.toFixed(2)} USDT (${reason})`, 'Portfolio Manager', {
       portfolioData: {
         valueBefore,
         valueAfter,
