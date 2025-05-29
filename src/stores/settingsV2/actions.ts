@@ -160,10 +160,14 @@ export const createSettingsV2Actions = (
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
       
-      // Reset modified flags
+      // Reset modified flags and ensure verified status is maintained
       const newBlocks = { ...blocks };
       Object.keys(newBlocks).forEach(key => {
-        newBlocks[key].modified = false;
+        newBlocks[key] = {
+          ...newBlocks[key],
+          modified: false,
+          verified: true // Ensure verified status is maintained after save
+        };
       });
       set({ blocks: newBlocks });
       

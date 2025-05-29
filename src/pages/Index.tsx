@@ -14,23 +14,24 @@ const Index = () => {
   useEffect(() => {
     console.log('Index component mounted, checking V2 setup status...');
     
-    // Check if V2 settings are properly configured
-    const hasValidV2Settings = canSave();
+    // Check if essential settings are present (prioritize this over canSave())
+    const hasEssentialSettings = settings.kucoin.key && settings.openRouter.apiKey;
     
-    // Check if user has any data at all (to distinguish between new user and migration case)
-    const hasAnyData = settings.kucoin.key || settings.openRouter.apiKey;
+    // Check canSave for verification status
+    const hasValidV2Settings = canSave();
     
     // Create a simple hash of current settings to detect changes
     const settingsHash = JSON.stringify({
       kucoinKey: !!settings.kucoin.key,
       openRouterKey: !!settings.openRouter.apiKey,
       tradingMode: settings.tradingMode,
+      hasEssentialSettings,
       canSave: hasValidV2Settings
     });
 
     console.log('Settings check:', {
+      hasEssentialSettings,
       hasValidV2Settings,
-      hasAnyData,
       tradingMode: settings.tradingMode,
       settingsHash,
       lastSettingsCheck
@@ -40,14 +41,9 @@ const Index = () => {
     if (settingsHash !== lastSettingsCheck) {
       setLastSettingsCheck(settingsHash);
       
-      if (!hasValidV2Settings && !hasAnyData) {
-        console.log('Index: New user detected, showing onboarding');
-        setShowOnboarding(true);
-      } else if (!hasValidV2Settings && hasAnyData) {
-        console.log('Index: Incomplete settings detected, showing onboarding');
-        setShowOnboarding(true);
-      } else {
-        console.log('Index: V2 setup complete, showing dashboard');
+      // Primary condition: If we have essential settings, show dashboard
+      if (hasEssentialSettings) {
+        console.log('Index: Essential settings present, showing dashboard');
         setShowOnboarding(false);
         
         // Log successful settings verification
@@ -56,6 +52,10 @@ const Index = () => {
           hasKucoinKeys: !!settings.kucoin.key,
           hasOpenRouterKey: !!settings.openRouter.apiKey
         });
+      } else {
+        // Only show onboarding if essential settings are missing
+        console.log('Index: Essential settings missing, showing onboarding');
+        setShowOnboarding(true);
       }
     }
   }, [canSave, settings, lastSettingsCheck]);

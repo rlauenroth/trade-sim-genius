@@ -26,7 +26,7 @@ const SettingsDrawerV2 = ({ isOpen, onClose, isOnboarding = false }: SettingsDra
   const { formData, handleFieldChange } = useSettingsForm();
   const verificationHandlers = useVerificationHandlers(formData);
 
-  // Save handler with proper state management
+  // Save handler with improved state management
   const handleSave = async () => {
     console.log('SettingsDrawerV2: Saving settings...', {
       isOnboarding,
@@ -47,12 +47,15 @@ const SettingsDrawerV2 = ({ isOpen, onClose, isOnboarding = false }: SettingsDra
 
         console.log('SettingsDrawerV2: Settings saved successfully');
         
-        // Use state-based navigation instead of hard redirect
-        onClose();
+        // Use a small delay to ensure state updates are complete
+        setTimeout(() => {
+          onClose();
+        }, 100);
         
         if (isOnboarding) {
-          // For onboarding, let the parent component handle the state transition
           console.log('SettingsDrawerV2: Onboarding completed, letting parent handle transition');
+        } else {
+          console.log('SettingsDrawerV2: Regular settings save, returning to dashboard');
         }
       } else {
         console.error('SettingsDrawerV2: Failed to save settings');
