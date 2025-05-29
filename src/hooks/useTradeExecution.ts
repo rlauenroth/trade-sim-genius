@@ -1,3 +1,4 @@
+
 import { useCallback } from 'react';
 import { Signal, SimulationState, Position } from '@/types/simulation';
 import { toast } from '@/hooks/use-toast';
@@ -329,9 +330,17 @@ export const useTradeExecution = () => {
     }, 15000);
   }, []);
 
-  // Add the missing executeTradeFromSignal method with complete implementation
+  // Fixed executeTradeFromSignal method with proper type checking
   const executeTradeFromSignal = useCallback(async (signal: Signal, simulationState: SimulationState) => {
     try {
+      // Add validation for tradeable signals only
+      if (signal.signalType !== 'BUY' && signal.signalType !== 'SELL') {
+        return {
+          success: false,
+          error: `Signal type ${signal.signalType} is not tradeable`
+        };
+      }
+
       const { calculatePositionSize } = useRiskManagement('balanced');
       
       // Get current market price
@@ -355,11 +364,11 @@ export const useTradeExecution = () => {
       const tradingFee = actualPositionSize * 0.001; // 0.1% fee
       const assetSymbol = signal.assetPair.split('/')[0] || signal.assetPair.split('-')[0];
       
-      // Create new position
+      // Create new position - now with proper type narrowing
       const newPosition: Position = {
         id: `pos_${Date.now()}`,
         assetPair: signal.assetPair,
-        type: signal.signalType as 'BUY' | 'SELL',
+        type: signal.signalType, // This is now guaranteed to be 'BUY' | 'SELL'
         entryPrice: currentPrice,
         quantity,
         takeProfit: signal.takeProfitPrice,
