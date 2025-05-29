@@ -1,4 +1,3 @@
-
 export class RateLimitError extends Error {
   retryAfter: number;
   response: Response;
@@ -75,3 +74,6 @@ export class MissingHeaderError extends ApiError {
     this.name = 'MissingHeaderError';
   }
 }
+
+// Export AI-specific errors
+export * from './errors/aiErrors';

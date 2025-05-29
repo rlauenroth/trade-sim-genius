@@ -1,67 +1,64 @@
 
 import React from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Bot, Settings, LogOut, RefreshCw } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { Settings, RefreshCw, LogOut } from 'lucide-react';
+import { AIHealthBadge } from '@/components/AIHealthBadge';
 
 interface DashboardHeaderProps {
-  isSimulationActive: boolean;
-  isPaused?: boolean;
-  onLogout: () => void;
-  onOpenSettings: () => void;
-  onRefresh: () => void;
+  onSettingsClick: () => void;
+  onRefreshClick: () => void;
+  onLogoutClick: () => void;
+  isRefreshing?: boolean;
 }
 
-const DashboardHeader = ({ isSimulationActive, isPaused, onLogout, onOpenSettings, onRefresh }: DashboardHeaderProps) => {
-  const getStatusBadge = () => {
-    if (!isSimulationActive) {
-      return <Badge variant="secondary" className="bg-slate-600">Bereit</Badge>;
-    }
-    
-    if (isPaused) {
-      return <Badge variant="outline" className="border-yellow-500 text-yellow-400">Pausiert</Badge>;
-    }
-    
-    return <Badge className="bg-green-600">Simulation aktiv</Badge>;
-  };
-
+export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
+  onSettingsClick,
+  onRefreshClick,
+  onLogoutClick,
+  isRefreshing = false
+}) => {
   return (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center space-x-4">
-        <div className="flex items-center space-x-3">
-          <div className="p-2 bg-blue-600 rounded-lg">
-            <Bot className="h-6 w-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-white">KI Trading Assistant</h1>
-            <div className="flex items-center space-x-2">
-              <p className="text-slate-400">Paper-Trading Dashboard</p>
-              <span className="text-slate-500">•</span>
-              <Badge variant="outline" className="border-green-500 text-green-400 text-xs">
-                Automatisch ausgeführt
-              </Badge>
-            </div>
-          </div>
-        </div>
-        {getStatusBadge()}
+    <div className="flex items-center justify-between p-4 bg-white border-b">
+      <div className="flex items-center gap-4">
+        <h1 className="text-2xl font-bold text-gray-900">Trading Dashboard</h1>
+        <AIHealthBadge />
       </div>
       
-      <div className="flex items-center space-x-2">
-        <Button variant="ghost" size="sm" onClick={onRefresh} className="text-slate-400">
-          <RefreshCw className="h-4 w-4 mr-2" />
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onRefreshClick}
+          disabled={isRefreshing}
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
           Aktualisieren
         </Button>
-        <Button variant="ghost" size="sm" onClick={onOpenSettings} className="text-slate-400">
-          <Settings className="h-4 w-4 mr-2" />
+        
+        <Separator orientation="vertical" className="h-6" />
+        
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onSettingsClick}
+          className="flex items-center gap-2"
+        >
+          <Settings className="h-4 w-4" />
           Einstellungen
         </Button>
-        <Button variant="ghost" size="sm" onClick={onLogout} className="text-slate-400">
-          <LogOut className="h-4 w-4 mr-2" />
+        
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onLogoutClick}
+          className="flex items-center gap-2"
+        >
+          <LogOut className="h-4 w-4" />
           Abmelden
         </Button>
       </div>
     </div>
   );
 };
-
-export default DashboardHeader;
