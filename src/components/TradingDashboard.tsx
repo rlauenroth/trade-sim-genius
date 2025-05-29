@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import DashboardInitializer from './TradingDashboard/DashboardInitializer';
 import DashboardContent from './TradingDashboard/DashboardContent';
@@ -86,14 +85,14 @@ const TradingDashboard = () => {
         acceptSignal(currentSignal);
         loggingService.logEvent('TRADE', 'Signal accepted', {
           signalType: currentSignal.signalType,
-          pair: currentSignal.pair,
+          assetPair: currentSignal.assetPair,
           tradingMode: userSettings?.tradingMode
         });
       } catch (error) {
         console.error('Error accepting signal:', error);
         loggingService.logError('Signal acceptance failed', {
           error: error instanceof Error ? error.message : 'Unknown error',
-          signalId: currentSignal.id
+          assetPair: currentSignal.assetPair
         });
       }
     }
@@ -105,13 +104,13 @@ const TradingDashboard = () => {
         ignoreSignal(currentSignal);
         loggingService.logEvent('TRADE', 'Signal ignored', {
           signalType: currentSignal.signalType,
-          pair: currentSignal.pair
+          assetPair: currentSignal.assetPair
         });
       } catch (error) {
         console.error('Error ignoring signal:', error);
         loggingService.logError('Signal ignore failed', {
           error: error instanceof Error ? error.message : 'Unknown error',
-          signalId: currentSignal.id
+          assetPair: currentSignal.assetPair
         });
       }
     }
