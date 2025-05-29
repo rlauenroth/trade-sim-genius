@@ -1,6 +1,5 @@
-
 import { ApiKeys, TradeOrder, OrderResponse, RiskLimits } from '@/types/appState';
-import { createOrder, getOrderStatus, getAllOrders } from '@/utils/kucoin/trading';
+import { createOrder, getOrderStatus, getAllOrders, getAccountBalances } from '@/utils/kucoin/trading';
 import { loggingService } from '@/services/loggingService';
 
 interface KuCoinCredentials {
@@ -67,8 +66,8 @@ class RealTradingService {
     }
 
     try {
-      // Pre-trade risk checks
-      await this.performPreTradeChecks(trade);
+      // Enhanced pre-trade risk checks with real API data
+      await this.performEnhancedPreTradeChecks(trade);
 
       // Convert API keys format
       const credentials = convertApiKeys(this.apiKeys);
@@ -100,34 +99,80 @@ class RealTradingService {
     }
   }
 
-  private async performPreTradeChecks(trade: TradeOrder): Promise<void> {
+  private async performEnhancedPreTradeChecks(trade: TradeOrder): Promise<void> {
     try {
-      // Check account balance
-      // Check risk limits
-      // Validate trade parameters
-      console.log('Performing pre-trade checks for:', trade);
+      console.log('Performing enhanced pre-trade checks for:', trade);
       
       if (!trade.size || !trade.symbol) {
         throw new Error('Invalid trade parameters - missing size or symbol');
       }
-      
-      // Mock implementation - in real app, check actual account balance and limits
-      const estimatedValue = parseFloat(trade.size) * (parseFloat(trade.price || '0') || 1);
-      
-      if (estimatedValue > this.riskLimits.maxExposure) {
-        throw new Error(`Trade value ($${estimatedValue.toFixed(2)}) exceeds maximum exposure limit ($${this.riskLimits.maxExposure})`);
+
+      const credentials = convertApiKeys(this.apiKeys!);
+
+      // Get real account balances
+      const balances = await getAccountBalances(credentials);
+      const usdtBalance = balances.find(b => b.currency === 'USDT');
+      const availableUSDT = parseFloat(usdtBalance?.available || '0');
+
+      loggingService.logEvent('TRADE', 'Real account balance retrieved', {
+        availableUSDT,
+        minBalanceRequired: this.riskLimits.minBalance
+      });
+
+      // Check minimum balance requirement
+      if (availableUSDT < this.riskLimits.minBalance) {
+        throw new Error(`Insufficient balance. Available: $${availableUSDT.toFixed(2)}, minimum required: $${this.riskLimits.minBalance}`);
       }
-      
-      if (estimatedValue < 10) {
+
+      // Get current open orders
+      const openOrders = await getAllOrders(credentials, 'active');
+      const currentOpenOrdersCount = openOrders.length;
+
+      loggingService.logEvent('TRADE', 'Current open orders retrieved', {
+        openOrdersCount: currentOpenOrdersCount,
+        maxAllowed: this.riskLimits.maxOpenOrders
+      });
+
+      // Check max open orders limit
+      if (currentOpenOrdersCount >= this.riskLimits.maxOpenOrders) {
+        throw new Error(`Maximum open orders limit reached. Current: ${currentOpenOrdersCount}, maximum allowed: ${this.riskLimits.maxOpenOrders}`);
+      }
+
+      // Calculate total exposure from existing orders
+      const totalCurrentExposure = openOrders.reduce((total, order) => {
+        const orderValue = parseFloat(order.size) * parseFloat(order.price || '0');
+        return total + orderValue;
+      }, 0);
+
+      // Calculate estimated trade value
+      const estimatedTradeValue = parseFloat(trade.size) * (parseFloat(trade.price || '0') || 1);
+
+      // Check total exposure limit
+      const newTotalExposure = totalCurrentExposure + estimatedTradeValue;
+      if (newTotalExposure > this.riskLimits.maxExposure) {
+        throw new Error(`Total exposure limit exceeded. Current: $${totalCurrentExposure.toFixed(2)}, new trade: $${estimatedTradeValue.toFixed(2)}, total would be: $${newTotalExposure.toFixed(2)}, maximum allowed: $${this.riskLimits.maxExposure}`);
+      }
+
+      // Check if sufficient balance for trade
+      if (estimatedTradeValue > availableUSDT) {
+        throw new Error(`Insufficient balance for trade. Required: $${estimatedTradeValue.toFixed(2)}, available: $${availableUSDT.toFixed(2)}`);
+      }
+
+      // Minimum trade value check
+      if (estimatedTradeValue < 10) {
         throw new Error('Trade value too small - minimum $10 required');
       }
-      
-      loggingService.logEvent('TRADE', 'Pre-trade checks passed', {
-        estimatedValue,
-        maxExposure: this.riskLimits.maxExposure
+
+      loggingService.logEvent('TRADE', 'Enhanced pre-trade checks passed', {
+        estimatedTradeValue,
+        totalCurrentExposure,
+        newTotalExposure,
+        availableUSDT,
+        currentOpenOrders: currentOpenOrdersCount,
+        limits: this.riskLimits
       });
     } catch (error) {
-      loggingService.logError('Pre-trade checks failed', {
+      loggingService.logError('Enhanced pre-trade checks failed', {
         error: error instanceof Error ? error.message : 'unknown',
         trade
       });

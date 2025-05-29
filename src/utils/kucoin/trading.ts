@@ -1,4 +1,3 @@
-
 import { TradeOrder, OrderResponse } from '@/types/appState';
 import { kucoinFetch } from './core';
 
@@ -7,6 +6,37 @@ interface KuCoinCredentials {
   kucoinApiSecret: string;
   kucoinApiPassphrase: string;
 }
+
+interface AccountBalance {
+  currency: string;
+  balance: string;
+  available: string;
+  holds: string;
+}
+
+export const getAccountBalances = async (
+  credentials: KuCoinCredentials
+): Promise<AccountBalance[]> => {
+  try {
+    console.log('Fetching account balances...');
+
+    const response = await kucoinFetch('/api/v1/accounts', 'GET');
+
+    if (response?.data && Array.isArray(response.data)) {
+      return response.data.map((account: any) => ({
+        currency: account.currency,
+        balance: account.balance,
+        available: account.available,
+        holds: account.holds
+      }));
+    }
+
+    return [];
+  } catch (error) {
+    console.error('Error fetching account balances:', error);
+    throw error;
+  }
+};
 
 export const createOrder = async (
   credentials: KuCoinCredentials,
