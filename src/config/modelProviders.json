@@ -1,0 +1,71 @@
+
+{
+  "models": [
+    {
+      "id": "mistralai/mistral-7b-instruct",
+      "name": "Mistral 7B Instruct",
+      "providers": [
+        {
+          "name": "Groq",
+          "priceUsdPer1k": 0,
+          "latencyMs": 200,
+          "endpoint": "https://api.groq.com/openai/v1"
+        }
+      ],
+      "description": "Fast and free model for general tasks",
+      "isDefault": true
+    },
+    {
+      "id": "openai/gpt-4o",
+      "name": "GPT-4 Omni",
+      "providers": [
+        {
+          "name": "OpenAI",
+          "priceUsdPer1k": 5.0,
+          "latencyMs": 800,
+          "endpoint": "https://api.openai.com/v1"
+        }
+      ],
+      "description": "Most capable model for complex reasoning"
+    },
+    {
+      "id": "anthropic/claude-3-haiku",
+      "name": "Claude 3 Haiku",
+      "providers": [
+        {
+          "name": "Anthropic",
+          "priceUsdPer1k": 0.8,
+          "latencyMs": 600,
+          "endpoint": "https://api.anthropic.com/v1"
+        }
+      ],
+      "description": "Fast and efficient for simple tasks"
+    },
+    {
+      "id": "mistralai/mixtral-8x7b-instruct",
+      "name": "Mixtral 8x7B Instruct",
+      "providers": [
+        {
+          "name": "Groq",
+          "priceUsdPer1k": 0.24,
+          "latencyMs": 300,
+          "endpoint": "https://api.groq.com/openai/v1"
+        }
+      ],
+      "description": "Powerful mixture of experts model"
+    },
+    {
+      "id": "openai/gpt-3.5-turbo-0125",
+      "name": "GPT-3.5 Turbo",
+      "providers": [
+        {
+          "name": "OpenAI",
+          "priceUsdPer1k": 1.5,
+          "latencyMs": 500,
+          "endpoint": "https://api.openai.com/v1"
+        }
+      ],
+      "description": "Balanced performance and cost"
+    }
+  ]
+}
