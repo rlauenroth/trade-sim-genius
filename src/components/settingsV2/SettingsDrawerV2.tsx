@@ -13,6 +13,7 @@ import ModelSection from './sections/ModelSection';
 import ProxySection from './sections/ProxySection';
 import TradingModeSection from './sections/TradingModeSection';
 import StrategySection from './sections/StrategySection';
+import { loggingService } from '@/services/loggingService';
 
 interface SettingsDrawerV2Props {
   isOpen: boolean;
@@ -21,18 +22,51 @@ interface SettingsDrawerV2Props {
 }
 
 const SettingsDrawerV2 = ({ isOpen, onClose, isOnboarding = false }: SettingsDrawerV2Props) => {
-  const { blocks, saveSettings, canSave } = useSettingsV2Store();
+  const { blocks, saveSettings, canSave, settings } = useSettingsV2Store();
   const { formData, handleFieldChange } = useSettingsForm();
   const verificationHandlers = useVerificationHandlers(formData);
 
-  // Save handler
+  // Save handler with proper state management
   const handleSave = async () => {
-    const success = await saveSettings();
-    if (success && isOnboarding) {
-      // Redirect to dashboard after successful onboarding
-      window.location.href = '/';
-    } else if (success) {
-      onClose();
+    console.log('SettingsDrawerV2: Saving settings...', {
+      isOnboarding,
+      canSave: canSave(),
+      currentTradingMode: settings.tradingMode,
+      formDataTradingMode: formData.tradingMode
+    });
+
+    try {
+      const success = await saveSettings();
+      
+      if (success) {
+        loggingService.logEvent('SIM', 'Settings saved successfully', {
+          isOnboarding,
+          tradingMode: settings.tradingMode,
+          riskLimits: settings.riskLimits
+        });
+
+        console.log('SettingsDrawerV2: Settings saved successfully');
+        
+        // Use state-based navigation instead of hard redirect
+        onClose();
+        
+        if (isOnboarding) {
+          // For onboarding, let the parent component handle the state transition
+          console.log('SettingsDrawerV2: Onboarding completed, letting parent handle transition');
+        }
+      } else {
+        console.error('SettingsDrawerV2: Failed to save settings');
+        loggingService.logError('Settings save failed', {
+          isOnboarding,
+          canSave: canSave()
+        });
+      }
+    } catch (error) {
+      console.error('SettingsDrawerV2: Error saving settings:', error);
+      loggingService.logError('Settings save error', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        isOnboarding
+      });
     }
   };
 

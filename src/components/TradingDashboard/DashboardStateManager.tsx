@@ -1,5 +1,6 @@
+
 import { useCallback } from 'react';
-import { useAppState } from '@/hooks/useAppState';
+import { useSettingsV2Store } from '@/stores/settingsV2';
 import { useSimulation } from '@/hooks/useSimulation';
 import { usePortfolioData } from '@/hooks/usePortfolioData';
 import { useTradingDashboardData } from '@/hooks/useTradingDashboardData';
@@ -8,15 +9,11 @@ import { useSimGuard } from '@/hooks/useSimGuard';
 import { useSimReadinessPortfolio } from '@/hooks/useSimReadinessPortfolio';
 import { simReadinessStore } from '@/stores/simReadinessStore';
 import { toast } from '@/hooks/use-toast';
+import { loggingService } from '@/services/loggingService';
 
 export const useDashboardStateManager = () => {
-  const { 
-    userSettings, 
-    logoutAndClearData, 
-    isFirstTimeAfterSetup, 
-    completeFirstTimeSetup, 
-    apiKeys 
-  } = useAppState();
+  // Use V2 settings store instead of old useAppState
+  const { settings } = useSettingsV2Store();
   
   const { 
     portfolioData, 
@@ -58,19 +55,58 @@ export const useDashboardStateManager = () => {
     hasValidSimulation
   } = useTradingDashboardData(simulationState, portfolioData, isSimulationActive);
 
+  // Create a simplified API keys object from V2 settings
+  const apiKeys = {
+    kucoinApiKey: settings.kucoin.key,
+    kucoinApiSecret: settings.kucoin.secret,
+    kucoinApiPassphrase: settings.kucoin.passphrase,
+    openRouterApiKey: settings.openRouter.apiKey
+  };
+
+  // Create userSettings object compatible with old interface
+  const userSettings = {
+    tradingMode: settings.tradingMode,
+    tradingStrategy: settings.tradingStrategy,
+    riskLimits: settings.riskLimits,
+    openRouterApiKey: settings.openRouter.apiKey,
+    proxyUrl: settings.proxyUrl,
+    selectedAiModelId: settings.model.id,
+    isRealTradingEnabled: settings.tradingMode === 'real',
+    maxConcurrentTrades: settings.riskLimits.maxOpenOrders,
+    tradeAllBalance: false, // Default value
+    maxUsdPerTrade: settings.riskLimits.maxExposure
+  };
+
   const { handleStartSimulation: handleStartSimulationFromEffects, handleOpenSettings } = useTradingDashboardEffects({
-    isFirstTimeAfterSetup,
+    isFirstTimeAfterSetup: false, // Simplified for now
     decryptedApiKeys: apiKeys,
-    livePortfolio, // Changed from portfolioData to livePortfolio
+    livePortfolio,
     loadPortfolioData,
-    completeFirstTimeSetup,
+    completeFirstTimeSetup: () => {}, // Simplified
     startSimulation
   });
 
   // Use the handleStartSimulation from effects which has the correct signature
   const handleStartSimulation = useCallback(() => {
-    handleStartSimulationFromEffects();
-  }, [handleStartSimulationFromEffects]);
+    console.log('🚀 DashboardStateManager: Starting simulation...');
+    console.log('Trading mode:', settings.tradingMode);
+    console.log('Live portfolio:', livePortfolio);
+    
+    try {
+      handleStartSimulationFromEffects();
+    } catch (error) {
+      console.error('❌ Error starting simulation:', error);
+      loggingService.logError('Simulation start failed in DashboardStateManager', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        tradingMode: settings.tradingMode
+      });
+      toast({
+        title: "Simulation-Fehler",
+        description: error instanceof Error ? error.message : "Unbekannter Fehler",
+        variant: "destructive"
+      });
+    }
+  }, [handleStartSimulationFromEffects, settings.tradingMode, livePortfolio]);
 
   // Add handler for manual refresh with performance report
   const handleManualRefresh = useCallback(() => {
@@ -87,6 +123,13 @@ export const useDashboardStateManager = () => {
       description: "Portfolio und Marktdaten werden neu geladen",
     });
   }, [isSimulationActive, logPerformanceReport]);
+
+  // Simple logout function
+  const logoutAndClearData = useCallback(() => {
+    console.log('🚪 Logout and clear data called');
+    localStorage.clear();
+    window.location.reload();
+  }, []);
 
   // Calculate simulation data for activity log
   const getSimulationDataForLog = () => {
@@ -106,7 +149,7 @@ export const useDashboardStateManager = () => {
   return {
     userSettings,
     logoutAndClearData,
-    isFirstTimeAfterSetup,
+    isFirstTimeAfterSetup: false, // Simplified
     apiKeys,
     portfolioData,
     portfolioLoading,
