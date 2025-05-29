@@ -26,16 +26,44 @@ class RealTradingService {
   };
 
   setApiKeys(keys: ApiKeys) {
-    this.apiKeys = keys;
+    try {
+      if (!keys || !keys.kucoin || !keys.kucoin.key || !keys.kucoin.secret || !keys.kucoin.passphrase) {
+        throw new Error('Invalid API keys provided');
+      }
+      
+      this.apiKeys = keys;
+      loggingService.logEvent('TRADE', 'API keys set for real trading');
+    } catch (error) {
+      loggingService.logError('Failed to set API keys', { error: error instanceof Error ? error.message : 'unknown' });
+      throw error;
+    }
   }
 
   setRiskLimits(limits: RiskLimits) {
-    this.riskLimits = limits;
+    try {
+      if (!limits || typeof limits.maxOpenOrders !== 'number' || typeof limits.maxExposure !== 'number') {
+        throw new Error('Invalid risk limits provided');
+      }
+      
+      this.riskLimits = {
+        maxOpenOrders: Math.max(1, limits.maxOpenOrders),
+        maxExposure: Math.max(100, limits.maxExposure),
+        minBalance: Math.max(10, limits.minBalance),
+        requireConfirmation: limits.requireConfirmation ?? true
+      };
+      
+      loggingService.logEvent('TRADE', 'Risk limits updated', { riskLimits: this.riskLimits });
+    } catch (error) {
+      loggingService.logError('Failed to set risk limits', { error: error instanceof Error ? error.message : 'unknown' });
+      throw error;
+    }
   }
 
   async executeRealTrade(trade: TradeOrder): Promise<OrderResponse | null> {
     if (!this.apiKeys) {
-      throw new Error('API keys not configured for real trading');
+      const error = new Error('API keys not configured for real trading');
+      loggingService.logError('Real trade execution failed - no API keys');
+      throw error;
     }
 
     try {
@@ -59,27 +87,51 @@ class RealTradingService {
         
         return orderResponse;
       } else {
-        throw new Error('Order creation failed');
+        throw new Error('Order creation failed - no response from exchange');
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('Real trade execution failed:', error);
-      loggingService.logError(`Real trade failed: ${errorMessage}`);
+      loggingService.logError(`Real trade failed: ${errorMessage}`, {
+        trade,
+        riskLimits: this.riskLimits
+      });
       throw error;
     }
   }
 
   private async performPreTradeChecks(trade: TradeOrder): Promise<void> {
-    // Check account balance
-    // Check risk limits
-    // Validate trade parameters
-    console.log('Performing pre-trade checks for:', trade);
-    
-    // Mock implementation - in real app, check actual account balance and limits
-    const estimatedValue = parseFloat(trade.size) * (parseFloat(trade.price || '0') || 1);
-    
-    if (estimatedValue > this.riskLimits.maxExposure) {
-      throw new Error(`Trade value (${estimatedValue}) exceeds maximum exposure limit (${this.riskLimits.maxExposure})`);
+    try {
+      // Check account balance
+      // Check risk limits
+      // Validate trade parameters
+      console.log('Performing pre-trade checks for:', trade);
+      
+      if (!trade.size || !trade.symbol) {
+        throw new Error('Invalid trade parameters - missing size or symbol');
+      }
+      
+      // Mock implementation - in real app, check actual account balance and limits
+      const estimatedValue = parseFloat(trade.size) * (parseFloat(trade.price || '0') || 1);
+      
+      if (estimatedValue > this.riskLimits.maxExposure) {
+        throw new Error(`Trade value ($${estimatedValue.toFixed(2)}) exceeds maximum exposure limit ($${this.riskLimits.maxExposure})`);
+      }
+      
+      if (estimatedValue < 10) {
+        throw new Error('Trade value too small - minimum $10 required');
+      }
+      
+      loggingService.logEvent('TRADE', 'Pre-trade checks passed', {
+        estimatedValue,
+        maxExposure: this.riskLimits.maxExposure
+      });
+    } catch (error) {
+      loggingService.logError('Pre-trade checks failed', {
+        error: error instanceof Error ? error.message : 'unknown',
+        trade
+      });
+      throw error;
     }
   }
 
@@ -94,12 +146,19 @@ class RealTradingService {
         } else if (status?.status === 'cancelled' || status?.status === 'failed') {
           loggingService.logError(`Order ${orderId} ${status.status}`);
         } else {
-          // Continue monitoring
-          setTimeout(checkStatus, 5000);
+          // Continue monitoring for up to 5 minutes
+          const orderAge = Date.now() - parseInt(orderId.substring(0, 13));
+          if (orderAge < 300000) { // 5 minutes
+            setTimeout(checkStatus, 5000);
+          } else {
+            loggingService.logEvent('TRADE', `Order monitoring timeout for ${orderId}`);
+          }
         }
       } catch (error) {
         console.error('Error checking order status:', error);
-        loggingService.logError(`Failed to check order status: ${orderId}`);
+        loggingService.logError(`Failed to check order status: ${orderId}`, {
+          error: error instanceof Error ? error.message : 'unknown'
+        });
       }
     };
 
@@ -109,7 +168,9 @@ class RealTradingService {
 
   async getOpenOrders(): Promise<OrderResponse[]> {
     if (!this.apiKeys) {
-      throw new Error('API keys not configured');
+      const error = new Error('API keys not configured');
+      loggingService.logError('Failed to get open orders - no API keys');
+      throw error;
     }
 
     try {
@@ -118,13 +179,18 @@ class RealTradingService {
       return orders || [];
     } catch (error) {
       console.error('Error fetching open orders:', error);
+      loggingService.logError('Failed to fetch open orders', {
+        error: error instanceof Error ? error.message : 'unknown'
+      });
       return [];
     }
   }
 
   async cancelOrder(orderId: string): Promise<boolean> {
     if (!this.apiKeys) {
-      throw new Error('API keys not configured');
+      const error = new Error('API keys not configured');
+      loggingService.logError('Failed to cancel order - no API keys');
+      throw error;
     }
 
     try {
@@ -134,9 +200,33 @@ class RealTradingService {
       return true;
     } catch (error) {
       console.error('Error canceling order:', error);
-      loggingService.logError(`Failed to cancel order: ${orderId}`);
+      loggingService.logError(`Failed to cancel order: ${orderId}`, {
+        error: error instanceof Error ? error.message : 'unknown'
+      });
       return false;
     }
+  }
+
+  // Public method to validate configuration
+  validateConfiguration(): { valid: boolean; errors: string[] } {
+    const errors: string[] = [];
+    
+    if (!this.apiKeys) {
+      errors.push('API keys not configured');
+    } else {
+      if (!this.apiKeys.kucoin?.key) errors.push('KuCoin API key missing');
+      if (!this.apiKeys.kucoin?.secret) errors.push('KuCoin API secret missing');
+      if (!this.apiKeys.kucoin?.passphrase) errors.push('KuCoin API passphrase missing');
+    }
+    
+    if (!this.riskLimits || typeof this.riskLimits.maxOpenOrders !== 'number') {
+      errors.push('Risk limits not properly configured');
+    }
+    
+    return {
+      valid: errors.length === 0,
+      errors
+    };
   }
 }
 

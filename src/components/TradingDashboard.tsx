@@ -1,8 +1,8 @@
-
 import React, { useState } from 'react';
 import DashboardInitializer from './TradingDashboard/DashboardInitializer';
 import DashboardContent from './TradingDashboard/DashboardContent';
 import { useDashboardStateManager } from './TradingDashboard/DashboardStateManager';
+import RealTradingErrorBoundary from './TradingDashboard/RealTradingErrorBoundary';
 
 const TradingDashboard = () => {
   const [showSettings, setShowSettings] = useState(false);
@@ -56,7 +56,7 @@ const TradingDashboard = () => {
   };
 
   return (
-    <>
+    <RealTradingErrorBoundary tradingMode={userSettings?.tradingMode || 'simulation'}>
       <DashboardInitializer 
         onInitializationComplete={setInitializationComplete}
       />
@@ -96,7 +96,7 @@ const TradingDashboard = () => {
         showSettings={showSettings}
         setShowSettings={setShowSettings}
       />
-    </>
+    </RealTradingErrorBoundary>
   );
 };
 

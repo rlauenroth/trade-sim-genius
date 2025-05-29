@@ -1,3 +1,4 @@
+
 import { useCallback, useEffect } from 'react';
 import { Signal } from '@/types/simulation';
 import { useSimulationState } from './useSimulationState';
@@ -8,7 +9,7 @@ import { useSimulationActions } from './useSimulationActions';
 import { useSignalProcessor } from './useSignalProcessor';
 import { useSimulationTimers } from './useSimulationTimers';
 import { useExitScreening } from './useExitScreening';
-import { useCircuitBreaker } from './useCircuitBreaker';
+import { useCircuitBreakerOptimized } from './useCircuitBreakerOptimized';
 import { usePerformanceMonitoring } from './usePerformanceMonitoring';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useAppState } from './useAppState';
@@ -42,29 +43,15 @@ export const useSimulation = () => {
   const { processSignal, acceptSignal: acceptSignalAction, ignoreSignal: ignoreSignalAction } = useSignalProcessor();
   const { aiGenerationTimer, setAiGenerationTimer, updateTimerInterval, clearTimer } = useSimulationTimers();
   
-  // New integrated modules
+  // New integrated modules with optimized circuit breaker
   const { startExitScreening, stopExitScreening } = useExitScreening();
-  const { enforceRiskLimits, getPortfolioHealthStatus } = useCircuitBreaker();
+  const { enforceRiskLimitsOptimized, getPortfolioHealthStatus, liquidateAllPositions } = useCircuitBreakerOptimized();
   const { trackApiCall, trackSimulationCycle, logPerformanceReport } = usePerformanceMonitoring();
 
-  // Enhanced signal processing with circuit breaker
+  // Enhanced signal processing with optimized circuit breaker (only force check after trades)
   const handleProcessSignal = useCallback(async (signal: Signal) => {
     const cycleStartTime = Date.now();
     const portfolioValueBefore = simulationState?.currentPortfolioValue || 0;
-
-    // Check risk limits before processing signal
-    if (simulationState && userSettings.tradingStrategy) {
-      const riskLimitReached = enforceRiskLimits(
-        simulationState,
-        userSettings.tradingStrategy,
-        pauseSimulationState,
-        addLogEntry
-      );
-      
-      if (riskLimitReached) {
-        return; // Stop processing if risk limits are breached
-      }
-    }
 
     await processSignal(
       signal,
@@ -77,11 +64,29 @@ export const useSimulation = () => {
       addLogEntry
     );
 
+    // Only check risk limits AFTER trade execution (force check)
+    if (simulationState && userSettings.tradingStrategy) {
+      const riskLimitReached = enforceRiskLimitsOptimized(
+        simulationState,
+        userSettings.tradingStrategy,
+        () => {
+          // Enhanced pause with position liquidation on drawdown breach
+          if (simulationState) {
+            const liquidatedState = liquidateAllPositions(simulationState, addLogEntry);
+            updateSimulationState(liquidatedState);
+          }
+          pauseSimulationState();
+        },
+        addLogEntry,
+        true // Force check after trade
+      );
+    }
+
     // Track simulation cycle performance
     const cycleEndTime = Date.now();
     const portfolioValueAfter = simulationState?.currentPortfolioValue || portfolioValueBefore;
     trackSimulationCycle(cycleStartTime, cycleEndTime, portfolioValueBefore, portfolioValueAfter);
-  }, [processSignal, userSettings, isSimulationActive, simulationState, setCurrentSignal, executeAutoTrade, updateSimulationState, addLogEntry, enforceRiskLimits, pauseSimulationState, trackSimulationCycle]);
+  }, [processSignal, userSettings, isSimulationActive, simulationState, setCurrentSignal, executeAutoTrade, updateSimulationState, addLogEntry, enforceRiskLimitsOptimized, pauseSimulationState, trackSimulationCycle, liquidateAllPositions]);
 
   // Enhanced start simulation with exit screening
   const startSimulation = useCallback(async (portfolioData: any) => {
@@ -108,10 +113,10 @@ export const useSimulation = () => {
       }
     }
 
-    addLogEntry('SIM', '🔄 Exit-Screening und Risk-Management aktiviert');
+    addLogEntry('SIM', '🔄 Exit-Screening und optimiertes Risk-Management aktiviert');
   }, [startSimulationAction, userSettings, initializeSimulation, startAISignalGeneration, addLogEntry, updateSimulationState, startExitScreening, apiKeys]);
 
-  // Update timer interval - centralized timer management
+  // Update timer interval - centralized timer management (REMOVED excessive risk checks)
   useEffect(() => {
     console.log('🔄 Timer update effect triggered:', { isSimulationActive, simulationState: simulationState?.isActive });
     updateTimerInterval(
@@ -186,7 +191,7 @@ export const useSimulation = () => {
     ignoreSignalAction(signal, addLogEntry, setCurrentSignal);
   }, [ignoreSignalAction, addLogEntry, setCurrentSignal]);
 
-  // Get portfolio health status
+  // Get portfolio health status (optimized - no frequent calls)
   const portfolioHealthStatus = simulationState && userSettings.tradingStrategy 
     ? getPortfolioHealthStatus(simulationState, userSettings.tradingStrategy)
     : 'HEALTHY';
