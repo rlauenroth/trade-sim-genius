@@ -18,7 +18,8 @@ export class MarketScreeningService {
     loggingService.logEvent('AI', 'Starting comprehensive market screening', {
       topX: AI_SIGNAL_CONFIG.SCREENING_TOP_X,
       minVolume: AI_SIGNAL_CONFIG.SCREENING_MIN_VOLUME,
-      strategy: this.params.strategy
+      strategy: this.params.strategy,
+      selectedModel: this.params.selectedModelId
     });
     
     try {
@@ -51,12 +52,13 @@ export class MarketScreeningService {
         low_24h: parseFloat(ticker.low)
       }));
       
-      // Send to AI for screening
-      const screeningPrompt = createScreeningPrompt(this.params.strategy, marketData);
+      // Send to AI for screening - now with selectedModelId
+      const screeningPrompt = createScreeningPrompt(this.params.selectedModelId, this.params.strategy, marketData);
       
       loggingService.logEvent('AI', 'Sending screening request to OpenRouter', {
         pairsToAnalyze: marketData.length,
-        strategy: this.params.strategy
+        strategy: this.params.strategy,
+        selectedModel: this.params.selectedModelId
       });
       
       const aiResponse = await sendAIRequest(

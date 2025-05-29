@@ -31,7 +31,8 @@ export class SignalAnalysisService {
     loggingService.logEvent('AI', 'Starting detailed signal analysis', {
       assetPair,
       strategy: this.params.strategy,
-      category: getAssetCategory(assetPair)
+      category: getAssetCategory(assetPair),
+      selectedModel: this.params.selectedModelId
     });
     
     try {
@@ -101,8 +102,9 @@ export class SignalAnalysisService {
         strategy: this.params.strategy
       };
       
-      // Generate analysis prompt
+      // Generate analysis prompt - now with selectedModelId as first parameter
       const analysisPrompt = createAnalysisPrompt(
+        this.params.selectedModelId,
         this.params.strategy,
         assetPair,
         marketData,
@@ -114,7 +116,8 @@ export class SignalAnalysisService {
         assetPair,
         currentPrice,
         portfolioValue: this.params.simulatedPortfolioValue,
-        availableUSDT: this.params.availableUSDT
+        availableUSDT: this.params.availableUSDT,
+        selectedModel: this.params.selectedModelId
       });
       
       // Send to AI for detailed analysis

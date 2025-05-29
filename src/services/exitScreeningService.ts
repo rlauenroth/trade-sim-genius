@@ -3,6 +3,7 @@ import { Position } from '@/types/simulation';
 import { AISignalService } from '@/services/aiSignal';
 import { loggingService } from '@/services/loggingService';
 import { ApiKeys } from '@/types/appState';
+import { useSettingsV2Store } from '@/stores/settingsV2';
 
 export class ExitScreeningService {
   async analyzePositionForExit(
@@ -18,6 +19,10 @@ export class ExitScreeningService {
         currentPnL: position.unrealizedPnL
       });
 
+      // Get the selected model from settings
+      const { settings } = useSettingsV2Store.getState();
+      const selectedModelId = settings.model.id;
+
       const aiService = new AISignalService({
         kucoinCredentials: {
           kucoinApiKey: apiKeys.kucoin.key,
@@ -27,7 +32,8 @@ export class ExitScreeningService {
         openRouterApiKey: apiKeys.openRouter,
         strategy,
         simulatedPortfolioValue: 1000,
-        availableUSDT: 0
+        availableUSDT: 0,
+        selectedModelId: selectedModelId // Add the required selectedModelId
       });
 
       const signal = await aiService.generateDetailedSignal(position.assetPair);
