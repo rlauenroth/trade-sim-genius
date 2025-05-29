@@ -6,7 +6,7 @@ import { createUpdateActions } from './updateActions';
 import { createVerificationActions } from './verificationActions';
 import { createSaveActions } from './saveActions';
 
-export { SettingsV2Actions } from './actionTypes';
+export type { SettingsV2Actions } from './actionTypes';
 
 export const createSettingsV2Actions = (
   get: GetState,
