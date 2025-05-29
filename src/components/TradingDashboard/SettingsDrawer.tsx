@@ -1,604 +1,272 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerClose,
-  DrawerFooter,
-} from '@/components/ui/drawer';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import React from 'react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Settings, Wifi, Copy, X, Key, Bot, Shield, Palette, AlertTriangle, DollarSign } from 'lucide-react';
-import { KUCOIN_PROXY_BASE } from '@/config';
-import { useProxyConnection } from '@/hooks/useProxyConnection';
-import { useSettingsStore } from '@/stores/settingsStore';
-import { modelOptions } from '@/config/modelOptions';
-import { ApiKeys, UserSettings } from '@/types/appState';
+import { AlertTriangle, Settings, CheckCircle, XCircle } from 'lucide-react';
+import { RealTradingWarningModal } from '@/components/ui/real-trading';
 import { toast } from '@/hooks/use-toast';
-import { RealTradingWarningModal } from '@/components/ui/real-trading-modals';
-import TradingModeIndicator from './TradingModeIndicator';
+import { UserSettings } from '@/types/appState';
 
 interface SettingsDrawerProps {
   isOpen: boolean;
   onClose: () => void;
+  userSettings: UserSettings;
+  onSaveSettings: (settings: Partial<UserSettings>) => Promise<boolean>;
 }
 
-const SettingsDrawer = ({ isOpen, onClose }: SettingsDrawerProps) => {
-  const { isTestingProxy, proxyStatus, testConnection } = useProxyConnection();
-  const { 
-    apiKeys, 
-    userSettings, 
-    riskLimits,
-    saveApiKeys, 
-    saveSettings,
-    saveRiskLimits,
-    clearApiKeys,
-    validateApiKeys,
-    validateSettings,
-    enableRealMode,
-    disableRealMode
-  } = useSettingsStore();
+const SettingsDrawer = ({ isOpen, onClose, userSettings, onSaveSettings }: SettingsDrawerProps) => {
+  const [apiKey, setApiKey] = React.useState(userSettings?.openRouterApiKey || '');
+  const [proxyUrl, setProxyUrl] = React.useState(userSettings?.proxyUrl || '');
+  const [selectedAiModelId, setSelectedAiModelId] = React.useState(userSettings?.selectedAiModelId || 'anthropic/claude-3-opus');
+  const [tradingStrategy, setTradingStrategy] = React.useState(userSettings?.tradingStrategy || 'balanced');
+  const [isRealTradingEnabled, setIsRealTradingEnabled] = React.useState(userSettings?.isRealTradingEnabled || false);
+  const [maxConcurrentTrades, setMaxConcurrentTrades] = React.useState(userSettings?.maxConcurrentTrades || 3);
+  const [tradeAllBalance, setTradeAllBalance] = React.useState(userSettings?.tradeAllBalance || false);
+  const [maxUsdPerTrade, setMaxUsdPerTrade] = React.useState(userSettings?.maxUsdPerTrade || 100);
+  const [isRealTradingWarningOpen, setIsRealTradingWarningOpen] = React.useState(false);
 
-  // Modal states
-  const [showRealTradingWarning, setShowRealTradingWarning] = useState(false);
+  const handleSaveSettings = async () => {
+    const settingsToSave: Partial<UserSettings> = {
+      openRouterApiKey: apiKey,
+      proxyUrl,
+      selectedAiModelId,
+      tradingStrategy,
+      isRealTradingEnabled,
+      maxConcurrentTrades,
+      tradeAllBalance,
+      maxUsdPerTrade
+    };
 
-  // Create safe default values for form data
-  const createDefaultApiKeys = (): ApiKeys => ({
-    kucoin: { key: '', secret: '', passphrase: '' },
-    openRouter: ''
-  });
-
-  // Initialize form data with safe defaults
-  const [formData, setFormData] = useState({
-    apiKeys: createDefaultApiKeys(),
-    settings: userSettings,
-    riskLimits
-  });
-
-  const [validationErrors, setValidationErrors] = useState<{
-    apiKeys: string[];
-    settings: string[];
-  }>({
-    apiKeys: [],
-    settings: []
-  });
-
-  // Update form when store changes
-  useEffect(() => {
-    console.log('SettingsDrawer: Store data changed', { apiKeys, userSettings });
-    setFormData({
-      apiKeys: apiKeys || createDefaultApiKeys(),
-      settings: userSettings,
-      riskLimits
-    });
-  }, [apiKeys, userSettings, riskLimits]);
-
-  const copyProxyUrl = () => {
-    navigator.clipboard.writeText(KUCOIN_PROXY_BASE);
-    toast({
-      title: "URL kopiert",
-      description: "Proxy-URL wurde in die Zwischenablage kopiert.",
-    });
-  };
-
-  const getStatusBadge = () => {
-    switch (proxyStatus) {
-      case 'connected':
-        return <Badge className="bg-green-600 text-white">Verbunden</Badge>;
-      case 'failed':
-        return <Badge className="bg-red-600 text-white">Fehler</Badge>;
-      default:
-        return <Badge className="bg-gray-600 text-white">Unbekannt</Badge>;
-    }
-  };
-
-  const handleApiKeysChange = (field: string, value: string) => {
-    if (field.startsWith('kucoin.')) {
-      const kucoinField = field.split('.')[1];
-      setFormData(prev => ({
-        ...prev,
-        apiKeys: {
-          ...prev.apiKeys,
-          kucoin: {
-            ...prev.apiKeys.kucoin,
-            [kucoinField]: value
-          }
-        }
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        apiKeys: {
-          ...prev.apiKeys,
-          [field]: value
-        }
-      }));
-    }
-  };
-
-  const handleSettingsChange = (field: keyof UserSettings, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      settings: {
-        ...prev.settings,
-        [field]: value
-      }
-    }));
-  };
-
-  const handleRiskLimitsChange = (field: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      riskLimits: {
-        ...prev.riskLimits,
-        [field]: value
-      }
-    }));
-  };
-
-  const handleTradingModeToggle = (enabled: boolean) => {
-    if (enabled) {
-      // Show warning modal before enabling real mode
-      setShowRealTradingWarning(true);
-    } else {
-      // Directly disable real mode
-      handleSettingsChange('tradingMode', 'simulation');
-    }
-  };
-
-  const handleRealModeConfirm = async () => {
-    const success = await enableRealMode();
+    const success = await onSaveSettings(settingsToSave);
     if (success) {
-      setFormData(prev => ({
-        ...prev,
-        settings: {
-          ...prev.settings,
-          tradingMode: 'real'
-        }
-      }));
+      onClose();
     }
   };
 
-  const handleSave = async () => {
-    // Validate both API keys and settings
-    const apiKeyErrors = validateApiKeys(formData.apiKeys);
-    const settingsErrors = validateSettings(formData.settings);
-    
-    setValidationErrors({
-      apiKeys: apiKeyErrors,
-      settings: settingsErrors
-    });
-
-    if (apiKeyErrors.length > 0 || settingsErrors.length > 0) {
-      return;
+  const handleRealTradingToggle = () => {
+    if (!isRealTradingEnabled) {
+      setIsRealTradingWarningOpen(true);
+    } else {
+      setIsRealTradingEnabled(false);
     }
-
-    // Save API keys if they have values
-    const hasApiKeys = formData.apiKeys.kucoin.key || formData.apiKeys.openRouter;
-    if (hasApiKeys) {
-      const apiKeysSaved = await saveApiKeys(formData.apiKeys);
-      if (!apiKeysSaved) return;
-    }
-
-    // Save settings
-    const settingsSaved = await saveSettings(formData.settings);
-    if (!settingsSaved) return;
-
-    // Save risk limits
-    await saveRiskLimits(formData.riskLimits);
-
-    // Close drawer on success
-    onClose();
   };
 
-  const handleClearApiKeys = () => {
-    clearApiKeys();
-    setFormData(prev => ({
-      ...prev,
-      apiKeys: createDefaultApiKeys(),
-      settings: {
-        ...prev.settings,
-        tradingMode: 'simulation'
-      }
-    }));
+  const confirmRealTrading = () => {
+    setIsRealTradingEnabled(true);
+    setIsRealTradingWarningOpen(false);
   };
 
   return (
-    <>
-      <Drawer open={isOpen} onOpenChange={onClose}>
-        <DrawerContent className="bg-slate-800 border-slate-700 max-h-[90vh]">
-          <DrawerHeader>
-            <DrawerTitle className="text-white flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Settings className="h-5 w-5" />
-                <span>Einstellungen</span>
-              </div>
-              <TradingModeIndicator mode={formData.settings.tradingMode} />
-            </DrawerTitle>
-            <DrawerClose className="absolute right-4 top-4">
-              <Button variant="ghost" size="sm">
-                <X className="h-4 w-4" />
-              </Button>
-            </DrawerClose>
-          </DrawerHeader>
+    <Sheet open={isOpen} onOpenChange={onClose}>
+      <SheetContent side="right" className="bg-slate-900 border-slate-700 text-white w-[600px]">
+        <SheetHeader className="pb-6">
+          <SheetTitle className="flex items-center space-x-2 text-xl">
+            <Settings className="h-6 w-6" />
+            <span>Einstellungen</span>
+          </SheetTitle>
+        </SheetHeader>
 
-          <div className="px-4 pb-4 space-y-6 overflow-y-auto">
-            {/* Trading Mode Section */}
-            <Card className="bg-slate-700 border-slate-600">
-              <CardHeader>
-                <CardTitle className="text-white text-lg flex items-center space-x-2">
-                  <AlertTriangle className="h-5 w-5" />
-                  <span>Trading-Modus</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
+        <div className="space-y-4">
+          {/* OpenRouter API Key */}
+          <Card>
+            <CardHeader>
+              <CardTitle>OpenRouter API Key</CardTitle>
+              <CardDescription>
+                Geben Sie Ihren OpenRouter API-Schlüssel ein, um die KI-Funktionen zu aktivieren.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4">
+                <div className="flex flex-col space-y-1.5">
+                  <Label htmlFor="api-key">API Key</Label>
+                  <Input id="api-key" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-..." />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Proxy URL */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Proxy URL</CardTitle>
+              <CardDescription>
+                Geben Sie Ihre Proxy-URL ein, um die Verbindung zu KuCoin herzustellen.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4">
+                <div className="flex flex-col space-y-1.5">
+                  <Label htmlFor="proxy-url">Proxy URL</Label>
+                  <Input id="proxy-url" value={proxyUrl} onChange={(e) => setProxyUrl(e.target.value)} placeholder="https://..." />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* AI Model Selection */}
+          <Card>
+            <CardHeader>
+              <CardTitle>KI Modell</CardTitle>
+              <CardDescription>
+                Wählen Sie das KI-Modell aus, das für die Analyse verwendet werden soll.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4">
+                <div className="flex flex-col space-y-1.5">
+                  <Label htmlFor="ai-model">KI Modell</Label>
+                  <Select value={selectedAiModelId} onValueChange={setSelectedAiModelId}>
+                    <SelectTrigger id="ai-model">
+                      <SelectValue placeholder="Wähle ein KI Modell" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="anthropic/claude-3-opus">Claude 3 Opus</SelectItem>
+                      <SelectItem value="anthropic/claude-3-sonnet">Claude 3 Sonnet</SelectItem>
+                      <SelectItem value="google/gemini-1.5-pro-latest">Gemini 1.5 Pro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Trading Strategy Selection */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Trading Strategie</CardTitle>
+              <CardDescription>
+                Wählen Sie die Trading-Strategie aus, die für die Simulation verwendet werden soll.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4">
+                <div className="flex flex-col space-y-1.5">
+                  <Label htmlFor="trading-strategy">Trading Strategie</Label>
+                  <Select value={tradingStrategy} onValueChange={setTradingStrategy}>
+                    <SelectTrigger id="trading-strategy">
+                      <SelectValue placeholder="Wähle eine Strategie" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="conservative">Konservativ</SelectItem>
+                      <SelectItem value="balanced">Ausgewogen</SelectItem>
+                      <SelectItem value="aggressive">Aggressiv</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Real Trading Mode */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                Real Trading Modus
+                {isRealTradingEnabled && (
+                  <Badge variant="destructive" className="ml-2">
+                    <AlertTriangle className="h-4 w-4 mr-1" />
+                    Aktiviert
+                  </Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                Aktiviere den Real Trading Modus, um mit echtem Geld zu handeln.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4">
                 <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Label className="text-slate-300 font-medium">Echter Handel</Label>
-                    <div className="text-sm text-slate-400">
-                      Aktiviert echte Trades mit echtem Kapital
-                    </div>
-                  </div>
-                  <Switch
-                    checked={formData.settings.tradingMode === 'real'}
-                    onCheckedChange={handleTradingModeToggle}
-                  />
-                </div>
-                
-                {formData.settings.tradingMode === 'real' && (
-                  <div className="bg-red-900/50 border border-red-600 p-3 rounded">
-                    <div className="text-red-200 text-sm space-y-1">
-                      <div className="font-semibold">⚠️ WARNUNG: Real-Trading aktiv</div>
-                      <div>Alle Trades werden mit echtem Kapital ausgeführt!</div>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Risk Limits Section - only show in real mode */}
-            {formData.settings.tradingMode === 'real' && (
-              <Card className="bg-slate-700 border-slate-600">
-                <CardHeader>
-                  <CardTitle className="text-white text-lg flex items-center space-x-2">
-                    <Shield className="h-5 w-5" />
-                    <span>Risiko-Limits</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label className="text-slate-300">Max. offene Orders</Label>
-                    <Input
-                      type="number"
-                      value={formData.riskLimits.maxOpenOrders}
-                      onChange={(e) => handleRiskLimitsChange('maxOpenOrders', parseInt(e.target.value))}
-                      className="bg-slate-800 border-slate-600 text-slate-200 mt-1"
-                      min="1"
-                      max="20"
-                    />
-                  </div>
-
-                  <div>
-                    <Label className="text-slate-300">Max. Exposure (USD)</Label>
-                    <Input
-                      type="number"
-                      value={formData.riskLimits.maxExposure}
-                      onChange={(e) => handleRiskLimitsChange('maxExposure', parseFloat(e.target.value))}
-                      className="bg-slate-800 border-slate-600 text-slate-200 mt-1"
-                      min="100"
-                      step="100"
-                    />
-                  </div>
-
-                  <div>
-                    <Label className="text-slate-300">Min. USDT-Saldo</Label>
-                    <Input
-                      type="number"
-                      value={formData.riskLimits.minBalance}
-                      onChange={(e) => handleRiskLimitsChange('minBalance', parseFloat(e.target.value))}
-                      className="bg-slate-800 border-slate-600 text-slate-200 mt-1"
-                      min="10"
-                      step="10"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <Label className="text-slate-300">Trade-Bestätigung erforderlich</Label>
-                      <div className="text-sm text-slate-400">
-                        Manuelle Bestätigung vor jedem Trade
-                      </div>
-                    </div>
-                    <Switch
-                      checked={formData.riskLimits.requireConfirmation}
-                      onCheckedChange={(checked) => handleRiskLimitsChange('requireConfirmation', checked)}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* API Keys Section */}
-            <Card className="bg-slate-700 border-slate-600">
-              <CardHeader>
-                <CardTitle className="text-white text-lg flex items-center space-x-2">
-                  <Key className="h-5 w-5" />
-                  <span>API-Schlüssel</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* KuCoin API Keys */}
-                <div className="space-y-3">
-                  <Label className="text-slate-300 font-medium">KuCoin API</Label>
-                  <div>
-                    <Label className="text-slate-400 text-sm">API Key</Label>
-                    <Input
-                      value={formData.apiKeys?.kucoin?.key || ''}
-                      onChange={(e) => handleApiKeysChange('kucoin.key', e.target.value)}
-                      placeholder="KuCoin API Key eingeben..."
-                      className="bg-slate-800 border-slate-600 text-slate-200"
-                      type="password"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-slate-400 text-sm">API Secret</Label>
-                    <Input
-                      value={formData.apiKeys?.kucoin?.secret || ''}
-                      onChange={(e) => handleApiKeysChange('kucoin.secret', e.target.value)}
-                      placeholder="KuCoin API Secret eingeben..."
-                      className="bg-slate-800 border-slate-600 text-slate-200"
-                      type="password"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-slate-400 text-sm">Passphrase</Label>
-                    <Input
-                      value={formData.apiKeys?.kucoin?.passphrase || ''}
-                      onChange={(e) => handleApiKeysChange('kucoin.passphrase', e.target.value)}
-                      placeholder="KuCoin Passphrase eingeben..."
-                      className="bg-slate-800 border-slate-600 text-slate-200"
-                      type="password"
-                    />
-                  </div>
-                </div>
-
-                {/* OpenRouter API Key */}
-                <div>
-                  <Label className="text-slate-300 font-medium">OpenRouter API</Label>
-                  <Input
-                    value={formData.apiKeys?.openRouter || ''}
-                    onChange={(e) => handleApiKeysChange('openRouter', e.target.value)}
-                    placeholder="OpenRouter API Key eingeben..."
-                    className="bg-slate-800 border-slate-600 text-slate-200 mt-1"
-                    type="password"
-                  />
-                </div>
-
-                {validationErrors.apiKeys.length > 0 && (
-                  <div className="bg-red-900/50 border border-red-600 p-3 rounded">
-                    <div className="text-red-200 text-sm space-y-1">
-                      {validationErrors.apiKeys.map((error, index) => (
-                        <div key={index}>• {error}</div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex space-x-2">
-                  <Button
-                    onClick={handleClearApiKeys}
-                    variant="outline"
-                    size="sm"
-                    className="border-slate-600 text-slate-300"
-                  >
-                    Alle löschen
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Trading Strategy Section */}
-            <Card className="bg-slate-700 border-slate-600">
-              <CardHeader>
-                <CardTitle className="text-white text-lg flex items-center space-x-2">
-                  <Bot className="h-5 w-5" />
-                  <span>Trading-Strategie</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <RadioGroup
-                  value={formData.settings.tradingStrategy}
-                  onValueChange={(value) => handleSettingsChange('tradingStrategy', value as any)}
-                  className="space-y-3"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="conservative" id="conservative" />
-                    <Label htmlFor="conservative" className="text-slate-300">
-                      Konservativ - Sicherheit steht im Vordergrund
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="balanced" id="balanced" />
-                    <Label htmlFor="balanced" className="text-slate-300">
-                      Ausgewogen - Balance zwischen Risiko und Ertrag
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="aggressive" id="aggressive" />
-                    <Label htmlFor="aggressive" className="text-slate-300">
-                      Aggressiv - Höhere Rendite bei mehr Risiko
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </CardContent>
-            </Card>
-
-            {/* AI Model Section */}
-            <Card className="bg-slate-700 border-slate-600">
-              <CardHeader>
-                <CardTitle className="text-white text-lg flex items-center space-x-2">
-                  <Bot className="h-5 w-5" />
-                  <span>KI-Modell</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Select
-                  value={formData.settings.selectedAiModelId}
-                  onValueChange={(value) => handleSettingsChange('selectedAiModelId', value)}
-                >
-                  <SelectTrigger className="bg-slate-800 border-slate-600 text-slate-200">
-                    <SelectValue placeholder="Modell auswählen..." />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-800 border-slate-600">
-                    {modelOptions.map((model) => (
-                      <SelectItem key={model.id} value={model.id} className="text-slate-200">
-                        <div className="flex flex-col">
-                          <div className="flex items-center space-x-2">
-                            <span>{model.name}</span>
-                            <Badge variant="outline" className="text-xs">
-                              {model.provider}
-                            </Badge>
-                          </div>
-                          <div className="text-xs text-slate-400">
-                            {model.priceHint} • {model.description}
-                          </div>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </CardContent>
-            </Card>
-
-            {/* Network & Proxy Section */}
-            <Card className="bg-slate-700 border-slate-600">
-              <CardHeader>
-                <CardTitle className="text-white text-lg flex items-center space-x-2">
-                  <Wifi className="h-5 w-5" />
-                  <span>Netzwerk & Proxy</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label className="text-slate-300">Proxy-Status</Label>
-                  <div className="flex items-center justify-between mt-1">
-                    {getStatusBadge()}
-                    <Button
-                      onClick={testConnection}
-                      disabled={isTestingProxy}
-                      variant="outline"
-                      size="sm"
-                      className="border-slate-600 text-slate-300"
-                    >
-                      {isTestingProxy ? 'Teste...' : 'Verbindung testen'}
-                    </Button>
-                  </div>
-                </div>
-
-                <div>
-                  <Label className="text-slate-300">Proxy-URL</Label>
-                  <div className="flex items-center space-x-2 mt-1">
-                    <Input
-                      value={formData.settings.proxyUrl}
-                      onChange={(e) => handleSettingsChange('proxyUrl', e.target.value)}
-                      className="bg-slate-800 border-slate-600 text-slate-200 text-sm"
-                    />
-                    <Button
-                      onClick={copyProxyUrl}
-                      variant="outline"
-                      size="sm"
-                      className="border-slate-600 text-slate-300"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="text-xs text-slate-400 mt-1">
-                    Alle KuCoin-API-Aufrufe werden über diesen Proxy geleitet.
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Theme Section */}
-            <Card className="bg-slate-700 border-slate-600">
-              <CardHeader>
-                <CardTitle className="text-white text-lg flex items-center space-x-2">
-                  <Palette className="h-5 w-5" />
-                  <span>Design & Sprache</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label className="text-slate-300">Design</Label>
-                  <Select
-                    value={formData.settings.theme}
-                    onValueChange={(value) => handleSettingsChange('theme', value as any)}
-                  >
-                    <SelectTrigger className="bg-slate-800 border-slate-600 text-slate-200 mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-slate-800 border-slate-600">
-                      <SelectItem value="dark" className="text-slate-200">Dunkel</SelectItem>
-                      <SelectItem value="light" className="text-slate-200">Hell</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label className="text-slate-300">Sprache</Label>
-                  <Select
-                    value={formData.settings.language}
-                    onValueChange={(value) => handleSettingsChange('language', value as any)}
-                  >
-                    <SelectTrigger className="bg-slate-800 border-slate-600 text-slate-200 mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-slate-800 border-slate-600">
-                      <SelectItem value="de" className="text-slate-200">Deutsch</SelectItem>
-                      <SelectItem value="en" className="text-slate-200">English</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
-
-            {validationErrors.settings.length > 0 && (
-              <div className="bg-red-900/50 border border-red-600 p-3 rounded">
-                <div className="text-red-200 text-sm space-y-1">
-                  {validationErrors.settings.map((error, index) => (
-                    <div key={index}>• {error}</div>
-                  ))}
+                  <Label htmlFor="real-trading">Real Trading aktivieren</Label>
+                  <Switch id="real-trading" checked={isRealTradingEnabled} onCheckedChange={handleRealTradingToggle} />
                 </div>
               </div>
-            )}
-          </div>
+            </CardContent>
+          </Card>
 
-          <DrawerFooter>
-            <div className="flex space-x-2">
-              <Button onClick={onClose} variant="outline" className="flex-1">
-                Abbrechen
-              </Button>
-              <Button onClick={handleSave} className="flex-1">
-                Speichern & Schließen
-              </Button>
-            </div>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
+          {/* Max Concurrent Trades */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Maximale Anzahl gleichzeitiger Trades</CardTitle>
+              <CardDescription>
+                Geben Sie die maximale Anzahl gleichzeitiger Trades ein.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4">
+                <div className="flex flex-col space-y-1.5">
+                  <Label htmlFor="max-concurrent-trades">Maximale Anzahl</Label>
+                  <Input
+                    id="max-concurrent-trades"
+                    type="number"
+                    value={maxConcurrentTrades}
+                    onChange={(e) => setMaxConcurrentTrades(parseInt(e.target.value))}
+                    placeholder="3"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-      <RealTradingWarningModal
-        isOpen={showRealTradingWarning}
-        onClose={() => setShowRealTradingWarning(false)}
-        onConfirm={handleRealModeConfirm}
-      />
-    </>
+          {/* Trade All Balance */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Gesamtes Guthaben für jeden Trade verwenden</CardTitle>
+              <CardDescription>
+                Aktiviere diese Option, um das gesamte verfügbare Guthaben für jeden Trade zu verwenden.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="trade-all-balance">Gesamtes Guthaben verwenden</Label>
+                  <Switch id="trade-all-balance" checked={tradeAllBalance} onCheckedChange={() => setTradeAllBalance(!tradeAllBalance)} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Max USD per Trade */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Maximaler USD-Betrag pro Trade</CardTitle>
+              <CardDescription>
+                Geben Sie den maximalen USD-Betrag ein, der pro Trade verwendet werden soll.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4">
+                <div className="flex flex-col space-y-1.5">
+                  <Label htmlFor="max-usd-per-trade">Maximaler Betrag</Label>
+                  <Input
+                    id="max-usd-per-trade"
+                    type="number"
+                    value={maxUsdPerTrade}
+                    onChange={(e) => setMaxUsdPerTrade(parseInt(e.target.value))}
+                    placeholder="100"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Button onClick={handleSaveSettings} className="w-full bg-blue-600 hover:bg-blue-700 text-white mt-6">
+          Einstellungen speichern
+        </Button>
+
+        <RealTradingWarningModal
+          isOpen={isRealTradingWarningOpen}
+          onClose={() => setIsRealTradingWarningOpen(false)}
+          onConfirm={confirmRealTrading}
+        />
+      </SheetContent>
+    </Sheet>
   );
 };
 

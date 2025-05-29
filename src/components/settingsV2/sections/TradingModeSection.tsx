@@ -1,13 +1,13 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Separator } from '@/components/ui/separator';
-import { AlertTriangle, Shield, DollarSign } from 'lucide-react';
-import { RealTradingWarningModal } from '@/components/ui/real-trading-modals';
+import { Label } from '@/components/ui/label';
+import { AlertTriangle } from 'lucide-react';
+import { RealTradingWarningModal } from '@/components/ui/real-trading';
+import { useSettingsV2Store } from '@/stores/settingsV2';
 
 interface TradingModeSectionProps {
   formData: any;
@@ -15,159 +15,116 @@ interface TradingModeSectionProps {
 }
 
 const TradingModeSection = ({ formData, onFieldChange }: TradingModeSectionProps) => {
-  const [showWarningModal, setShowWarningModal] = useState(false);
-  const [pendingRealMode, setPendingRealMode] = useState(false);
+  const { settings } = useSettingsV2Store();
+  const [isRealTradingModalOpen, setIsRealTradingModalOpen] = useState(false);
 
-  const isRealMode = formData.tradingMode === 'real';
-
-  const handleTradingModeChange = (enabled: boolean) => {
-    if (enabled && !isRealMode) {
-      // Show warning modal before enabling real mode
-      setPendingRealMode(true);
-      setShowWarningModal(true);
+  const handleTradingModeChange = (checked: boolean) => {
+    if (checked) {
+      // Attempt to switch to real trading mode
+      if (localStorage.getItem('kiTradingApp_skipTradeConfirmation') === 'true') {
+        // Skip warning and directly enable real trading
+        onFieldChange('tradingMode', 'real');
+      } else {
+        // Open the real trading warning modal
+        setIsRealTradingModalOpen(true);
+      }
     } else {
-      // Switching to simulation mode - no warning needed
+      // Switch back to simulation mode
       onFieldChange('tradingMode', 'simulation');
     }
   };
 
-  const handleConfirmRealMode = () => {
+  const handleConfirmRealTrading = () => {
     onFieldChange('tradingMode', 'real');
-    setPendingRealMode(false);
+    setIsRealTradingModalOpen(false);
   };
 
-  const handleCancelRealMode = () => {
-    setPendingRealMode(false);
+  const handleCloseRealTradingModal = () => {
+    setIsRealTradingModalOpen(false);
   };
 
   return (
-    <>
-      <Card className="bg-slate-800 border-slate-700">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center space-x-2">
-            <Shield className="h-5 w-5" />
-            <span>Trading Modus</span>
-          </CardTitle>
-          <CardDescription className="text-slate-400">
-            Wählen Sie zwischen Simulation und realem Handel
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Trading Mode Toggle */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <Label className="text-white">Trading Modus</Label>
-              <p className="text-sm text-slate-400">
-                {isRealMode ? 'Echter Handel mit realem Kapital' : 'Simulation ohne echtes Geld'}
-              </p>
-            </div>
-            <div className="flex items-center space-x-3">
-              <span className="text-sm text-slate-400">Simulation</span>
-              <Switch
-                checked={isRealMode}
-                onCheckedChange={handleTradingModeChange}
-                className="data-[state=checked]:bg-red-600"
+    <Card className="bg-slate-800 border-slate-700">
+      <CardHeader>
+        <CardTitle className="text-white">Trading Mode</CardTitle>
+        <CardDescription className="text-slate-400">
+          Wählen Sie den Modus, in dem der Trading-Bot ausgeführt werden soll.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <Label htmlFor="trading-mode" className="text-white">
+              Real-Trading aktivieren
+            </Label>
+            <p className="text-sm text-slate-400">
+              Im Real-Trading-Modus werden Trades mit echtem Kapital ausgeführt.
+            </p>
+            {settings.tradingMode === 'real' && (
+              <Badge variant="destructive" className="mt-2">
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                Real-Trading aktiv
+              </Badge>
+            )}
+          </div>
+          <Switch
+            id="trading-mode"
+            checked={settings.tradingMode === 'real'}
+            onCheckedChange={handleTradingModeChange}
+          />
+        </div>
+
+        {/* Risk Limits */}
+        <div className="space-y-2">
+          <h4 className="text-white font-semibold">Risiko-Limits</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="max-open-orders" className="text-slate-300">
+                Max. offene Orders
+              </Label>
+              <Input
+                type="number"
+                id="max-open-orders"
+                value={formData.riskLimits?.maxOpenOrders || settings.riskLimits.maxOpenOrders}
+                onChange={(e) => onFieldChange('riskLimits', { ...formData.riskLimits, maxOpenOrders: parseInt(e.target.value) })}
+                className="bg-slate-700 border-slate-600 text-white"
               />
-              <span className="text-sm text-slate-400">Real</span>
+            </div>
+            <div>
+              <Label htmlFor="max-exposure" className="text-slate-300">
+                Max. Exposure (USD)
+              </Label>
+              <Input
+                type="number"
+                id="max-exposure"
+                value={formData.riskLimits?.maxExposure || settings.riskLimits.maxExposure}
+                onChange={(e) => onFieldChange('riskLimits', { ...formData.riskLimits, maxExposure: parseInt(e.target.value) })}
+                className="bg-slate-700 border-slate-600 text-white"
+              />
+            </div>
+            <div>
+              <Label htmlFor="min-balance" className="text-slate-300">
+                Min. Balance (USD)
+              </Label>
+              <Input
+                type="number"
+                id="min-balance"
+                value={formData.riskLimits?.minBalance || settings.riskLimits.minBalance}
+                onChange={(e) => onFieldChange('riskLimits', { ...formData.riskLimits, minBalance: parseInt(e.target.value) })}
+                className="bg-slate-700 border-slate-600 text-white"
+              />
             </div>
           </div>
+        </div>
 
-          {/* Current Mode Alert */}
-          <Alert className={isRealMode ? "bg-red-900/50 border-red-600" : "bg-green-900/50 border-green-600"}>
-            {isRealMode ? <AlertTriangle className="h-4 w-4" /> : <Shield className="h-4 w-4" />}
-            <AlertDescription className={isRealMode ? "text-red-200" : "text-green-200"}>
-              <strong>Aktuell aktiv:</strong> {isRealMode ? 'Real-Trading Modus' : 'Simulations-Modus'}
-              {isRealMode && ' - Alle Trades werden mit echtem Kapital ausgeführt!'}
-            </AlertDescription>
-          </Alert>
-
-          {/* Risk Limits (only show in real mode) */}
-          {isRealMode && (
-            <>
-              <Separator className="bg-slate-600" />
-              
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <DollarSign className="h-4 w-4 text-yellow-400" />
-                  <Label className="text-white">Risiko-Limits</Label>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-sm text-slate-300">Max. offene Orders</Label>
-                    <Input
-                      type="number"
-                      value={formData.riskLimits?.maxOpenOrders || 5}
-                      onChange={(e) => onFieldChange('riskLimits', {
-                        ...formData.riskLimits,
-                        maxOpenOrders: parseInt(e.target.value) || 5
-                      })}
-                      className="bg-slate-700 border-slate-600 text-white"
-                      min="1"
-                      max="20"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-sm text-slate-300">Max. Exposure (USD)</Label>
-                    <Input
-                      type="number"
-                      value={formData.riskLimits?.maxExposure || 1000}
-                      onChange={(e) => onFieldChange('riskLimits', {
-                        ...formData.riskLimits,
-                        maxExposure: parseInt(e.target.value) || 1000
-                      })}
-                      className="bg-slate-700 border-slate-600 text-white"
-                      min="100"
-                      step="100"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-sm text-slate-300">Min. Balance (USDT)</Label>
-                    <Input
-                      type="number"
-                      value={formData.riskLimits?.minBalance || 50}
-                      onChange={(e) => onFieldChange('riskLimits', {
-                        ...formData.riskLimits,
-                        minBalance: parseInt(e.target.value) || 50
-                      })}
-                      className="bg-slate-700 border-slate-600 text-white"
-                      min="10"
-                      step="10"
-                    />
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      checked={formData.riskLimits?.requireConfirmation !== false}
-                      onCheckedChange={(checked) => onFieldChange('riskLimits', {
-                        ...formData.riskLimits,
-                        requireConfirmation: checked
-                      })}
-                    />
-                    <Label className="text-sm text-slate-300">Trade-Bestätigung erforderlich</Label>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Warning Modal */}
-      <RealTradingWarningModal
-        isOpen={showWarningModal}
-        onClose={() => {
-          setShowWarningModal(false);
-          handleCancelRealMode();
-        }}
-        onConfirm={() => {
-          setShowWarningModal(false);
-          handleConfirmRealMode();
-        }}
-      />
-    </>
+        {/* Real Trading Warning Modal */}
+        <RealTradingWarningModal
+          isOpen={isRealTradingModalOpen}
+          onClose={handleCloseRealTradingModal}
+          onConfirm={handleConfirmRealTrading}
+        />
+      </CardContent>
+    </Card>
   );
 };
 
