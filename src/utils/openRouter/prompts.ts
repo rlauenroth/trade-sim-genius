@@ -1,10 +1,10 @@
 
 // OpenRouter prompt generation functions
 import { OpenRouterRequest } from '@/types/openRouter';
-import { DEFAULT_MODELS, STRATEGY_CONFIGS } from './config';
 
 // Generate market screening prompt
 export function createScreeningPrompt(
+  modelId: string,
   strategy: string,
   marketData: any[]
 ): OpenRouterRequest {
@@ -15,7 +15,7 @@ export function createScreeningPrompt(
   }[strategy] || 'Ausgewogen';
 
   return {
-    model: DEFAULT_MODELS.screening,
+    model: modelId, // Use the passed model ID instead of hardcoded default
     messages: [
       {
         role: 'system',
@@ -45,16 +45,41 @@ Antwort-Format:
 }
 
 export function createAnalysisPrompt(
+  modelId: string,
   strategy: string,
   assetPair: string,
   marketData: any,
   technicalIndicators: any,
   portfolioData: any
 ): OpenRouterRequest {
-  const strategyDetails = STRATEGY_CONFIGS[strategy as keyof typeof STRATEGY_CONFIGS] || STRATEGY_CONFIGS.balanced;
+  const strategyDetails = {
+    conservative: {
+      description: 'Konservativ: Kapitalerhalt, geringes Risiko, klare Trends, enge Stops',
+      targetPercent: '1-2%',
+      stopPercent: '0.5-1%',
+      positionSize: '2%'
+    },
+    balanced: {
+      description: 'Ausgewogen: Balance zwischen Sicherheit und Rendite, moderate Risiken',
+      targetPercent: '2-5%',
+      stopPercent: '1-2%',
+      positionSize: '3-5%'
+    },
+    aggressive: {
+      description: 'Aggressiv: Hohe Rendite-Chancen, höhere Risiken, schnelle Bewegungen',
+      targetPercent: '5-10%',
+      stopPercent: '2-4%',
+      positionSize: '5-8%'
+    }
+  }[strategy] || {
+    description: 'Ausgewogen: Balance zwischen Sicherheit und Rendite, moderate Risiken',
+    targetPercent: '2-5%',
+    stopPercent: '1-2%',
+    positionSize: '3-5%'
+  };
 
   return {
-    model: DEFAULT_MODELS.analysis,
+    model: modelId, // Use the passed model ID instead of hardcoded default
     messages: [
       {
         role: 'system',

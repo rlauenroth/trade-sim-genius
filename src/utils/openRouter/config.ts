@@ -9,10 +9,8 @@ export const API_HEADERS = {
   'X-Title': 'KI Trading Assistant'
 };
 
-export const DEFAULT_MODELS = {
-  screening: 'anthropic/claude-3-haiku',
-  analysis: 'anthropic/claude-3.5-sonnet'
-};
+// Fallback model for error handling only
+export const FALLBACK_MODEL_ID = 'mistralai/mistral-7b-instruct';
 
 export const STRATEGY_CONFIGS = {
   conservative: {

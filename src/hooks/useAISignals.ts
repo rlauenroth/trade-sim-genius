@@ -1,6 +1,7 @@
 
 import { useSignalGeneration } from './ai/useSignalGeneration';
 import { useCandidates } from '@/hooks/useCandidates';
+import { useSettingsV2Store } from '@/stores/settingsV2';
 
 export const useAISignals = () => {
   const {
@@ -12,6 +13,7 @@ export const useAISignals = () => {
   } = useSignalGeneration();
 
   const { candidates } = useCandidates();
+  const { settings } = useSettingsV2Store();
 
   return {
     currentSignal,
@@ -19,6 +21,7 @@ export const useAISignals = () => {
     availableSignals,
     setAvailableSignals,
     startAISignalGeneration: generateSignals,
-    candidates
+    candidates,
+    selectedModelId: settings.model.id // Expose the selected model ID
   };
 };

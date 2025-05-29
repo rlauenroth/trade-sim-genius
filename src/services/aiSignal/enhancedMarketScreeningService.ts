@@ -3,6 +3,7 @@ import { sendAIRequest, createScreeningPrompt } from '@/utils/openRouter';
 import { getMarketTickers } from '@/utils/kucoinApi';
 import { SignalGenerationParams, MarketDataPoint } from '@/types/aiSignal';
 import { AI_SIGNAL_CONFIG } from '@/config/aiSignalConfig';
+import { FALLBACK_MODEL_ID } from '@/utils/openRouter/config';
 import { loggingService } from '@/services/loggingService';
 import { candidateErrorManager } from '@/services/aiErrorHandling/candidateErrorManager';
 import { aiResponseValidator } from '@/services/aiErrorHandling/aiResponseValidator';
@@ -24,7 +25,8 @@ export class EnhancedMarketScreeningService {
       requestId,
       topX: AI_SIGNAL_CONFIG.SCREENING_TOP_X,
       minVolume: AI_SIGNAL_CONFIG.SCREENING_MIN_VOLUME,
-      strategy: this.params.strategy
+      strategy: this.params.strategy,
+      selectedModel: this.params.selectedModelId
     });
     
     try {
@@ -51,7 +53,18 @@ export class EnhancedMarketScreeningService {
       // Try AI screening with retry logic
       for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
         try {
-          const aiResponse = await this.performAIRequest(marketData, attempt, requestId);
+          const modelToUse = attempt === 1 ? this.params.selectedModelId : FALLBACK_MODEL_ID;
+          
+          if (attempt > 1) {
+            loggingService.logEvent('AI', 'Using fallback model for retry', {
+              requestId,
+              attempt,
+              fallbackModel: modelToUse,
+              originalModel: this.params.selectedModelId
+            });
+          }
+          
+          const aiResponse = await this.performAIRequest(marketData, attempt, requestId, modelToUse);
           const validation = aiResponseValidator.validateScreeningResponse(aiResponse, expectedSymbols);
           
           if (validation.isValid) {
@@ -92,7 +105,7 @@ export class EnhancedMarketScreeningService {
     }
   }
 
-  private async performAIRequest(marketData: MarketDataPoint[], attempt: number, requestId: string): Promise<string> {
+  private async performAIRequest(marketData: MarketDataPoint[], attempt: number, requestId: string, modelId: string): Promise<string> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
 
@@ -100,10 +113,11 @@ export class EnhancedMarketScreeningService {
       loggingService.logEvent('AI', `AI screening request attempt ${attempt}`, {
         requestId,
         pairsToAnalyze: marketData.length,
-        timeout: this.timeoutMs
+        timeout: this.timeoutMs,
+        modelId
       });
 
-      const screeningPrompt = createScreeningPrompt(this.params.strategy, marketData);
+      const screeningPrompt = createScreeningPrompt(modelId, this.params.strategy, marketData);
       
       const response = await Promise.race([
         sendAIRequest(this.params.openRouterApiKey, screeningPrompt, 'screening'),

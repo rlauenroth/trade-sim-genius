@@ -1,17 +1,20 @@
-
 import { useCallback } from 'react';
 import { AISignalService } from '@/services/aiSignal';
 import { loggingService } from '@/services/loggingService';
 import { SignalGenerationParams, MarketScreeningResult } from '@/types/aiSignalHooks';
 import { useCandidates } from '@/hooks/useCandidates';
+import { useSettingsV2Store } from '@/stores/settingsV2';
 
 export const useMarketScreening = () => {
   const { addCandidate, updateCandidateStatus } = useCandidates();
+  const { settings } = useSettingsV2Store();
 
   const performScreeningAndAnalysis = useCallback(async (
     params: SignalGenerationParams,
     addLogEntry: (type: any, message: string) => void
   ): Promise<MarketScreeningResult> => {
+    const selectedModelId = settings.model.id;
+    
     const aiService = new AISignalService({
       kucoinCredentials: {
         kucoinApiKey: params.kucoinKeys.key,
@@ -21,7 +24,8 @@ export const useMarketScreening = () => {
       openRouterApiKey: params.openRouterApiKey,
       strategy: params.strategy,
       simulatedPortfolioValue: params.portfolioValue,
-      availableUSDT: params.availableUSDT
+      availableUSDT: params.availableUSDT,
+      selectedModelId: selectedModelId // Pass the selected model ID
     });
 
     // Check if API is properly configured
@@ -95,7 +99,7 @@ export const useMarketScreening = () => {
     }
 
     return { selectedPairs, signals };
-  }, [addCandidate, updateCandidateStatus]);
+  }, [addCandidate, updateCandidateStatus, settings.model.id]);
 
   return { performScreeningAndAnalysis };
 };

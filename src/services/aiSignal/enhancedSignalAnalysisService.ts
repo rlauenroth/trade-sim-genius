@@ -4,6 +4,7 @@ import { getHistoricalCandles, getCurrentPrice } from '@/utils/kucoinApi';
 import { calculateAllIndicators } from '@/utils/technicalIndicators';
 import { SignalGenerationParams, GeneratedSignal, CandleData, DetailedMarketData, PortfolioData } from '@/types/aiSignal';
 import { AI_SIGNAL_CONFIG, getAssetCategory } from '@/config/aiSignalConfig';
+import { FALLBACK_MODEL_ID } from '@/utils/openRouter/config';
 import { loggingService } from '@/services/loggingService';
 import { candidateErrorManager } from '@/services/aiErrorHandling/candidateErrorManager';
 import { aiResponseValidator } from '@/services/aiErrorHandling/aiResponseValidator';
@@ -44,7 +45,8 @@ export class EnhancedSignalAnalysisService {
       assetPair,
       requestId,
       strategy: this.params.strategy,
-      category: getAssetCategory(assetPair)
+      category: getAssetCategory(assetPair),
+      selectedModel: this.params.selectedModelId
     });
     
     try {
@@ -54,7 +56,19 @@ export class EnhancedSignalAnalysisService {
       // Try AI analysis with retry logic
       for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
         try {
-          const aiResponse = await this.performAIRequest(assetPair, candleData, currentPrice, technicalIndicators, attempt, requestId);
+          const modelToUse = attempt === 1 ? this.params.selectedModelId : FALLBACK_MODEL_ID;
+          
+          if (attempt > 1) {
+            loggingService.logEvent('AI', 'Using fallback model for analysis retry', {
+              assetPair,
+              requestId,
+              attempt,
+              fallbackModel: modelToUse,
+              originalModel: this.params.selectedModelId
+            });
+          }
+          
+          const aiResponse = await this.performAIRequest(assetPair, candleData, currentPrice, technicalIndicators, attempt, requestId, modelToUse);
           const validation = aiResponseValidator.validateDetailedSignal(aiResponse, assetPair);
           
           if (validation.isValid) {
@@ -131,7 +145,8 @@ export class EnhancedSignalAnalysisService {
     currentPrice: number,
     technicalIndicators: any,
     attempt: number,
-    requestId: string
+    requestId: string,
+    modelId: string
   ): Promise<string> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
@@ -141,7 +156,8 @@ export class EnhancedSignalAnalysisService {
         assetPair,
         requestId,
         currentPrice,
-        timeout: this.timeoutMs
+        timeout: this.timeoutMs,
+        modelId
       });
 
       const marketData: DetailedMarketData = {
@@ -160,6 +176,7 @@ export class EnhancedSignalAnalysisService {
       };
 
       const analysisPrompt = createAnalysisPrompt(
+        modelId,
         this.params.strategy,
         assetPair,
         marketData,

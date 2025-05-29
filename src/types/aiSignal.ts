@@ -1,4 +1,3 @@
-
 // AI Signal type definitions
 
 export interface KuCoinCredentials {
@@ -13,6 +12,7 @@ export interface SignalGenerationParams {
   strategy: string;
   simulatedPortfolioValue: number;
   availableUSDT: number;
+  selectedModelId: string; // NEW: User-selected model ID
 }
 
 export interface GeneratedSignal {
