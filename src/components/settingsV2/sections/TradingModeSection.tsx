@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -6,10 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Shield } from 'lucide-react';
 import { RealTradingWarningModal } from '@/components/ui/real-trading';
+import { PinSetupModal } from '@/components/ui/pin-setup-modal';
 import { useSettingsV2Store } from '@/stores/settingsV2';
 import { loggingService } from '@/services/loggingService';
+import { pinService } from '@/services/pinService';
 
 interface TradingModeSectionProps {
   formData: any;
@@ -19,7 +20,14 @@ interface TradingModeSectionProps {
 const TradingModeSection = ({ formData, onFieldChange }: TradingModeSectionProps) => {
   const { settings, updateBlock } = useSettingsV2Store();
   const [isRealTradingModalOpen, setIsRealTradingModalOpen] = useState(false);
+  const [isPinSetupModalOpen, setIsPinSetupModalOpen] = useState(false);
   const [initializationError, setInitializationError] = useState<string | null>(null);
+  const [hasPinConfigured, setHasPinConfigured] = useState(false);
+
+  // Check PIN status when component mounts and when trading mode changes
+  useEffect(() => {
+    setHasPinConfigured(pinService.hasPinConfigured());
+  }, []);
 
   // Ensure riskLimits are properly initialized
   useEffect(() => {
@@ -56,18 +64,17 @@ const TradingModeSection = ({ formData, onFieldChange }: TradingModeSectionProps
           throw new Error('Risk limits nicht korrekt initialisiert');
         }
         
+        // Check if PIN is configured when enabling real trading
+        if (!pinService.hasPinConfigured()) {
+          // Need to set up PIN first
+          setIsPinSetupModalOpen(true);
+          return;
+        }
+        
         // Attempt to switch to real trading mode
         if (localStorage.getItem('kiTradingApp_skipTradeConfirmation') === 'true') {
           // Skip warning and directly enable real trading
-          onFieldChange('tradingMode', 'real');
-          
-          // Update the settings store as well
-          updateBlock('trading', { tradingMode: 'real' });
-          
-          loggingService.logEvent('SIM', 'Real trading mode enabled', {
-            skippedWarning: true,
-            riskLimits: currentRiskLimits
-          });
+          enableRealTrading(currentRiskLimits);
         } else {
           // Open the real trading warning modal
           setIsRealTradingModalOpen(true);
@@ -89,14 +96,34 @@ const TradingModeSection = ({ formData, onFieldChange }: TradingModeSectionProps
     }
   };
 
+  const enableRealTrading = (currentRiskLimits: any) => {
+    onFieldChange('tradingMode', 'real');
+    updateBlock('trading', { tradingMode: 'real' });
+    
+    loggingService.logEvent('SIM', 'Real trading mode enabled', {
+      skippedWarning: true,
+      riskLimits: currentRiskLimits,
+      hasPinConfigured: pinService.hasPinConfigured()
+    });
+  };
+
   const handleConfirmRealTrading = () => {
     try {
-      onFieldChange('tradingMode', 'real');
-      updateBlock('trading', { tradingMode: 'real' });
+      const currentRiskLimits = formData.riskLimits || settings.riskLimits;
+      
+      // Check PIN again before final confirmation
+      if (!pinService.hasPinConfigured()) {
+        setIsRealTradingModalOpen(false);
+        setIsPinSetupModalOpen(true);
+        return;
+      }
+      
+      enableRealTrading(currentRiskLimits);
       setIsRealTradingModalOpen(false);
       
       loggingService.logEvent('SIM', 'Real trading mode confirmed via modal', {
-        riskLimits: formData.riskLimits || settings.riskLimits
+        riskLimits: currentRiskLimits,
+        hasPinConfigured: true
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -107,6 +134,19 @@ const TradingModeSection = ({ formData, onFieldChange }: TradingModeSectionProps
 
   const handleCloseRealTradingModal = () => {
     setIsRealTradingModalOpen(false);
+  };
+
+  const handlePinSetupSuccess = () => {
+    setIsPinSetupModalOpen(false);
+    setHasPinConfigured(true);
+    
+    // After PIN setup, continue with real trading activation
+    if (localStorage.getItem('kiTradingApp_skipTradeConfirmation') === 'true') {
+      const currentRiskLimits = formData.riskLimits || settings.riskLimits;
+      enableRealTrading(currentRiskLimits);
+    } else {
+      setIsRealTradingModalOpen(true);
+    }
   };
 
   const handleRiskLimitChange = (field: string, value: number) => {
@@ -174,6 +214,12 @@ const TradingModeSection = ({ formData, onFieldChange }: TradingModeSectionProps
                 Real-Trading aktiv
               </Badge>
             )}
+            {currentTradingMode === 'real' && hasPinConfigured && (
+              <Badge variant="outline" className="mt-2 border-green-500 text-green-400">
+                <Shield className="h-4 w-4 mr-2" />
+                PIN konfiguriert
+              </Badge>
+            )}
           </div>
           <Switch
             id="trading-mode"
@@ -237,6 +283,13 @@ const TradingModeSection = ({ formData, onFieldChange }: TradingModeSectionProps
           isOpen={isRealTradingModalOpen}
           onClose={handleCloseRealTradingModal}
           onConfirm={handleConfirmRealTrading}
+        />
+
+        {/* PIN Setup Modal */}
+        <PinSetupModal
+          isOpen={isPinSetupModalOpen}
+          onClose={() => setIsPinSetupModalOpen(false)}
+          onSuccess={handlePinSetupSuccess}
         />
       </CardContent>
     </Card>

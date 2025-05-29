@@ -1,8 +1,12 @@
+
 import React, { useState } from 'react';
 import DashboardInitializer from './TradingDashboard/DashboardInitializer';
 import DashboardContent from './TradingDashboard/DashboardContent';
 import { useDashboardStateManager } from './TradingDashboard/DashboardStateManager';
 import RealTradingErrorBoundary from './TradingDashboard/RealTradingErrorBoundary';
+import { PinSetupModal } from '@/components/ui/pin-setup-modal';
+import { PinVerificationModal } from '@/components/ui/pin-verification-modal';
+import { usePinAuthentication } from '@/hooks/usePinAuthentication';
 
 const TradingDashboard = () => {
   const [showSettings, setShowSettings] = useState(false);
@@ -42,9 +46,26 @@ const TradingDashboard = () => {
     portfolioHealthStatus
   } = useDashboardStateManager();
 
+  const {
+    isPinRequired,
+    isPinSetupRequired,
+    isAuthenticated,
+    showPinSetup,
+    showPinVerification,
+    handlePinSetupSuccess,
+    handlePinVerificationSuccess,
+    handleForgotPin,
+    closePinModals,
+    requirePinVerification
+  } = usePinAuthentication();
+
   // Wrap acceptSignal and ignoreSignal to handle current signal automatically
   const handleAcceptSignal = () => {
     if (currentSignal) {
+      // Check PIN authentication for real trading
+      if (userSettings?.tradingMode === 'real' && !requirePinVerification()) {
+        return; // PIN verification required but not authenticated
+      }
       acceptSignal(currentSignal);
     }
   };
@@ -95,6 +116,20 @@ const TradingDashboard = () => {
         retryLoadPortfolioData={retryLoadPortfolioData}
         showSettings={showSettings}
         setShowSettings={setShowSettings}
+      />
+
+      {/* PIN Authentication Modals */}
+      <PinSetupModal
+        isOpen={showPinSetup}
+        onClose={closePinModals}
+        onSuccess={handlePinSetupSuccess}
+      />
+
+      <PinVerificationModal
+        isOpen={showPinVerification}
+        onClose={closePinModals}
+        onSuccess={handlePinVerificationSuccess}
+        onForgotPin={handleForgotPin}
       />
     </RealTradingErrorBoundary>
   );
