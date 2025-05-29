@@ -1,6 +1,6 @@
 
 import React from 'react';
-import DashboardHeader from '../DashboardHeader';
+import { DashboardHeader } from '../DashboardHeader';
 import FirstTimeUserInfo from '../FirstTimeUserInfo';
 import TradingModeIndicator from '../TradingModeIndicator';
 import { useSettingsV2Store } from '@/stores/settingsV2';

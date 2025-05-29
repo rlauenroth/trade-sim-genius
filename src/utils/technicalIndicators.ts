@@ -1,6 +1,6 @@
 
 // Technical indicators calculation utilities
-interface CandleData {
+export interface CandleData {
   open: number;
   high: number;
   low: number;

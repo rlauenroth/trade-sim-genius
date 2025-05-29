@@ -1,4 +1,3 @@
-
 import { calculateAllIndicators, CandleData } from '@/utils/technicalIndicators';
 import { loggingService } from '@/services/loggingService';
 
@@ -56,8 +55,8 @@ export class TechnicalRulesFallback {
     const signals: Array<{ type: 'BUY' | 'SELL' | 'HOLD'; weight: number; reason: string }> = [];
 
     // RSI Analysis
-    if (indicators.rsi) {
-      const rsi = indicators.rsi[indicators.rsi.length - 1];
+    if (indicators.RSI_14) {
+      const rsi = indicators.RSI_14;
       if (rsi < 30) {
         signals.push({ type: 'BUY', weight: 0.8, reason: 'RSI oversold' });
       } else if (rsi > 70) {
@@ -68,9 +67,9 @@ export class TechnicalRulesFallback {
     }
 
     // MACD Analysis
-    if (indicators.macd) {
-      const macd = indicators.macd[indicators.macd.length - 1];
-      const signal = indicators.macdSignal[indicators.macdSignal.length - 1];
+    if (indicators.MACD_value && indicators.MACD_signal) {
+      const macd = indicators.MACD_value;
+      const signal = indicators.MACD_signal;
       
       if (macd > signal && macd > 0) {
         signals.push({ type: 'BUY', weight: 0.6, reason: 'MACD bullish' });
@@ -80,13 +79,13 @@ export class TechnicalRulesFallback {
     }
 
     // Moving Average Analysis
-    if (indicators.sma20 && indicators.sma50) {
-      const sma20 = indicators.sma20[indicators.sma20.length - 1];
-      const sma50 = indicators.sma50[indicators.sma50.length - 1];
+    if (indicators.SMA_20 && indicators.EMA_26) {
+      const sma20 = indicators.SMA_20;
+      const ema26 = indicators.EMA_26;
       
-      if (currentPrice > sma20 && sma20 > sma50) {
+      if (currentPrice > sma20 && sma20 > ema26) {
         signals.push({ type: 'BUY', weight: 0.5, reason: 'Above moving averages' });
-      } else if (currentPrice < sma20 && sma20 < sma50) {
+      } else if (currentPrice < sma20 && sma20 < ema26) {
         signals.push({ type: 'SELL', weight: 0.5, reason: 'Below moving averages' });
       }
     }
@@ -188,8 +187,8 @@ export class TechnicalRulesFallback {
       }
 
       // Technical exit signals
-      if (indicators.rsi) {
-        const rsi = indicators.rsi[indicators.rsi.length - 1];
+      if (indicators.RSI_14) {
+        const rsi = indicators.RSI_14;
         if (position.type === 'BUY' && rsi > 80) return 'SELL'; // Very overbought
         if (position.type === 'SELL' && rsi < 20) return 'SELL'; // Very oversold
       }

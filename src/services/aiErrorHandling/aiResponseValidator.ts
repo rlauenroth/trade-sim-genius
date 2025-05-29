@@ -205,7 +205,7 @@ export class AIResponseValidator {
       Object.entries(patterns).forEach(([key, pattern]) => {
         const match = text.match(pattern);
         if (match) {
-          let value = match[1].trim();
+          let value: any = match[1].trim();
           if (key === 'confidence_score') {
             value = Math.min(1, Math.max(0, parseFloat(value) || 0));
           }
