@@ -1,14 +1,15 @@
-
 import { useState, useCallback } from 'react';
 import { Signal } from '@/types/simulation';
 import { Candidate } from '@/types/candidate';
 import { AISignalService } from '@/services/aiSignal';
 import { loggingService } from '@/services/loggingService';
 import { useCandidates } from '@/hooks/useCandidates';
+import { useSettingsV2Store } from '@/stores/settingsV2';
 
 export const useAISignals = () => {
   const [currentSignal, setCurrentSignal] = useState<Signal | null>(null);
   const [availableSignals, setAvailableSignals] = useState<Signal[]>([]);
+  const { settings } = useSettingsV2Store();
   
   const {
     candidates,
@@ -34,13 +35,17 @@ export const useAISignals = () => {
     clearCandidates();
     
     try {
+      // Use dynamic strategy from settings instead of hardcoded 'balanced'
+      const strategy = settings.tradingStrategy || 'balanced';
+      
       loggingService.logEvent('AI', 'Starting comprehensive AI market analysis', {
         portfolioValue: simulationState?.currentPortfolioValue,
         availableUSDT: simulationState?.paperAssets.find((asset: any) => asset.symbol === 'USDT')?.quantity,
-        openPositions: simulationState?.openPositions?.length || 0
+        openPositions: simulationState?.openPositions?.length || 0,
+        strategy: strategy
       });
       
-      addLogEntry('AI', 'Starte umfassende KI-Marktanalyse...');
+      addLogEntry('AI', `Starte umfassende KI-Marktanalyse (${strategy})...`);
       
       // Get API keys from localStorage
       const storedKeys = JSON.parse(localStorage.getItem('kiTradingApp_apiKeys') || '{}');
@@ -67,7 +72,7 @@ export const useAISignals = () => {
           kucoinApiPassphrase: storedKeys.kucoinApiPassphrase || ''
         },
         openRouterApiKey: storedKeys.openRouterApiKey || '',
-        strategy: 'balanced',
+        strategy: strategy, // Use dynamic strategy
         simulatedPortfolioValue: portfolioValue,
         availableUSDT: availableUSDT
       });
@@ -75,7 +80,8 @@ export const useAISignals = () => {
       // Check if API is properly configured
       loggingService.logEvent('AI', 'Validating comprehensive API configuration', {
         hasKucoinKeys: !!(storedKeys.kucoinApiKey && storedKeys.kucoinApiSecret && storedKeys.kucoinApiPassphrase),
-        hasOpenRouterKey: !!storedKeys.openRouterApiKey
+        hasOpenRouterKey: !!storedKeys.openRouterApiKey,
+        strategy: strategy
       });
       
       const isValidConfig = await aiService.isApiConfigurationValid();
@@ -89,14 +95,8 @@ export const useAISignals = () => {
         return;
       }
 
-      addLogEntry('INFO', 'Verwende umfassende KI-Analyse mit Multi-Asset-Screening');
+      addLogEntry('INFO', `Verwende umfassende KI-Analyse mit ${strategy} Strategie`);
       
-      loggingService.logEvent('AI', 'Starting multi-signal generation', {
-        strategy: 'balanced',
-        portfolioValue,
-        availableUSDT
-      });
-
       // Stage 1: Market screening - add candidates with screening status
       addLogEntry('AI', 'Stage 1: Market-Screening wird gestartet...');
       const selectedPairs = await aiService.performMarketScreening();
@@ -201,14 +201,15 @@ export const useAISignals = () => {
         error: error instanceof Error ? error.message : 'unknown',
         stack: error instanceof Error ? error.stack : undefined,
         portfolioValue: simulationState?.currentPortfolioValue,
-        availableUSDT: simulationState?.paperAssets.find((asset: any) => asset.symbol === 'USDT')?.quantity
+        availableUSDT: simulationState?.paperAssets.find((asset: any) => asset.symbol === 'USDT')?.quantity,
+        strategy: settings.tradingStrategy
       });
       
       addLogEntry('ERROR', `KI-Service Fehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
       setAvailableSignals([]);
       setCurrentSignal(null);
     }
-  }, [clearCandidates, addCandidate, updateCandidateStatus]);
+  }, [clearCandidates, addCandidate, updateCandidateStatus, settings.tradingStrategy]);
 
   return {
     currentSignal,

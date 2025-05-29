@@ -21,6 +21,7 @@ export const getDefaultSettings = (): VerifiedSettings => ({
   },
   proxyUrl: 'https://t3h.online/kucoin-proxy.php?path=',
   tradingMode: 'simulation',
+  tradingStrategy: 'balanced',
   riskLimits: {
     maxOpenOrders: 5,
     maxExposure: 1000,
@@ -53,6 +54,11 @@ export const getDefaultBlocks = (): Record<string, SettingsBlock> => ({
   },
   trading: {
     name: 'Trading Mode',
+    verified: true,
+    modified: false
+  },
+  strategy: {
+    name: 'Trading Strategy',
     verified: true,
     modified: false
   }

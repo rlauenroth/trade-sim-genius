@@ -19,6 +19,7 @@ export interface VerifiedSettings {
   };
   proxyUrl: string;
   tradingMode: 'simulation' | 'real';
+  tradingStrategy: 'conservative' | 'balanced' | 'aggressive';
   riskLimits: {
     maxOpenOrders: number;
     maxExposure: number;

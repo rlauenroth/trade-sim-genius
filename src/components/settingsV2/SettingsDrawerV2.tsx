@@ -12,6 +12,7 @@ import OpenRouterSection from './sections/OpenRouterSection';
 import ModelSection from './sections/ModelSection';
 import ProxySection from './sections/ProxySection';
 import TradingModeSection from './sections/TradingModeSection';
+import StrategySection from './sections/StrategySection';
 
 interface SettingsDrawerV2Props {
   isOpen: boolean;
@@ -93,6 +94,11 @@ const SettingsDrawerV2 = ({ isOpen, onClose, isOnboarding = false }: SettingsDra
           />
 
           <TradingModeSection
+            formData={formData}
+            onFieldChange={handleFieldChange}
+          />
+
+          <StrategySection
             formData={formData}
             onFieldChange={handleFieldChange}
           />

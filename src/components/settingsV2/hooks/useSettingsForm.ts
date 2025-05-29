@@ -14,6 +14,7 @@ export const useSettingsForm = () => {
     modelId: '',
     proxyUrl: '',
     tradingMode: 'simulation' as 'simulation' | 'real',
+    tradingStrategy: 'balanced' as 'conservative' | 'balanced' | 'aggressive',
     riskLimits: {
       maxOpenOrders: 5,
       maxExposure: 1000,
@@ -32,6 +33,7 @@ export const useSettingsForm = () => {
       modelId: settings.model.id,
       proxyUrl: settings.proxyUrl,
       tradingMode: settings.tradingMode,
+      tradingStrategy: settings.tradingStrategy,
       riskLimits: settings.riskLimits
     });
   }, [settings]);
@@ -69,6 +71,8 @@ export const useSettingsForm = () => {
       updateBlock('proxy', { proxyUrl: value });
     } else if (field === 'tradingMode') {
       updateBlock('trading', { tradingMode: value });
+    } else if (field === 'tradingStrategy') {
+      updateBlock('strategy', { tradingStrategy: value });
     } else if (field === 'riskLimits') {
       updateBlock('trading', { riskLimits: value });
     }
