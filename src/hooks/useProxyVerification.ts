@@ -34,7 +34,7 @@ export const useProxyVerification = () => {
           latencyMs 
         });
         
-        loggingService.logEvent('SETTINGS_VERIFY', `Proxy verification successful (${latencyMs}ms)`);
+        loggingService.logEvent('API', `Proxy verification successful (${latencyMs}ms)`);
         return true;
       } else {
         throw new Error(`HTTP ${response.status}`);

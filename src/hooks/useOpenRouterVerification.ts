@@ -45,7 +45,7 @@ export const useOpenRouterVerification = () => {
           latencyMs 
         });
         
-        loggingService.logEvent('SETTINGS_VERIFY', `OpenRouter verification successful (${latencyMs}ms)`);
+        loggingService.logEvent('API', `OpenRouter verification successful (${latencyMs}ms)`);
         return true;
       } else if (response.status === 401) {
         throw new Error('Ungültiger API-Key');

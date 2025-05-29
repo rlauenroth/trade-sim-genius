@@ -60,7 +60,7 @@ export const useModelVerification = () => {
           latencyMs 
         });
         
-        loggingService.logEvent('SETTINGS_VERIFY', `Model ${modelId} verification successful (${latencyMs}ms)`);
+        loggingService.logEvent('AI', `Model ${modelId} verification successful (${latencyMs}ms)`);
         return true;
       } else {
         throw new Error(`HTTP ${response.status}`);

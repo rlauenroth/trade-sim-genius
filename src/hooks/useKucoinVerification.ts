@@ -42,7 +42,7 @@ export const useKucoinVerification = () => {
             latencyMs 
           });
           
-          loggingService.logEvent('SETTINGS_VERIFY', `KuCoin verification successful (${latencyMs}ms)`);
+          loggingService.logEvent('API', `KuCoin verification successful (${latencyMs}ms)`);
           return true;
         }
       }

@@ -89,7 +89,7 @@ export const useSettingsV2Store = create<SettingsV2State>((set, get) => ({
           isLoading: false 
         });
         
-        loggingService.logEvent('SETTINGS_LOAD', 'Settings V2 loaded successfully');
+        loggingService.logEvent('API', 'Settings V2 loaded successfully');
       } else {
         set({ isLoading: false });
       }
@@ -172,7 +172,7 @@ export const useSettingsV2Store = create<SettingsV2State>((set, get) => ({
       set({ blocks: newBlocks });
       
       const modifiedBlocks = Object.keys(blocks).filter(key => blocks[key].modified);
-      loggingService.logEvent('SETTINGS_UPDATE', `Settings saved: ${modifiedBlocks.join(', ')}`);
+      loggingService.logEvent('API', `Settings saved: ${modifiedBlocks.join(', ')}`);
       
       toast({
         title: "Einstellungen gespeichert",
