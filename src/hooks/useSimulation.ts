@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect } from 'react';
 import { Signal } from '@/types/simulation';
 import { useSimulationState } from './useSimulationState';
@@ -13,6 +12,7 @@ import { useCircuitBreakerOptimized } from './useCircuitBreakerOptimized';
 import { usePerformanceMonitoring } from './usePerformanceMonitoring';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useAppState } from './useAppState';
+import { usePortfolioEvaluation } from './usePortfolioEvaluation';
 
 export const useSimulation = () => {
   const {
@@ -48,6 +48,13 @@ export const useSimulation = () => {
   const { enforceRiskLimitsOptimized, getPortfolioHealthStatus, liquidateAllPositions } = useCircuitBreakerOptimized();
   const { trackApiCall, trackSimulationCycle, logPerformanceReport } = usePerformanceMonitoring();
 
+  // Add portfolio evaluation hook
+  const { triggerEvaluation } = usePortfolioEvaluation(
+    simulationState,
+    isSimulationActive,
+    updateSimulationState
+  );
+
   // Enhanced signal processing with optimized circuit breaker (only force check after trades)
   const handleProcessSignal = useCallback(async (signal: Signal) => {
     const cycleStartTime = Date.now();
@@ -63,6 +70,11 @@ export const useSimulation = () => {
       updateSimulationState,
       addLogEntry
     );
+
+    // Trigger portfolio evaluation after trade execution
+    if (simulationState && simulationState.openPositions.length > 0) {
+      await triggerEvaluation();
+    }
 
     // Only check risk limits AFTER trade execution (force check)
     if (simulationState && userSettings.tradingStrategy) {
@@ -86,7 +98,7 @@ export const useSimulation = () => {
     const cycleEndTime = Date.now();
     const portfolioValueAfter = simulationState?.currentPortfolioValue || portfolioValueBefore;
     trackSimulationCycle(cycleStartTime, cycleEndTime, portfolioValueBefore, portfolioValueAfter);
-  }, [processSignal, userSettings, isSimulationActive, simulationState, setCurrentSignal, executeAutoTrade, updateSimulationState, addLogEntry, enforceRiskLimitsOptimized, pauseSimulationState, trackSimulationCycle, liquidateAllPositions]);
+  }, [processSignal, userSettings, isSimulationActive, simulationState, setCurrentSignal, executeAutoTrade, updateSimulationState, addLogEntry, enforceRiskLimitsOptimized, pauseSimulationState, trackSimulationCycle, liquidateAllPositions, triggerEvaluation]);
 
   // Enhanced start simulation with exit screening
   const startSimulation = useCallback(async (portfolioData: any) => {
@@ -213,6 +225,7 @@ export const useSimulation = () => {
     processSignal: handleProcessSignal,
     portfolioHealthStatus,
     trackApiCall,
-    logPerformanceReport
+    logPerformanceReport,
+    triggerPortfolioEvaluation: triggerEvaluation
   };
 };

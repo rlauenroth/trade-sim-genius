@@ -5,6 +5,8 @@ import { toast } from '@/hooks/use-toast';
 import { useRiskManagement } from '../useRiskManagement';
 import { loggingService } from '@/services/loggingService';
 import { getOrderbookSnapshot, getSymbolInfo, roundToTickSize, validateOrderSize } from '@/utils/kucoin/marketData';
+import { slippageService } from '@/services/slippageService';
+import { portfolioEvaluationService } from '@/services/portfolioEvaluationService';
 
 export const useSimulatedTradeExecution = () => {
   const executeSimulatedTrade = useCallback(async (
@@ -20,6 +22,7 @@ export const useSimulatedTradeExecution = () => {
     let currentPrice: number;
     let priceSource: string;
     let spread: number = 0;
+    let orderbookData: any = null;
     
     try {
       // Convert signal.assetPair format to KuCoin format if needed
@@ -39,58 +42,41 @@ export const useSimulatedTradeExecution = () => {
       } else {
         // Get orderbook snapshot for realistic market order execution
         try {
-          const orderbook = await getOrderbookSnapshot(kucoinSymbol);
+          orderbookData = await getOrderbookSnapshot(kucoinSymbol);
           
           // For BUY orders, use bestAsk (worse price for buyer)
           // For SELL orders, use bestBid (worse price for seller)
           if (signal.signalType === 'BUY') {
-            currentPrice = orderbook.bestAsk > 0 ? orderbook.bestAsk : orderbook.price;
-            priceSource = orderbook.bestAsk > 0 ? 'Best Ask (Market Buy)' : 'Last Price (Fallback)';
+            currentPrice = orderbookData.bestAsk > 0 ? orderbookData.bestAsk : orderbookData.price;
+            priceSource = orderbookData.bestAsk > 0 ? 'Best Ask (Market Buy)' : 'Last Price (Fallback)';
           } else {
-            currentPrice = orderbook.bestBid > 0 ? orderbook.bestBid : orderbook.price;
-            priceSource = orderbook.bestBid > 0 ? 'Best Bid (Market Sell)' : 'Last Price (Fallback)';
+            currentPrice = orderbookData.bestBid > 0 ? orderbookData.bestBid : orderbookData.price;
+            priceSource = orderbookData.bestBid > 0 ? 'Best Bid (Market Sell)' : 'Last Price (Fallback)';
           }
           
           // Calculate spread for logging
-          if (orderbook.bestBid > 0 && orderbook.bestAsk > 0) {
-            spread = ((orderbook.bestAsk - orderbook.bestBid) / orderbook.bestBid) * 100;
+          if (orderbookData.bestBid > 0 && orderbookData.bestAsk > 0) {
+            spread = ((orderbookData.bestAsk - orderbookData.bestBid) / orderbookData.bestBid) * 100;
           }
           
           loggingService.logEvent('TRADE', 'Using realistic market price', {
             assetPair: signal.assetPair,
             signalType: signal.signalType,
-            bestBid: orderbook.bestBid,
-            bestAsk: orderbook.bestAsk,
-            lastPrice: orderbook.price,
+            bestBid: orderbookData.bestBid,
+            bestAsk: orderbookData.bestAsk,
+            lastPrice: orderbookData.price,
             executionPrice: currentPrice,
             spread: spread.toFixed(4) + '%',
             source: 'orderbook_snapshot'
           });
           
         } catch (orderbookError) {
-          console.log('Orderbook fetch failed, using fallback price');
-          currentPrice = signal.assetPair.includes('BTC') ? 60000 : 3000;
-          priceSource = 'Fallback (Mock)';
-          
-          loggingService.logEvent('TRADE', 'Using fallback mock price', {
-            assetPair: signal.assetPair,
-            mockPrice: currentPrice,
-            reason: 'orderbook_unavailable',
-            error: orderbookError instanceof Error ? orderbookError.message : 'unknown'
-          });
+          throw new Error(`Orderbook fetch failed: ${orderbookError}`);
         }
       }
     } catch (error) {
-      console.log('Price determination failed, using mock price');
-      currentPrice = signal.assetPair.includes('BTC') ? 60000 : 3000;
-      priceSource = 'Fallback (Mock)';
-      
-      loggingService.logEvent('TRADE', 'Using mock price due to error', {
-        assetPair: signal.assetPair,
-        mockPrice: currentPrice,
-        reason: 'price_fetch_error',
-        error: error instanceof Error ? error.message : 'unknown'
-      });
+      console.error('Price determination failed:', error);
+      throw new Error(`Unable to determine execution price: ${error}`);
     }
     
     const availableUSDT = simulationState.paperAssets.find(asset => asset.symbol === 'USDT')?.quantity || 0;
@@ -198,6 +184,42 @@ export const useSimulatedTradeExecution = () => {
       });
     }
     
+    // Phase 4: Apply slippage if orderbook data is available and price wasn't AI-suggested
+    if (orderbookData && typeof signal.entryPriceSuggestion !== 'number') {
+      try {
+        const slippageResult = slippageService.calculateSlippage(
+          signal.signalType as 'BUY' | 'SELL',
+          actualPositionSize,
+          {
+            bestBid: orderbookData.bestBid,
+            bestAsk: orderbookData.bestAsk,
+            spread: orderbookData.bestAsk - orderbookData.bestBid
+          },
+          strategy
+        );
+        
+        if (slippageResult.slippageBps > 0) {
+          finalPrice = slippageResult.adjustedPrice;
+          actualPositionSize = quantity * finalPrice; // Recalculate with slippage
+          
+          addLogEntry('INFO', `Slippage angewendet: ${slippageResult.slippageBps.toFixed(2)} bps (${slippageResult.slippageAmount.toFixed(6)}$)`);
+          
+          loggingService.logEvent('TRADE', 'Slippage applied to execution price', {
+            assetPair: signal.assetPair,
+            originalPrice: slippageResult.originalPrice,
+            adjustedPrice: slippageResult.adjustedPrice,
+            slippageBps: slippageResult.slippageBps,
+            strategy
+          });
+        }
+      } catch (slippageError) {
+        loggingService.logEvent('TRADE', 'Slippage calculation failed, proceeding without', {
+          assetPair: signal.assetPair,
+          error: slippageError instanceof Error ? slippageError.message : 'unknown'
+        });
+      }
+    }
+    
     const tradingFee = actualPositionSize * 0.001;
     
     const newPosition: Position = {
@@ -233,7 +255,26 @@ export const useSimulatedTradeExecution = () => {
       });
     }
 
-    const portfolioValueAfter = simulationState.currentPortfolioValue - tradingFee;
+    // Phase 3: Calculate updated portfolio value using evaluation service
+    let portfolioValueAfter = portfolioValueBefore - tradingFee;
+    
+    try {
+      const tempState = {
+        ...simulationState,
+        openPositions: [...simulationState.openPositions, newPosition],
+        paperAssets: updatedAssets
+      };
+      
+      const evaluation = await portfolioEvaluationService.evaluatePortfolio(tempState);
+      portfolioValueAfter = evaluation.totalValue;
+      
+      addLogEntry('INFO', `Portfolio-Bewertung: $${evaluation.totalValue.toFixed(2)} (Unrealisiert: ${evaluation.unrealizedPnL >= 0 ? '+' : ''}$${evaluation.unrealizedPnL.toFixed(2)})`);
+    } catch (evaluationError) {
+      loggingService.logEvent('TRADE', 'Portfolio evaluation failed, using simple calculation', {
+        error: evaluationError instanceof Error ? evaluationError.message : 'unknown'
+      });
+    }
+
     const updatedState = {
       ...simulationState,
       openPositions: [...simulationState.openPositions, newPosition],
@@ -241,7 +282,7 @@ export const useSimulatedTradeExecution = () => {
       currentPortfolioValue: portfolioValueAfter
     };
 
-    loggingService.logEvent('TRADE', 'Realistic simulation trade executed successfully', {
+    loggingService.logEvent('TRADE', 'Enhanced simulation trade executed successfully', {
       positionId: newPosition.id,
       assetPair: signal.assetPair,
       type: signal.signalType,
@@ -254,7 +295,9 @@ export const useSimulatedTradeExecution = () => {
       totalValue: actualPositionSize,
       portfolioValueBefore,
       portfolioValueAfter,
-      openPositionsCount: updatedState.openPositions.length
+      openPositionsCount: updatedState.openPositions.length,
+      tickSizeCompliant: finalPrice !== currentPrice,
+      slippageApplied: orderbookData && finalPrice !== (signal.signalType === 'BUY' ? orderbookData.bestAsk : orderbookData.bestBid)
     });
 
     saveSimulationState(updatedState);

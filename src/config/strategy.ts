@@ -1,4 +1,3 @@
-
 export interface StrategyConfig {
   tradeFraction: number;
   maxOpenPositions: number;
@@ -27,6 +26,35 @@ export const STRATEGY_CONFIGS: Record<string, StrategyConfig> = {
     defaultStopLossPercent: -3,
     defaultTakeProfitPercent: 8
   }
+};
+
+export const SLIPPAGE_CONFIG = {
+  ENABLED: true,
+  STRATEGIES: {
+    conservative: {
+      baseSlippageBps: 2, // 0.02%
+      volumeImpactThreshold: 1000, // $1000
+      maxSlippageBps: 10, // 0.1%
+    },
+    balanced: {
+      baseSlippageBps: 3, // 0.03%
+      volumeImpactThreshold: 500, // $500
+      maxSlippageBps: 15, // 0.15%
+    },
+    aggressive: {
+      baseSlippageBps: 5, // 0.05%
+      volumeImpactThreshold: 200, // $200
+      maxSlippageBps: 25, // 0.25%
+    }
+  }
+};
+
+// Portfolio evaluation settings
+export const PORTFOLIO_EVALUATION = {
+  UPDATE_INTERVAL: 60000, // 60 seconds
+  CACHE_TTL: 30000, // 30 seconds
+  BATCH_SIZE: 10, // Max positions to evaluate in parallel
+  ENABLED: true
 };
 
 export function calcTradeSize(
