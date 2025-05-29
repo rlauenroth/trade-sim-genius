@@ -40,7 +40,7 @@ export const useSimulation = () => {
   const { executeAutoTrade, autoModeError } = useAutoTradeExecution();
   const { startSimulation: startSimulationAction, stopSimulation: stopSimulationAction, pauseSimulation: pauseSimulationAction, resumeSimulation: resumeSimulationAction } = useSimulationActions();
   const { processSignal, acceptSignal: acceptSignalAction, ignoreSignal: ignoreSignalAction } = useSignalProcessor();
-  const { aiGenerationTimer, setAiGenerationTimer, updateTimerInterval } = useSimulationTimers();
+  const { aiGenerationTimer, setAiGenerationTimer, updateTimerInterval, clearTimer } = useSimulationTimers();
   
   // New integrated modules
   const { startExitScreening, stopExitScreening } = useExitScreening();
@@ -91,7 +91,6 @@ export const useSimulation = () => {
       initializeSimulation,
       startAISignalGeneration,
       addLogEntry,
-      setAiGenerationTimer,
       updateSimulationState
     );
 
@@ -110,10 +109,11 @@ export const useSimulation = () => {
     }
 
     addLogEntry('SIM', '🔄 Exit-Screening und Risk-Management aktiviert');
-  }, [startSimulationAction, userSettings, initializeSimulation, startAISignalGeneration, addLogEntry, setAiGenerationTimer, updateSimulationState, startExitScreening, apiKeys]);
+  }, [startSimulationAction, userSettings, initializeSimulation, startAISignalGeneration, addLogEntry, updateSimulationState, startExitScreening, apiKeys]);
 
-  // Update timer interval with performance monitoring
+  // Update timer interval - centralized timer management
   useEffect(() => {
+    console.log('🔄 Timer update effect triggered:', { isSimulationActive, simulationState: simulationState?.isActive });
     updateTimerInterval(
       isSimulationActive,
       true, // Always automatic mode
@@ -121,32 +121,30 @@ export const useSimulation = () => {
       startAISignalGeneration,
       addLogEntry
     );
-  }, [updateTimerInterval, isSimulationActive, simulationState, startAISignalGeneration, addLogEntry]);
+  }, [updateTimerInterval, isSimulationActive, simulationState?.isActive, simulationState?.isPaused, startAISignalGeneration, addLogEntry]);
 
   // Enhanced stop simulation
   const stopSimulation = useCallback(() => {
     stopExitScreening();
     stopSimulationAction(
-      aiGenerationTimer,
+      clearTimer,
       setCurrentSignal,
       setAvailableSignals,
       stopSimulationState,
-      addLogEntry,
-      setAiGenerationTimer
+      addLogEntry
     );
     logPerformanceReport();
-  }, [stopExitScreening, stopSimulationAction, aiGenerationTimer, setCurrentSignal, setAvailableSignals, stopSimulationState, addLogEntry, setAiGenerationTimer, logPerformanceReport]);
+  }, [stopExitScreening, stopSimulationAction, clearTimer, setCurrentSignal, setAvailableSignals, stopSimulationState, addLogEntry, logPerformanceReport]);
 
   // Enhanced pause simulation
   const pauseSimulation = useCallback(() => {
     stopExitScreening();
     pauseSimulationAction(
-      aiGenerationTimer,
+      clearTimer,
       pauseSimulationState,
-      addLogEntry,
-      setAiGenerationTimer
+      addLogEntry
     );
-  }, [stopExitScreening, pauseSimulationAction, aiGenerationTimer, pauseSimulationState, addLogEntry, setAiGenerationTimer]);
+  }, [stopExitScreening, pauseSimulationAction, clearTimer, pauseSimulationState, addLogEntry]);
 
   // Enhanced resume simulation
   const resumeSimulation = useCallback(async () => {
@@ -154,7 +152,6 @@ export const useSimulation = () => {
       resumeSimulationState,
       addLogEntry,
       startAISignalGeneration,
-      setAiGenerationTimer,
       updateSimulationState
     );
 
@@ -171,7 +168,7 @@ export const useSimulation = () => {
         );
       }
     }
-  }, [resumeSimulationAction, resumeSimulationState, addLogEntry, startAISignalGeneration, setAiGenerationTimer, updateSimulationState, startExitScreening, apiKeys, userSettings]);
+  }, [resumeSimulationAction, resumeSimulationState, addLogEntry, startAISignalGeneration, updateSimulationState, startExitScreening, apiKeys, userSettings]);
 
   // Accept signal manually (kept for compatibility but simplified)
   const acceptSignal = useCallback(async (signal: Signal) => {

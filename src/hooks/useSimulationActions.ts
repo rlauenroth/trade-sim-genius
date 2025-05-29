@@ -10,7 +10,6 @@ export const useSimulationActions = () => {
     initializeSimulation: (data: any) => SimulationState,
     startAISignalGeneration: (immediate: boolean, state: SimulationState, addLogEntry: any) => Promise<void>,
     addLogEntry: (type: any, message: string) => void,
-    setAiGenerationTimer: (timer: NodeJS.Timeout | null) => void,
     updateSimulationState: (state: SimulationState) => void
   ) => {
     try {
@@ -26,18 +25,8 @@ export const useSimulationActions = () => {
       const initialState = initializeSimulation(portfolioData);
       updateSimulationState(initialState);
       
-      // Start AI signal generation immediately
+      // Start AI signal generation immediately (timer will be handled by useSimulationTimers)
       await startAISignalGeneration(true, initialState, addLogEntry);
-      
-      // Set up periodic AI signal generation with constant 30s interval
-      const timer = setInterval(async () => {
-        const currentState = JSON.parse(localStorage.getItem('kiTradingApp_simulationState') || '{}');
-        if (currentState?.isActive && !currentState?.isPaused) {
-          await startAISignalGeneration(true, currentState, addLogEntry);
-        }
-      }, 30 * 1000);
-      
-      setAiGenerationTimer(timer);
       
     } catch (error) {
       loggingService.logError('Automatic simulation start failed', {
@@ -50,20 +39,15 @@ export const useSimulationActions = () => {
   }, []);
 
   const stopSimulation = useCallback((
-    aiGenerationTimer: NodeJS.Timeout | null,
+    clearTimer: () => void,
     setCurrentSignal: (signal: any) => void,
     setAvailableSignals: (signals: any[]) => void,
     stopSimulationState: () => void,
-    addLogEntry: (type: any, message: string) => void,
-    setAiGenerationTimer: (timer: NodeJS.Timeout | null) => void
+    addLogEntry: (type: any, message: string) => void
   ) => {
     loggingService.logEvent('SIM', 'Stopping automatic simulation');
     
-    if (aiGenerationTimer) {
-      clearInterval(aiGenerationTimer);
-      setAiGenerationTimer(null);
-    }
-    
+    clearTimer();
     setCurrentSignal(null);
     setAvailableSignals([]);
     stopSimulationState();
@@ -71,18 +55,13 @@ export const useSimulationActions = () => {
   }, []);
 
   const pauseSimulation = useCallback((
-    aiGenerationTimer: NodeJS.Timeout | null,
+    clearTimer: () => void,
     pauseSimulationState: () => void,
-    addLogEntry: (type: any, message: string) => void,
-    setAiGenerationTimer: (timer: NodeJS.Timeout | null) => void
+    addLogEntry: (type: any, message: string) => void
   ) => {
     loggingService.logEvent('SIM', 'Pausing automatic simulation');
     
-    if (aiGenerationTimer) {
-      clearInterval(aiGenerationTimer);
-      setAiGenerationTimer(null);
-    }
-    
+    clearTimer();
     pauseSimulationState();
     addLogEntry('SIM', 'Automatische Simulation pausiert');
   }, []);
@@ -91,7 +70,6 @@ export const useSimulationActions = () => {
     resumeSimulationState: () => void,
     addLogEntry: (type: any, message: string) => void,
     startAISignalGeneration: (immediate: boolean, state: SimulationState, addLogEntry: any) => Promise<void>,
-    setAiGenerationTimer: (timer: NodeJS.Timeout | null) => void,
     updateSimulationState: (state: SimulationState) => void
   ) => {
     loggingService.logEvent('SIM', 'Resuming automatic simulation');
@@ -99,19 +77,10 @@ export const useSimulationActions = () => {
     resumeSimulationState();
     addLogEntry('SIM', 'Automatische Simulation fortgesetzt');
     
-    // Get current simulation state and restart AI generation
+    // Get current simulation state and restart AI generation (timer will be handled by useSimulationTimers)
     const currentState = JSON.parse(localStorage.getItem('kiTradingApp_simulationState') || '{}');
     if (currentState) {
       await startAISignalGeneration(true, currentState, addLogEntry);
-      
-      const timer = setInterval(async () => {
-        const state = JSON.parse(localStorage.getItem('kiTradingApp_simulationState') || '{}');
-        if (state?.isActive && !state?.isPaused) {
-          await startAISignalGeneration(true, state, addLogEntry);
-        }
-      }, 30 * 1000);
-      
-      setAiGenerationTimer(timer);
     }
   }, []);
 

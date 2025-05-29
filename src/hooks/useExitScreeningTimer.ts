@@ -28,10 +28,14 @@ export const useExitScreeningTimer = () => {
       openPositions: simulationState.openPositions.length
     });
 
+    console.log('🔄 Starting exit screening timer');
     exitScreeningTimer.current = setInterval(async () => {
       const currentState = JSON.parse(localStorage.getItem('kiTradingApp_simulationState') || '{}');
       if (currentState?.isActive && !currentState?.isPaused && currentState.openPositions?.length > 0) {
+        console.log('⏰ Exit screening timer triggered');
         await processExitScreening(currentState, strategy, apiKeys, updateSimulationState, addLogEntry);
+      } else {
+        console.log('⏰ Exit screening timer triggered but conditions not met');
       }
     }, 5 * 60 * 1000);
 
@@ -42,6 +46,7 @@ export const useExitScreeningTimer = () => {
     if (exitScreeningTimer.current) {
       clearInterval(exitScreeningTimer.current);
       exitScreeningTimer.current = null;
+      console.log('🔄 Exit screening timer stopped');
       loggingService.logEvent('AI', 'Exit screening timer stopped');
     }
   }, []);

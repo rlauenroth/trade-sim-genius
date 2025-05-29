@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -46,6 +45,7 @@ const SettingsDrawer = ({ isOpen, onClose, userSettings, onSaveSettings }: Setti
 
     const success = await onSaveSettings(settingsToSave);
     if (success) {
+      setIsRealTradingWarningOpen(false);
       onClose();
     }
   };
@@ -60,6 +60,13 @@ const SettingsDrawer = ({ isOpen, onClose, userSettings, onSaveSettings }: Setti
 
   const confirmRealTrading = () => {
     setIsRealTradingEnabled(true);
+    setIsRealTradingWarningOpen(false);
+    setTimeout(() => {
+      handleSaveSettings();
+    }, 100);
+  };
+
+  const handleCloseWarningModal = () => {
     setIsRealTradingWarningOpen(false);
   };
 
@@ -267,7 +274,7 @@ const SettingsDrawer = ({ isOpen, onClose, userSettings, onSaveSettings }: Setti
 
         <RealTradingWarningModal
           isOpen={isRealTradingWarningOpen}
-          onClose={() => setIsRealTradingWarningOpen(false)}
+          onClose={handleCloseWarningModal}
           onConfirm={confirmRealTrading}
         />
       </SheetContent>
