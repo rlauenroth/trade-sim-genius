@@ -1,133 +1,10 @@
 
 import { create } from 'zustand';
-import { VerifiedSettings, SettingsBlock } from '@/types/settingsV2';
-import { modelProviderService } from '@/services/settingsV2/modelProviderService';
+import { SettingsV2State, STORAGE_KEY } from './types';
+import { getDefaultSettings, getDefaultBlocks } from './defaults';
+import { migrateFromOldSettings, cleanupOldStorage } from './migration';
 import { loggingService } from '@/services/loggingService';
 import { toast } from '@/hooks/use-toast';
-import { KUCOIN_PROXY_BASE } from '@/config';
-
-interface SettingsV2State {
-  settings: VerifiedSettings;
-  blocks: Record<string, SettingsBlock>;
-  isLoading: boolean;
-  
-  // Actions
-  load: () => void;
-  updateBlock: (blockName: string, data: Partial<VerifiedSettings>) => void;
-  markBlockModified: (blockName: string) => void;
-  markBlockVerified: (blockName: string, verified: boolean) => void;
-  saveSettings: () => Promise<boolean>;
-  canSave: () => boolean;
-  resetBlock: (blockName: string) => void;
-}
-
-const STORAGE_KEY = 'kiTradingApp_settingsV2';
-const OLD_STORAGE_KEYS = {
-  API_KEYS: 'kiTradingApp_apiKeys',
-  USER_SETTINGS: 'kiTradingApp_userSettings'
-};
-
-const getDefaultSettings = (): VerifiedSettings => {
-  const defaultModel = modelProviderService.getDefaultModel();
-  const optimalProvider = defaultModel ? modelProviderService.getOptimalProvider(defaultModel.id) : null;
-  
-  return {
-    kucoin: {
-      key: '',
-      secret: '',
-      passphrase: '',
-      verified: false
-    },
-    openRouter: {
-      apiKey: '',
-      verified: false
-    },
-    model: {
-      id: defaultModel?.id || 'mistralai/mistral-7b-instruct',
-      provider: optimalProvider?.name || 'Groq',
-      priceUsdPer1k: optimalProvider?.priceUsdPer1k || 0,
-      latencyMs: optimalProvider?.latencyMs || 200,
-      verified: false
-    },
-    proxyUrl: KUCOIN_PROXY_BASE,
-    lastUpdated: Date.now()
-  };
-};
-
-const getDefaultBlocks = (): Record<string, SettingsBlock> => ({
-  kucoin: { name: 'KuCoin', verified: false, modified: false },
-  openRouter: { name: 'OpenRouter', verified: false, modified: false },
-  model: { name: 'KI-Modell', verified: false, modified: false },
-  proxy: { name: 'Proxy', verified: true, modified: false } // Proxy is optional, so verified by default
-});
-
-// Migration function to import old settings
-const migrateFromOldSettings = (): { settings: Partial<VerifiedSettings>, shouldMarkVerified: boolean } => {
-  try {
-    const oldApiKeys = localStorage.getItem(OLD_STORAGE_KEYS.API_KEYS);
-    const oldUserSettings = localStorage.getItem(OLD_STORAGE_KEYS.USER_SETTINGS);
-    
-    const migration: Partial<VerifiedSettings> = {};
-    let hasKucoinData = false;
-    let hasOpenRouterData = false;
-    
-    if (oldApiKeys) {
-      const apiKeys = JSON.parse(oldApiKeys);
-      console.log('🔄 Migrating old API keys:', { hasKucoin: !!(apiKeys.kucoinApiKey || apiKeys.kucoinApiSecret), hasOpenRouter: !!apiKeys.openRouterApiKey });
-      
-      // Use the correct field names for migration
-      if (apiKeys.kucoinApiKey || apiKeys.kucoinApiSecret || apiKeys.kucoinApiPassphrase) {
-        migration.kucoin = {
-          key: apiKeys.kucoinApiKey || '',
-          secret: apiKeys.kucoinApiSecret || '', // Map apiSecret to secret
-          passphrase: apiKeys.kucoinApiPassphrase || '',
-          verified: true // Mark as verified since these were working keys
-        };
-        hasKucoinData = !!(apiKeys.kucoinApiKey && apiKeys.kucoinApiSecret && apiKeys.kucoinApiPassphrase);
-      }
-      if (apiKeys.openRouterApiKey) {
-        migration.openRouter = {
-          apiKey: apiKeys.openRouterApiKey,
-          verified: true // Mark as verified since these were working keys
-        };
-        hasOpenRouterData = true;
-      }
-    }
-    
-    if (oldUserSettings) {
-      const userSettings = JSON.parse(oldUserSettings);
-      console.log('🔄 Migrating old user settings:', { hasProxy: !!userSettings.proxyUrl, hasModel: !!userSettings.selectedAiModelId });
-      
-      if (userSettings.proxyUrl) {
-        migration.proxyUrl = userSettings.proxyUrl;
-      }
-      if (userSettings.selectedAiModelId) {
-        const provider = modelProviderService.getOptimalProvider(userSettings.selectedAiModelId);
-        migration.model = {
-          id: userSettings.selectedAiModelId,
-          provider: provider?.name || 'OpenAI',
-          priceUsdPer1k: provider?.priceUsdPer1k || 0,
-          latencyMs: provider?.latencyMs || 500,
-          verified: true // Mark as verified since this was a working model
-        };
-      }
-    }
-    
-    const shouldMarkVerified = hasKucoinData && hasOpenRouterData;
-    
-    if (shouldMarkVerified) {
-      loggingService.logEvent('API', 'Successfully migrated and verified settings from old format');
-      console.log('✅ Migration successful - all blocks will be marked as verified');
-    } else {
-      loggingService.logEvent('API', 'Partial migration from old format - verification required');
-    }
-    
-    return { settings: migration, shouldMarkVerified };
-  } catch (error) {
-    console.warn('Could not migrate old settings:', error);
-    return { settings: {}, shouldMarkVerified: false };
-  }
-};
 
 export const useSettingsV2Store = create<SettingsV2State>((set, get) => ({
   settings: getDefaultSettings(),
@@ -143,7 +20,7 @@ export const useSettingsV2Store = create<SettingsV2State>((set, get) => ({
       let shouldMarkAllVerified = false;
       
       if (stored) {
-        const parsed = JSON.parse(stored) as VerifiedSettings;
+        const parsed = JSON.parse(stored);
         settings = {
           ...settings,
           ...parsed,
@@ -158,8 +35,7 @@ export const useSettingsV2Store = create<SettingsV2State>((set, get) => ({
           console.log('✅ Successfully migrated old settings to V2 format');
           
           // Clean up old storage keys after successful migration
-          localStorage.removeItem(OLD_STORAGE_KEYS.API_KEYS);
-          localStorage.removeItem(OLD_STORAGE_KEYS.USER_SETTINGS);
+          cleanupOldStorage();
         }
       }
       
@@ -204,7 +80,7 @@ export const useSettingsV2Store = create<SettingsV2State>((set, get) => ({
     }
   },
 
-  updateBlock: (blockName: string, data: Partial<VerifiedSettings>) => {
+  updateBlock: (blockName: string, data) => {
     const { settings, blocks } = get();
     const newSettings = { ...settings, ...data, lastUpdated: Date.now() };
     const newBlocks = {
