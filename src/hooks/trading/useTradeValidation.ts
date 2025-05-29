@@ -3,6 +3,7 @@ import { useCallback } from 'react';
 import { Signal, SimulationState, Position } from '@/types/simulation';
 import { useRiskManagement } from '../useRiskManagement';
 import { loggingService } from '@/services/loggingService';
+import { getOrderbookSnapshot, getSymbolInfo, roundToTickSize, validateOrderSize } from '@/utils/kucoin/marketData';
 
 export const useTradeValidation = () => {
   const isTradeableSignal = useCallback((signal: Signal): signal is Signal & { signalType: 'BUY' | 'SELL' } => {
@@ -21,10 +22,32 @@ export const useTradeValidation = () => {
 
       const { calculatePositionSize } = useRiskManagement('balanced');
       
-      // Get current market price
-      const currentPrice = typeof signal.entryPriceSuggestion === 'number' 
-        ? signal.entryPriceSuggestion 
-        : (signal.assetPair.includes('BTC') ? 60000 : 3000);
+      // Get realistic market price using enhanced market data
+      let currentPrice: number;
+      try {
+        const kucoinSymbol = signal.assetPair.replace('/', '-');
+        
+        if (typeof signal.entryPriceSuggestion === 'number') {
+          currentPrice = signal.entryPriceSuggestion;
+        } else {
+          // Get orderbook snapshot for realistic pricing
+          const orderbook = await getOrderbookSnapshot(kucoinSymbol);
+          
+          if (signal.signalType === 'BUY') {
+            currentPrice = orderbook.bestAsk > 0 ? orderbook.bestAsk : orderbook.price;
+          } else {
+            currentPrice = orderbook.bestBid > 0 ? orderbook.bestBid : orderbook.price;
+          }
+        }
+      } catch (priceError) {
+        // Fallback to mock price if market data unavailable
+        currentPrice = signal.assetPair.includes('BTC') ? 60000 : 3000;
+        loggingService.logEvent('TRADE', 'Auto-trade using fallback price', {
+          assetPair: signal.assetPair,
+          fallbackPrice: currentPrice,
+          reason: 'market_data_unavailable'
+        });
+      }
       
       // Calculate position size based on portfolio value
       const availableUSDT = simulationState.paperAssets.find(asset => asset.symbol === 'USDT')?.quantity || 0;
@@ -37,8 +60,47 @@ export const useTradeValidation = () => {
         };
       }
       
-      const actualPositionSize = positionResult.size;
-      const quantity = actualPositionSize / currentPrice;
+      let actualPositionSize = positionResult.size;
+      let quantity = actualPositionSize / currentPrice;
+      let finalPrice = currentPrice;
+      
+      // Apply tick size compliance if available
+      try {
+        const kucoinSymbol = signal.assetPair.replace('/', '-');
+        const symbolInfo = await getSymbolInfo(kucoinSymbol);
+        
+        if (symbolInfo) {
+          // Round price conservatively
+          if (signal.signalType === 'BUY') {
+            finalPrice = roundToTickSize(currentPrice, symbolInfo.priceIncrement, true);
+          } else {
+            finalPrice = roundToTickSize(currentPrice, symbolInfo.priceIncrement, false);
+          }
+          
+          // Recalculate and validate quantity
+          quantity = actualPositionSize / finalPrice;
+          const validation = validateOrderSize(finalPrice, quantity, symbolInfo);
+          
+          if (!validation.isValid) {
+            return {
+              success: false,
+              error: validation.reason || 'Order validation failed'
+            };
+          }
+          
+          if (validation.adjustedQuantity) {
+            quantity = validation.adjustedQuantity;
+            actualPositionSize = quantity * finalPrice;
+          }
+        }
+      } catch (symbolError) {
+        // Continue without tick size compliance if not available
+        loggingService.logEvent('TRADE', 'Auto-trade proceeding without tick size compliance', {
+          assetPair: signal.assetPair,
+          reason: 'symbol_info_unavailable'
+        });
+      }
+      
       const tradingFee = actualPositionSize * 0.001; // 0.1% fee
       const assetSymbol = signal.assetPair.split('/')[0] || signal.assetPair.split('-')[0];
       
@@ -47,7 +109,7 @@ export const useTradeValidation = () => {
         id: `pos_${Date.now()}`,
         assetPair: signal.assetPair,
         type: signal.signalType, // This is now guaranteed to be 'BUY' | 'SELL' due to type guard
-        entryPrice: currentPrice,
+        entryPrice: finalPrice,
         quantity,
         takeProfit: signal.takeProfitPrice,
         stopLoss: signal.stopLossPrice,
@@ -71,18 +133,20 @@ export const useTradeValidation = () => {
         updatedAssets.push({
           symbol: assetSymbol,
           quantity: quantity,
-          entryPrice: currentPrice
+          entryPrice: finalPrice
         });
       }
 
-      loggingService.logEvent('TRADE', 'Auto-trade executed successfully', {
+      loggingService.logEvent('TRADE', 'Realistic auto-trade executed successfully', {
         positionId: newPosition.id,
         assetPair: signal.assetPair,
         type: signal.signalType,
         quantity,
-        price: currentPrice,
+        originalPrice: currentPrice,
+        finalPrice,
         fee: tradingFee,
-        totalValue: actualPositionSize
+        totalValue: actualPositionSize,
+        tickSizeCompliant: finalPrice !== currentPrice
       });
 
       return {
@@ -92,7 +156,7 @@ export const useTradeValidation = () => {
         fee: tradingFee
       };
     } catch (error) {
-      loggingService.logError('Auto-trade execution failed', {
+      loggingService.logError('Realistic auto-trade execution failed', {
         error: error instanceof Error ? error.message : 'unknown',
         assetPair: signal.assetPair,
         signalType: signal.signalType

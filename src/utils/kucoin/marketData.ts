@@ -1,4 +1,3 @@
-
 import { cacheService, CACHE_TTL } from '@/services/cacheService';
 import { loggingService } from '@/services/loggingService';
 import { ApiError, ProxyError } from '../errors';
@@ -10,6 +9,227 @@ let globalActivityLogger: ActivityLogger | null = null;
 
 export function setMarketDataActivityLogger(logger: ActivityLogger | null) {
   globalActivityLogger = logger;
+}
+
+interface OrderbookSnapshot {
+  symbol: string;
+  bestBid: number;
+  bestAsk: number;
+  price: number; // Last trade price
+  timestamp: number;
+}
+
+interface SymbolInfo {
+  symbol: string;
+  name: string;
+  baseCurrency: string;
+  quoteCurrency: string;
+  baseMinSize: string;
+  quoteMinSize: string;
+  baseMaxSize: string;
+  quoteMaxSize: string;
+  baseIncrement: string;
+  quoteIncrement: string;
+  priceIncrement: string;
+  minFunds: string;
+  isMarginEnabled: boolean;
+  enableTrading: boolean;
+}
+
+// Enhanced price fetching function with orderbook data
+export async function getOrderbookSnapshot(symbol: string): Promise<OrderbookSnapshot> {
+  // Check cache first
+  const cachedSnapshot = cacheService.get<OrderbookSnapshot>('orderbook', symbol);
+  if (cachedSnapshot) {
+    loggingService.logEvent('API', `ORDERBOOK CACHE HIT ${symbol}`, {
+      symbol,
+      bestBid: cachedSnapshot.bestBid,
+      bestAsk: cachedSnapshot.bestAsk,
+      price: cachedSnapshot.price,
+      source: 'cache'
+    });
+    return cachedSnapshot;
+  }
+
+  try {
+    console.log(`🔍 Fetching orderbook snapshot for ${symbol}...`);
+    const response = await kucoinFetch('/api/v1/market/orderbook/level1', 'GET', { symbol });
+    
+    if (response.code === '200000' && response.data) {
+      const data = response.data;
+      const snapshot: OrderbookSnapshot = {
+        symbol,
+        bestBid: parseFloat(data.bestBid || data.price || '0'),
+        bestAsk: parseFloat(data.bestAsk || data.price || '0'),
+        price: parseFloat(data.price || '0'),
+        timestamp: Date.now()
+      };
+      
+      // Cache the snapshot
+      cacheService.set('orderbook', snapshot, CACHE_TTL.ORDERBOOK, symbol);
+      
+      loggingService.logSuccess(`ORDERBOOK FETCHED ${symbol}`, {
+        symbol,
+        bestBid: snapshot.bestBid,
+        bestAsk: snapshot.bestAsk,
+        price: snapshot.price,
+        spread: ((snapshot.bestAsk - snapshot.bestBid) / snapshot.bestBid * 100).toFixed(4),
+        source: 'level1_orderbook',
+        cached: true
+      });
+      
+      globalActivityLogger?.addKucoinSuccessLog('/api/v1/market/orderbook/level1', `Orderbook für ${symbol}: Bid $${snapshot.bestBid}, Ask $${snapshot.bestAsk}`);
+      return snapshot;
+    }
+    
+    throw new ApiError(new Response(JSON.stringify(response), { status: 400 }));
+  } catch (error) {
+    console.error(`❌ Failed to fetch orderbook for ${symbol}:`, error);
+    
+    // Fallback: try to get price from allTickers
+    try {
+      const price = await getPrice(symbol);
+      const fallbackSnapshot: OrderbookSnapshot = {
+        symbol,
+        bestBid: price,
+        bestAsk: price,
+        price,
+        timestamp: Date.now()
+      };
+      
+      loggingService.logEvent('API', `ORDERBOOK FALLBACK ${symbol}`, {
+        symbol,
+        price,
+        source: 'price_fallback'
+      });
+      
+      return fallbackSnapshot;
+    } catch (fallbackError) {
+      loggingService.logError(`ORDERBOOK FAILED ${symbol}`, {
+        symbol,
+        error: 'all_endpoints_failed'
+      });
+      
+      throw new ProxyError(`Orderbook for ${symbol} not available from any endpoint`);
+    }
+  }
+}
+
+// Get symbol information for tick size compliance
+export async function getSymbolInfo(symbol: string): Promise<SymbolInfo | null> {
+  // Check cache first
+  const cachedInfo = cacheService.get<SymbolInfo>('symbolInfo', symbol);
+  if (cachedInfo) {
+    loggingService.logEvent('API', `SYMBOL INFO CACHE HIT ${symbol}`, {
+      symbol,
+      source: 'cache'
+    });
+    return cachedInfo;
+  }
+
+  try {
+    console.log(`🔍 Fetching symbol info for ${symbol}...`);
+    const response = await kucoinFetch('/api/v1/symbols', 'GET');
+    
+    if (response.code === '200000' && response.data) {
+      const symbolData = response.data.find((s: any) => s.symbol === symbol);
+      
+      if (!symbolData) {
+        loggingService.logEvent('API', `SYMBOL NOT FOUND ${symbol}`, {
+          symbol,
+          reason: 'symbol_not_in_list'
+        });
+        return null;
+      }
+      
+      const symbolInfo: SymbolInfo = {
+        symbol: symbolData.symbol,
+        name: symbolData.name,
+        baseCurrency: symbolData.baseCurrency,
+        quoteCurrency: symbolData.quoteCurrency,
+        baseMinSize: symbolData.baseMinSize,
+        quoteMinSize: symbolData.quoteMinSize,
+        baseMaxSize: symbolData.baseMaxSize,
+        quoteMaxSize: symbolData.quoteMaxSize,
+        baseIncrement: symbolData.baseIncrement,
+        quoteIncrement: symbolData.quoteIncrement,
+        priceIncrement: symbolData.priceIncrement,
+        minFunds: symbolData.minFunds,
+        isMarginEnabled: symbolData.isMarginEnabled,
+        enableTrading: symbolData.enableTrading
+      };
+      
+      // Cache symbol info for 1 hour (rarely changes)
+      cacheService.set('symbolInfo', symbolInfo, 60 * 60 * 1000, symbol);
+      
+      loggingService.logSuccess(`SYMBOL INFO FETCHED ${symbol}`, {
+        symbol,
+        priceIncrement: symbolInfo.priceIncrement,
+        baseIncrement: symbolInfo.baseIncrement,
+        quoteMinSize: symbolInfo.quoteMinSize,
+        source: 'symbols_endpoint',
+        cached: true
+      });
+      
+      globalActivityLogger?.addKucoinSuccessLog('/api/v1/symbols', `Symbol-Info für ${symbol}: Preis-Step ${symbolInfo.priceIncrement}, Mengen-Step ${symbolInfo.baseIncrement}`);
+      return symbolInfo;
+    }
+    
+    throw new ApiError(new Response(JSON.stringify(response), { status: 400 }));
+  } catch (error) {
+    console.error(`❌ Failed to fetch symbol info for ${symbol}:`, error);
+    
+    loggingService.logError(`SYMBOL INFO FAILED ${symbol}`, {
+      symbol,
+      error: error instanceof Error ? error.message : 'unknown'
+    });
+    
+    return null;
+  }
+}
+
+// Utility functions for tick size compliance
+export function roundToTickSize(value: number, increment: string, roundUp: boolean = false): number {
+  const inc = parseFloat(increment);
+  if (inc <= 0) return value;
+  
+  if (roundUp) {
+    return Math.ceil(value / inc) * inc;
+  } else {
+    return Math.floor(value / inc) * inc;
+  }
+}
+
+export function validateOrderSize(
+  price: number,
+  quantity: number,
+  symbolInfo: SymbolInfo
+): { isValid: boolean; reason?: string; adjustedQuantity?: number } {
+  const quoteSize = price * quantity;
+  const minQuoteSize = parseFloat(symbolInfo.quoteMinSize);
+  const minBaseSize = parseFloat(symbolInfo.baseMinSize);
+  
+  if (quantity < minBaseSize) {
+    return {
+      isValid: false,
+      reason: `Menge zu klein. Minimum: ${symbolInfo.baseMinSize} ${symbolInfo.baseCurrency}`
+    };
+  }
+  
+  if (quoteSize < minQuoteSize) {
+    return {
+      isValid: false,
+      reason: `Orderwert zu klein. Minimum: ${symbolInfo.quoteMinSize} ${symbolInfo.quoteCurrency}`
+    };
+  }
+  
+  // Round quantity to valid increment
+  const adjustedQuantity = roundToTickSize(quantity, symbolInfo.baseIncrement, false);
+  
+  return {
+    isValid: true,
+    adjustedQuantity
+  };
 }
 
 // Enhanced price fetching function with caching

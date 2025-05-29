@@ -1,4 +1,3 @@
-
 interface CacheEntry<T> {
   data: T;
   fetchedAt: number;
@@ -12,6 +11,7 @@ interface CacheStore {
   prices: Record<string, CacheEntry<number>>;
   candles: Record<string, CacheEntry<any[]>>;
   orderbook: Record<string, CacheEntry<any>>;
+  symbolInfo: Record<string, CacheEntry<any>>;
 }
 
 class CacheService {
@@ -19,7 +19,8 @@ class CacheService {
   private cache: CacheStore = {
     prices: {},
     candles: {},
-    orderbook: {}
+    orderbook: {},
+    symbolInfo: {}
   };
   private proactiveRefreshCallbacks: Map<string, () => Promise<void>> = new Map();
 
@@ -34,7 +35,7 @@ class CacheService {
     const now = Date.now();
     
     if (subKey) {
-      // For nested caches like prices, candles, orderbook
+      // For nested caches like prices, candles, orderbook, symbolInfo
       const nestedCache = this.cache[key as keyof CacheStore] as Record<string, CacheEntry<T>>;
       const entry = nestedCache?.[subKey];
       
@@ -121,7 +122,8 @@ class CacheService {
     this.cache = {
       prices: {},
       candles: {},
-      orderbook: {}
+      orderbook: {},
+      symbolInfo: {}
     };
     console.log('🗑️ All cache invalidated');
   }
@@ -139,7 +141,8 @@ class CacheService {
       allTickersAge: this.cache.allTickers ? now - this.cache.allTickers.fetchedAt : -1,
       pricesCount: Object.keys(this.cache.prices).length,
       candlesCount: Object.keys(this.cache.candles).length,
-      orderbookCount: Object.keys(this.cache.orderbook).length
+      orderbookCount: Object.keys(this.cache.orderbook).length,
+      symbolInfoCount: Object.keys(this.cache.symbolInfo).length
     };
   }
 
@@ -169,7 +172,8 @@ export const CACHE_TTL = {
   ALL_TICKERS: 60 * 1000,   // 60 seconds
   PRICE: 30 * 1000,         // 30 seconds
   CANDLES: 120 * 1000,      // 2 minutes
-  ORDERBOOK: 15 * 1000      // 15 seconds
+  ORDERBOOK: 15 * 1000,     // 15 seconds
+  SYMBOL_INFO: 60 * 60 * 1000  // 1 hour (rarely changes)
 };
 
 // Simulation configuration constants
