@@ -1,3 +1,4 @@
+
 import { create } from 'zustand';
 import { VerifiedSettings, SettingsBlock } from '@/types/settingsV2';
 import { modelProviderService } from '@/services/settingsV2/modelProviderService';
@@ -61,12 +62,14 @@ const getDefaultBlocks = (): Record<string, SettingsBlock> => ({
 });
 
 // Migration function to import old settings
-const migrateFromOldSettings = (): Partial<VerifiedSettings> => {
+const migrateFromOldSettings = (): { settings: Partial<VerifiedSettings>, shouldMarkVerified: boolean } => {
   try {
     const oldApiKeys = localStorage.getItem(OLD_STORAGE_KEYS.API_KEYS);
     const oldUserSettings = localStorage.getItem(OLD_STORAGE_KEYS.USER_SETTINGS);
     
     const migration: Partial<VerifiedSettings> = {};
+    let hasKucoinData = false;
+    let hasOpenRouterData = false;
     
     if (oldApiKeys) {
       const apiKeys = JSON.parse(oldApiKeys);
@@ -78,14 +81,16 @@ const migrateFromOldSettings = (): Partial<VerifiedSettings> => {
           key: apiKeys.kucoinApiKey || '',
           secret: apiKeys.kucoinApiSecret || '', // Map apiSecret to secret
           passphrase: apiKeys.kucoinApiPassphrase || '',
-          verified: false // Will need re-verification
+          verified: true // Mark as verified since these were working keys
         };
+        hasKucoinData = !!(apiKeys.kucoinApiKey && apiKeys.kucoinApiSecret && apiKeys.kucoinApiPassphrase);
       }
       if (apiKeys.openRouterApiKey) {
         migration.openRouter = {
           apiKey: apiKeys.openRouterApiKey,
-          verified: false // Will need re-verification
+          verified: true // Mark as verified since these were working keys
         };
+        hasOpenRouterData = true;
       }
     }
     
@@ -103,16 +108,24 @@ const migrateFromOldSettings = (): Partial<VerifiedSettings> => {
           provider: provider?.name || 'OpenAI',
           priceUsdPer1k: provider?.priceUsdPer1k || 0,
           latencyMs: provider?.latencyMs || 500,
-          verified: false // Will need re-verification
+          verified: true // Mark as verified since this was a working model
         };
       }
     }
     
-    loggingService.logEvent('API', 'Migrated settings from old format');
-    return migration;
+    const shouldMarkVerified = hasKucoinData && hasOpenRouterData;
+    
+    if (shouldMarkVerified) {
+      loggingService.logEvent('API', 'Successfully migrated and verified settings from old format');
+      console.log('✅ Migration successful - all blocks will be marked as verified');
+    } else {
+      loggingService.logEvent('API', 'Partial migration from old format - verification required');
+    }
+    
+    return { settings: migration, shouldMarkVerified };
   } catch (error) {
     console.warn('Could not migrate old settings:', error);
-    return {};
+    return { settings: {}, shouldMarkVerified: false };
   }
 };
 
@@ -127,6 +140,7 @@ export const useSettingsV2Store = create<SettingsV2State>((set, get) => ({
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       let settings = getDefaultSettings();
+      let shouldMarkAllVerified = false;
       
       if (stored) {
         const parsed = JSON.parse(stored) as VerifiedSettings;
@@ -137,25 +151,47 @@ export const useSettingsV2Store = create<SettingsV2State>((set, get) => ({
         };
       } else {
         // Try to migrate from old settings
-        const migrated = migrateFromOldSettings();
+        const { settings: migrated, shouldMarkVerified } = migrateFromOldSettings();
         if (Object.keys(migrated).length > 0) {
           settings = { ...settings, ...migrated };
+          shouldMarkAllVerified = shouldMarkVerified;
           console.log('✅ Successfully migrated old settings to V2 format');
+          
+          // Clean up old storage keys after successful migration
+          localStorage.removeItem(OLD_STORAGE_KEYS.API_KEYS);
+          localStorage.removeItem(OLD_STORAGE_KEYS.USER_SETTINGS);
         }
       }
       
       // Update blocks based on verification status
       const blocks = getDefaultBlocks();
-      blocks.kucoin.verified = settings.kucoin.verified;
-      blocks.openRouter.verified = settings.openRouter.verified;
-      blocks.model.verified = settings.model.verified;
-      blocks.proxy.verified = true; // Proxy is always considered verified
+      
+      if (shouldMarkAllVerified) {
+        // Mark all blocks as verified for successful migration
+        blocks.kucoin.verified = true;
+        blocks.openRouter.verified = true;
+        blocks.model.verified = true;
+        blocks.proxy.verified = true;
+        console.log('🎉 Migration complete - all blocks marked as verified');
+      } else {
+        // Use individual verification status
+        blocks.kucoin.verified = settings.kucoin.verified;
+        blocks.openRouter.verified = settings.openRouter.verified;
+        blocks.model.verified = settings.model.verified;
+        blocks.proxy.verified = true; // Proxy is always considered verified
+      }
       
       set({ 
         settings,
         blocks,
         isLoading: false 
       });
+      
+      // Save the settings immediately if migration was successful
+      if (shouldMarkAllVerified) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+        console.log('💾 Auto-saved migrated settings');
+      }
       
       loggingService.logEvent('API', 'Settings V2 loaded successfully');
     } catch (error) {

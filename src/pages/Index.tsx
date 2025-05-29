@@ -1,35 +1,36 @@
 
 import React, { useState, useEffect } from 'react';
-import { useAppState } from '@/hooks/useAppState';
 import TradingDashboard from '@/components/TradingDashboard';
 import { Loader2 } from 'lucide-react';
 import SettingsManagerV2 from '@/components/settingsV2/SettingsManagerV2';
 import { useSettingsV2Store } from '@/stores/settingsV2Store';
 
 const Index = () => {
-  const { isSetupComplete, isLoading } = useAppState();
-  const { canSave } = useSettingsV2Store();
+  const { canSave, isLoading, settings } = useSettingsV2Store();
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
-    console.log('Index component mounted, checking setup status...');
+    console.log('Index component mounted, checking V2 setup status...');
     
     // Check if V2 settings are properly configured
     const hasValidV2Settings = canSave();
     
-    if (!isSetupComplete || !hasValidV2Settings) {
-      console.log('Index: Showing V2 onboarding');
+    // Check if user has any data at all (to distinguish between new user and migration case)
+    const hasAnyData = settings.kucoin.key || settings.openRouter.apiKey;
+    
+    if (!hasValidV2Settings) {
+      console.log('Index: V2 settings not complete, showing onboarding');
       setShowOnboarding(true);
     } else {
-      console.log('Index: Setup complete, showing dashboard');
+      console.log('Index: V2 setup complete, showing dashboard');
       setShowOnboarding(false);
     }
-  }, [isSetupComplete, canSave]);
+  }, [canSave, settings]);
 
   const handleOnboardingComplete = () => {
+    console.log('Onboarding completed, showing dashboard');
     setShowOnboarding(false);
-    // Force refresh of app state
-    window.location.reload();
+    // No reload needed - just update state
   };
 
   if (isLoading) {
