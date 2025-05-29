@@ -20,7 +20,7 @@ export const useOpenRouterVerification = () => {
     const startTime = Date.now();
 
     try {
-      // Use free model for testing
+      // Use the available free model from our modelProviders.json
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -30,7 +30,7 @@ export const useOpenRouterVerification = () => {
           'X-Title': 'KI Trading App'
         },
         body: JSON.stringify({
-          model: 'huggingfaceh4/zephyr-7b-beta', // Free model
+          model: 'mistralai/mistral-7b-instruct', // Available free model
           messages: [{ role: 'user', content: 'ping' }],
           max_tokens: 1
         })
@@ -49,6 +49,8 @@ export const useOpenRouterVerification = () => {
         return true;
       } else if (response.status === 401) {
         throw new Error('Ungültiger API-Key');
+      } else if (response.status === 404) {
+        throw new Error('Modell nicht verfügbar');
       } else {
         throw new Error(`HTTP ${response.status}`);
       }

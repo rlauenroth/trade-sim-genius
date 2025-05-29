@@ -18,6 +18,19 @@ export function setActivityLogger(logger: ActivityLogger | null) {
   globalActivityLogger = logger;
 }
 
+// Helper function to get temporary keys during verification
+function getTempKeys() {
+  try {
+    const tempKeys = localStorage.getItem('temp_kucoin_keys');
+    if (tempKeys) {
+      return JSON.parse(tempKeys);
+    }
+  } catch (error) {
+    console.warn('Could not parse temp keys:', error);
+  }
+  return null;
+}
+
 export async function kucoinFetch(
   path: string,
   method = 'GET',
@@ -25,7 +38,12 @@ export async function kucoinFetch(
   body?: unknown,
 ) {
   const startTime = Date.now();
-  const keys = getStoredKeys();
+  
+  // Try to get stored keys first, then temp keys for verification
+  let keys = getStoredKeys();
+  if (!keys) {
+    keys = getTempKeys();
+  }
   
   // Log API call start
   loggingService.logEvent('API', `CALL ${method} ${path}`, {

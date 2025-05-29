@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { VerificationResult } from '@/types/settingsV2';
 import { loggingService } from '@/services/loggingService';
+import { kucoinFetch } from '@/utils/kucoinProxyApi';
 
 export const useKucoinVerification = () => {
   const [isVerifying, setIsVerifying] = useState(false);
@@ -20,34 +21,30 @@ export const useKucoinVerification = () => {
     const startTime = Date.now();
 
     try {
-      // Simple timestamp request to verify credentials
-      const response = await fetch('/api/kucoin/timestamp', {
-        method: 'GET',
-        headers: {
-          'KC-API-KEY': apiKey,
-          'KC-API-SECRET': apiSecret,
-          'KC-API-PASSPHRASE': passphrase,
-          'Content-Type': 'application/json'
-        }
-      });
+      // Temporarily store the credentials for the verification
+      const tempKeys = { apiKey, apiSecret, passphrase };
+      localStorage.setItem('temp_kucoin_keys', JSON.stringify(tempKeys));
+
+      // Use the existing KuCoin infrastructure to test the connection
+      const response = await kucoinFetch('/api/v1/timestamp');
 
       const latencyMs = Date.now() - startTime;
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.code === '200000') {
-          setResult({ 
-            status: 'success', 
-            message: 'KuCoin-Verbindung erfolgreich',
-            latencyMs 
-          });
-          
-          loggingService.logEvent('API', `KuCoin verification successful (${latencyMs}ms)`);
-          return true;
-        }
+      if (response.code === '200000') {
+        setResult({ 
+          status: 'success', 
+          message: 'KuCoin-Verbindung erfolgreich',
+          latencyMs 
+        });
+        
+        loggingService.logEvent('API', `KuCoin verification successful (${latencyMs}ms)`);
+        
+        // Clean up temp keys
+        localStorage.removeItem('temp_kucoin_keys');
+        return true;
+      } else {
+        throw new Error(`KuCoin API Fehler: ${response.code} - ${response.msg}`);
       }
-
-      throw new Error(`KuCoin API Fehler: ${response.status}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler';
       setResult({ 
@@ -56,6 +53,9 @@ export const useKucoinVerification = () => {
       });
       
       loggingService.logError(`KuCoin verification failed: ${errorMessage}`);
+      
+      // Clean up temp keys on error
+      localStorage.removeItem('temp_kucoin_keys');
       return false;
     } finally {
       setIsVerifying(false);

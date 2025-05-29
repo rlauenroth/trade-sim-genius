@@ -60,8 +60,12 @@ export const useModelVerification = () => {
           latencyMs 
         });
         
-        loggingService.logEvent('AI', `Model ${modelId} verification successful (${latencyMs}ms)`);
+        loggingService.logEvent('API', `Model ${modelId} verification successful (${latencyMs}ms)`);
         return true;
+      } else if (response.status === 404) {
+        throw new Error('Modell nicht verfügbar - verwenden Sie ein anderes Modell');
+      } else if (response.status === 401) {
+        throw new Error('Ungültiger OpenRouter API-Key');
       } else {
         throw new Error(`HTTP ${response.status}`);
       }
