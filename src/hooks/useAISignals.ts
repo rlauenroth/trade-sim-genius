@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 import { Signal } from '@/types/simulation';
 import { Candidate } from '@/types/candidate';
@@ -47,8 +48,31 @@ export const useAISignals = () => {
       
       addLogEntry('AI', `Starte umfassende KI-Marktanalyse (${strategy})...`);
       
-      // Get API keys from localStorage
-      const storedKeys = JSON.parse(localStorage.getItem('kiTradingApp_apiKeys') || '{}');
+      // Validate API keys from settings store
+      const openRouterApiKey = settings.openRouter.apiKey;
+      const kucoinKeys = settings.kucoin;
+      
+      if (!openRouterApiKey || !settings.openRouter.verified) {
+        loggingService.logError('AI analysis failed - OpenRouter API key missing or not verified', {
+          hasApiKey: !!openRouterApiKey,
+          isVerified: settings.openRouter.verified
+        });
+        addLogEntry('ERROR', 'OpenRouter API-Schlüssel fehlt oder ist nicht verifiziert');
+        addLogEntry('INFO', 'Bitte konfigurieren Sie die API-Schlüssel in den Einstellungen');
+        return;
+      }
+
+      if (!kucoinKeys.key || !kucoinKeys.secret || !kucoinKeys.passphrase || !settings.kucoin.verified) {
+        loggingService.logError('AI analysis failed - KuCoin API keys missing or not verified', {
+          hasKey: !!kucoinKeys.key,
+          hasSecret: !!kucoinKeys.secret,
+          hasPassphrase: !!kucoinKeys.passphrase,
+          isVerified: settings.kucoin.verified
+        });
+        addLogEntry('ERROR', 'KuCoin API-Schlüssel fehlen oder sind nicht verifiziert');
+        addLogEntry('INFO', 'Bitte konfigurieren Sie die API-Schlüssel in den Einstellungen');
+        return;
+      }
       
       // Use actual portfolio value instead of hardcoded fallback
       const portfolioValue = simulationState?.currentPortfolioValue || null;
@@ -67,11 +91,11 @@ export const useAISignals = () => {
       
       const aiService = new AISignalService({
         kucoinCredentials: {
-          kucoinApiKey: storedKeys.kucoinApiKey || '',
-          kucoinApiSecret: storedKeys.kucoinApiSecret || '',
-          kucoinApiPassphrase: storedKeys.kucoinApiPassphrase || ''
+          kucoinApiKey: kucoinKeys.key,
+          kucoinApiSecret: kucoinKeys.secret,
+          kucoinApiPassphrase: kucoinKeys.passphrase
         },
-        openRouterApiKey: storedKeys.openRouterApiKey || '',
+        openRouterApiKey: openRouterApiKey,
         strategy: strategy, // Use dynamic strategy
         simulatedPortfolioValue: portfolioValue,
         availableUSDT: availableUSDT
@@ -79,18 +103,17 @@ export const useAISignals = () => {
       
       // Check if API is properly configured
       loggingService.logEvent('AI', 'Validating comprehensive API configuration', {
-        hasKucoinKeys: !!(storedKeys.kucoinApiKey && storedKeys.kucoinApiSecret && storedKeys.kucoinApiPassphrase),
-        hasOpenRouterKey: !!storedKeys.openRouterApiKey,
+        hasKucoinKeys: true, // Already validated above
+        hasOpenRouterKey: true, // Already validated above
         strategy: strategy
       });
       
       const isValidConfig = await aiService.isApiConfigurationValid();
       if (!isValidConfig) {
         loggingService.logError('AI analysis failed - invalid API configuration', {
-          hasKucoinKeys: !!(storedKeys.kucoinApiKey && storedKeys.kucoinApiSecret && storedKeys.kucoinApiPassphrase),
-          hasOpenRouterKey: !!storedKeys.openRouterApiKey
+          reason: 'api_validation_failed'
         });
-        addLogEntry('ERROR', 'OpenRouter API-Schlüssel ungültig oder nicht konfiguriert');
+        addLogEntry('ERROR', 'OpenRouter API-Schlüssel ungültig oder Konfiguration fehlerhaft');
         addLogEntry('INFO', 'Keine Demo-Signale verfügbar - nur echte KI-Analyse');
         return;
       }
@@ -209,7 +232,7 @@ export const useAISignals = () => {
       setAvailableSignals([]);
       setCurrentSignal(null);
     }
-  }, [clearCandidates, addCandidate, updateCandidateStatus, settings.tradingStrategy]);
+  }, [clearCandidates, addCandidate, updateCandidateStatus, settings]);
 
   return {
     currentSignal,
