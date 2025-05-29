@@ -13,10 +13,10 @@ export const getDefaultSettings = (): VerifiedSettings => ({
     verified: false
   },
   model: {
-    id: 'anthropic/claude-3.5-sonnet',
-    provider: 'anthropic',
-    priceUsdPer1k: 3.0,
-    latencyMs: 2000,
+    id: 'meta-llama/llama-4-scout',
+    provider: 'Meta',
+    priceUsdPer1k: 0.18,
+    latencyMs: 350,
     verified: false
   },
   proxyUrl: 'https://t3h.online/kucoin-proxy.php?path=',
