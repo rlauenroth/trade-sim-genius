@@ -1,3 +1,4 @@
+
 import { KUCOIN_PROXY_BASE, getStoredKeys } from '@/config';
 import { 
   RateLimitError, 
@@ -23,12 +24,26 @@ function getTempKeys() {
     const tempKeys = localStorage.getItem('temp_kucoin_keys');
     if (tempKeys) {
       const parsed = JSON.parse(tempKeys);
-      console.log('🔑 Retrieved temp keys:', { hasApiKey: !!parsed.apiKey, hasApiSecret: !!parsed.apiSecret, hasPassphrase: !!parsed.passphrase });
+      console.log('🔑 Retrieved temp keys:', { 
+        hasApiKey: !!parsed.apiKey, 
+        hasSecret: !!parsed.secret, 
+        hasPassphrase: !!parsed.passphrase 
+      });
       
-      // Ensure compatibility with both old and new field names
+      // Validate that all required fields are present and not empty
+      if (!parsed.apiKey || !parsed.secret || !parsed.passphrase) {
+        console.error('❌ Temp keys validation failed:', {
+          apiKey: parsed.apiKey ? 'present' : 'missing',
+          secret: parsed.secret ? 'present' : 'missing', 
+          passphrase: parsed.passphrase ? 'present' : 'missing'
+        });
+        return null;
+      }
+      
+      // Return keys with correct field names for auth functions
       return {
-        apiKey: parsed.apiKey || parsed.key,
-        apiSecret: parsed.apiSecret || parsed.secret,
+        apiKey: parsed.apiKey,
+        secret: parsed.secret,  // Use 'secret' field consistently
         passphrase: parsed.passphrase
       };
     }
