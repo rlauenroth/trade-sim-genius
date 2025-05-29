@@ -21,9 +21,15 @@ export const useKucoinVerification = () => {
     const startTime = Date.now();
 
     try {
-      // Temporarily store the credentials for the verification
-      const tempKeys = { apiKey, apiSecret, passphrase };
+      // Store temporary keys with correct field names for kucoinFetch
+      const tempKeys = { 
+        apiKey, 
+        apiSecret,  // Use apiSecret (not secret) to match old format
+        passphrase 
+      };
       localStorage.setItem('temp_kucoin_keys', JSON.stringify(tempKeys));
+
+      console.log('🔑 KuCoin verification: Stored temp keys');
 
       // Use the existing KuCoin infrastructure to test the connection
       const response = await kucoinFetch('/api/v1/timestamp');

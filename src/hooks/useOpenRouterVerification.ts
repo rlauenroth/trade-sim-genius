@@ -49,10 +49,24 @@ export const useOpenRouterVerification = () => {
         return true;
       } else if (response.status === 401) {
         throw new Error('Ungültiger API-Key');
+      } else if (response.status === 403) {
+        throw new Error('API-Key-Limit erreicht - bitte verwenden Sie einen anderen Key oder warten Sie');
       } else if (response.status === 404) {
         throw new Error('Modell nicht verfügbar');
+      } else if (response.status === 429) {
+        throw new Error('Rate-Limit erreicht - bitte warten Sie einen Moment');
       } else {
-        throw new Error(`HTTP ${response.status}`);
+        // Try to get more details from the response
+        let errorDetails = `HTTP ${response.status}`;
+        try {
+          const errorBody = await response.json();
+          if (errorBody.error?.message) {
+            errorDetails = errorBody.error.message;
+          }
+        } catch (e) {
+          // Ignore JSON parse errors
+        }
+        throw new Error(errorDetails);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler';

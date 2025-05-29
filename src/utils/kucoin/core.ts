@@ -1,4 +1,3 @@
-
 import { KUCOIN_PROXY_BASE, getStoredKeys } from '@/config';
 import { 
   RateLimitError, 
@@ -23,7 +22,15 @@ function getTempKeys() {
   try {
     const tempKeys = localStorage.getItem('temp_kucoin_keys');
     if (tempKeys) {
-      return JSON.parse(tempKeys);
+      const parsed = JSON.parse(tempKeys);
+      console.log('🔑 Retrieved temp keys:', { hasApiKey: !!parsed.apiKey, hasApiSecret: !!parsed.apiSecret, hasPassphrase: !!parsed.passphrase });
+      
+      // Ensure compatibility with both old and new field names
+      return {
+        apiKey: parsed.apiKey || parsed.key,
+        apiSecret: parsed.apiSecret || parsed.secret,
+        passphrase: parsed.passphrase
+      };
     }
   } catch (error) {
     console.warn('Could not parse temp keys:', error);

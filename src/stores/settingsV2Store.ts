@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import { VerifiedSettings, SettingsBlock } from '@/types/settingsV2';
 import { modelProviderService } from '@/services/settingsV2/modelProviderService';
@@ -71,10 +70,13 @@ const migrateFromOldSettings = (): Partial<VerifiedSettings> => {
     
     if (oldApiKeys) {
       const apiKeys = JSON.parse(oldApiKeys);
+      console.log('🔄 Migrating old API keys:', { hasKucoin: !!(apiKeys.kucoinApiKey || apiKeys.kucoinApiSecret), hasOpenRouter: !!apiKeys.openRouterApiKey });
+      
+      // Use the correct field names for migration
       if (apiKeys.kucoinApiKey || apiKeys.kucoinApiSecret || apiKeys.kucoinApiPassphrase) {
         migration.kucoin = {
           key: apiKeys.kucoinApiKey || '',
-          secret: apiKeys.kucoinApiSecret || '',
+          secret: apiKeys.kucoinApiSecret || '', // Map apiSecret to secret
           passphrase: apiKeys.kucoinApiPassphrase || '',
           verified: false // Will need re-verification
         };
@@ -89,6 +91,8 @@ const migrateFromOldSettings = (): Partial<VerifiedSettings> => {
     
     if (oldUserSettings) {
       const userSettings = JSON.parse(oldUserSettings);
+      console.log('🔄 Migrating old user settings:', { hasProxy: !!userSettings.proxyUrl, hasModel: !!userSettings.selectedAiModelId });
+      
       if (userSettings.proxyUrl) {
         migration.proxyUrl = userSettings.proxyUrl;
       }
@@ -136,6 +140,7 @@ export const useSettingsV2Store = create<SettingsV2State>((set, get) => ({
         const migrated = migrateFromOldSettings();
         if (Object.keys(migrated).length > 0) {
           settings = { ...settings, ...migrated };
+          console.log('✅ Successfully migrated old settings to V2 format');
         }
       }
       
