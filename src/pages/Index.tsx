@@ -1,94 +1,62 @@
 
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, Bot, Loader2 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import SetupWizard from '@/components/SetupWizard';
-import TradingDashboard from '@/components/TradingDashboard';
 import { useAppState } from '@/hooks/useAppState';
+import TradingDashboard from '@/components/TradingDashboard';
+import { Loader2 } from 'lucide-react';
+import SettingsManagerV2 from '@/components/settingsV2/SettingsManagerV2';
+import { useSettingsV2Store } from '@/stores/settingsV2Store';
 
 const Index = () => {
-  const { 
-    isSetupComplete, 
-    isLoading,
-    checkSetupStatus,
-    loadApiKeys,
-    checkFirstTimeSetup
-  } = useAppState();
+  const { isSetupComplete, isLoading } = useAppState();
+  const { canSave } = useSettingsV2Store();
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     console.log('Index component mounted, checking setup status...');
-    checkSetupStatus();
-    loadApiKeys();
-  }, [checkSetupStatus, loadApiKeys]);
-
-  useEffect(() => {
-    // Check if this is first time after setup once we have loaded everything
-    if (isSetupComplete && !isLoading) {
-      checkFirstTimeSetup();
+    
+    // Check if V2 settings are properly configured
+    const hasValidV2Settings = canSave();
+    
+    if (!isSetupComplete || !hasValidV2Settings) {
+      console.log('Index: Showing V2 onboarding');
+      setShowOnboarding(true);
+    } else {
+      console.log('Index: Setup complete, showing dashboard');
+      setShowOnboarding(false);
     }
-  }, [isSetupComplete, isLoading, checkFirstTimeSetup]);
+  }, [isSetupComplete, canSave]);
 
-  // Monitor state changes for debugging
-  useEffect(() => {
-    console.log('=== INDEX STATE CHANGE ===', { 
-      isSetupComplete, 
-      isLoading
-    });
-  }, [isSetupComplete, isLoading]);
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
+    // Force refresh of app state
+    window.location.reload();
+  };
 
-  // Show loading spinner while loading
   if (isLoading) {
-    console.log('Index: Showing loading screen...');
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-center min-h-[60vh]">
-            <Card className="w-full max-w-md bg-slate-800 border-slate-700">
-              <CardContent className="flex items-center justify-center py-12">
-                <div className="text-center space-y-4">
-                  <Loader2 className="h-8 w-8 animate-spin text-blue-400 mx-auto" />
-                  <div className="text-white font-medium">
-                    App wird geladen...
-                  </div>
-                  <div className="text-slate-400 text-sm">
-                    Bitte warten Sie einen Moment.
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <div className="flex items-center space-x-2 text-white">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Lade App...</span>
         </div>
       </div>
     );
   }
 
-  // Show setup wizard if first time user
-  if (!isSetupComplete) {
-    console.log('Index: Showing setup wizard');
+  if (showOnboarding) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-center mb-8">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-blue-600 rounded-xl">
-                <Bot className="h-8 w-8 text-white" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-white">KI Trading Assistant</h1>
-                <p className="text-slate-400">Intelligente Krypto-Trading Signale</p>
-              </div>
-            </div>
-          </div>
-          <SetupWizard />
-        </div>
+      <div className="min-h-screen bg-gray-900">
+        <SettingsManagerV2
+          isOnboarding={true}
+          isOpen={true}
+          onClose={handleOnboardingComplete}
+        />
       </div>
     );
   }
 
-  // Show main trading dashboard
-  console.log('Index: Showing trading dashboard (setup complete)');
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="min-h-screen bg-gray-900">
       <TradingDashboard />
     </div>
   );
