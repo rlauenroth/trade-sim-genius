@@ -1,5 +1,4 @@
 
-
 export const KUCOIN_PROXY_BASE = 'https://t3h.online/kucoin-proxy.php?path=';
 
 // Memory cache for API keys with TTL
@@ -27,8 +26,31 @@ export const getStoredKeys = () => {
     return apiKeyCache.keys;
   }
   
-  // Refresh from localStorage
+  // Refresh from localStorage - try V2 settings first
   try {
+    // Try V2 settings first
+    const v2Settings = localStorage.getItem('kiTradingApp_settingsV2');
+    if (v2Settings) {
+      const parsed = JSON.parse(v2Settings);
+      if (parsed.kucoin && parsed.kucoin.key && parsed.kucoin.secret && parsed.kucoin.passphrase) {
+        const keys = {
+          apiKey: parsed.kucoin.key,
+          secret: parsed.kucoin.secret,
+          passphrase: parsed.kucoin.passphrase
+        };
+        
+        // Update cache
+        apiKeyCache = {
+          keys,
+          timestamp: now
+        };
+        
+        console.log('✅ API keys loaded successfully from V2 settings');
+        return keys;
+      }
+    }
+    
+    // Fallback to old format
     const stored = localStorage.getItem('kiTradingApp_apiKeys');
     if (stored) {
       const parsed = JSON.parse(stored);
@@ -59,7 +81,7 @@ export const getStoredKeys = () => {
           timestamp: now
         };
         
-        console.log('✅ API keys loaded successfully from storage');
+        console.log('✅ API keys loaded successfully from legacy storage');
         return keys;
       }
     }
@@ -85,4 +107,3 @@ export const migrateProxyUrl = (currentUrl: string): string => {
   
   return currentUrl;
 };
-

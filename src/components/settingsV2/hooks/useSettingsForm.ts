@@ -12,7 +12,14 @@ export const useSettingsForm = () => {
     kucoinPassphrase: '',
     openRouterKey: '',
     modelId: '',
-    proxyUrl: ''
+    proxyUrl: '',
+    tradingMode: 'simulation' as 'simulation' | 'real',
+    riskLimits: {
+      maxOpenOrders: 5,
+      maxExposure: 1000,
+      minBalance: 50,
+      requireConfirmation: true
+    }
   });
 
   // Initialize form data from settings
@@ -23,11 +30,13 @@ export const useSettingsForm = () => {
       kucoinPassphrase: settings.kucoin.passphrase,
       openRouterKey: settings.openRouter.apiKey,
       modelId: settings.model.id,
-      proxyUrl: settings.proxyUrl
+      proxyUrl: settings.proxyUrl,
+      tradingMode: settings.tradingMode,
+      riskLimits: settings.riskLimits
     });
   }, [settings]);
 
-  const handleFieldChange = (field: string, value: string) => {
+  const handleFieldChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     
     // Update store and mark block as modified
@@ -58,6 +67,10 @@ export const useSettingsForm = () => {
       }
     } else if (field === 'proxyUrl') {
       updateBlock('proxy', { proxyUrl: value });
+    } else if (field === 'tradingMode') {
+      updateBlock('trading', { tradingMode: value });
+    } else if (field === 'riskLimits') {
+      updateBlock('trading', { riskLimits: value });
     }
   };
 

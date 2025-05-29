@@ -1,38 +1,59 @@
 
-import { VerifiedSettings, SettingsBlock } from '@/types/settingsV2';
-import { modelProviderService } from '@/services/settingsV2/modelProviderService';
-import { KUCOIN_PROXY_BASE } from '@/config';
+import { VerifiedSettings, SettingsBlock } from './types';
 
-export const getDefaultSettings = (): VerifiedSettings => {
-  const defaultModel = modelProviderService.getDefaultModel();
-  const optimalProvider = defaultModel ? modelProviderService.getOptimalProvider(defaultModel.id) : null;
-  
-  return {
-    kucoin: {
-      key: '',
-      secret: '',
-      passphrase: '',
-      verified: false
-    },
-    openRouter: {
-      apiKey: '',
-      verified: false
-    },
-    model: {
-      id: defaultModel?.id || 'mistralai/mistral-7b-instruct',
-      provider: optimalProvider?.name || 'Groq',
-      priceUsdPer1k: optimalProvider?.priceUsdPer1k || 0,
-      latencyMs: optimalProvider?.latencyMs || 200,
-      verified: false
-    },
-    proxyUrl: KUCOIN_PROXY_BASE,
-    lastUpdated: Date.now()
-  };
-};
+export const getDefaultSettings = (): VerifiedSettings => ({
+  kucoin: {
+    key: '',
+    secret: '',
+    passphrase: '',
+    verified: false
+  },
+  openRouter: {
+    apiKey: '',
+    verified: false
+  },
+  model: {
+    id: 'anthropic/claude-3.5-sonnet',
+    provider: 'anthropic',
+    priceUsdPer1k: 3.0,
+    latencyMs: 2000,
+    verified: false
+  },
+  proxyUrl: 'https://t3h.online/kucoin-proxy.php?path=',
+  tradingMode: 'simulation',
+  riskLimits: {
+    maxOpenOrders: 5,
+    maxExposure: 1000,
+    minBalance: 50,
+    requireConfirmation: true
+  },
+  lastUpdated: Date.now()
+});
 
 export const getDefaultBlocks = (): Record<string, SettingsBlock> => ({
-  kucoin: { name: 'KuCoin', verified: false, modified: false },
-  openRouter: { name: 'OpenRouter', verified: false, modified: false },
-  model: { name: 'KI-Modell', verified: false, modified: false },
-  proxy: { name: 'Proxy', verified: true, modified: false } // Proxy is optional, so verified by default
+  kucoin: {
+    name: 'KuCoin API',
+    verified: false,
+    modified: false
+  },
+  openRouter: {
+    name: 'OpenRouter API',
+    verified: false,
+    modified: false
+  },
+  model: {
+    name: 'AI Model',
+    verified: false,
+    modified: false
+  },
+  proxy: {
+    name: 'Proxy Connection',
+    verified: true,
+    modified: false
+  },
+  trading: {
+    name: 'Trading Mode',
+    verified: true,
+    modified: false
+  }
 });

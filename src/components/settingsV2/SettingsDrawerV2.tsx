@@ -11,6 +11,7 @@ import KucoinSection from './sections/KucoinSection';
 import OpenRouterSection from './sections/OpenRouterSection';
 import ModelSection from './sections/ModelSection';
 import ProxySection from './sections/ProxySection';
+import TradingModeSection from './sections/TradingModeSection';
 
 interface SettingsDrawerV2Props {
   isOpen: boolean;
@@ -89,6 +90,11 @@ const SettingsDrawerV2 = ({ isOpen, onClose, isOnboarding = false }: SettingsDra
             isVerifying={verificationHandlers.proxyVerification.isVerifying}
             verificationStatus={getVerificationStatus('proxy', blocks, verificationHandlers)}
             verificationMessage={getVerificationMessage('proxy', verificationHandlers)}
+          />
+
+          <TradingModeSection
+            formData={formData}
+            onFieldChange={handleFieldChange}
           />
         </div>
 
