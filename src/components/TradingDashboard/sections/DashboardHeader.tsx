@@ -34,11 +34,10 @@ const DashboardHeaderSection = ({
     <>
       <div className="flex items-center justify-between mb-4">
         <DashboardHeader 
-          isSimulationActive={isSimulationActive}
-          isPaused={isPaused}
-          onLogout={onLogout}
-          onOpenSettings={onOpenSettings}
-          onRefresh={onRefresh}
+          onSettingsClick={onOpenSettings}
+          onRefreshClick={onRefresh}
+          onLogoutClick={onLogout}
+          isRefreshing={false}
         />
         
         {/* Trading Mode Indicator */}
