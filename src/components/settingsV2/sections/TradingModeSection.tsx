@@ -32,7 +32,7 @@ const TradingModeSection = ({ formData, onFieldChange }: TradingModeSectionProps
           requireConfirmation: settings.riskLimits.requireConfirmation ?? true
         };
         
-        loggingService.logEvent('SETTINGS', 'Risk limits initialized', {
+        loggingService.logEvent('SIM', 'Risk limits initialized', {
           defaultRiskLimits,
           tradingMode: formData.tradingMode || settings.tradingMode
         });
@@ -64,7 +64,7 @@ const TradingModeSection = ({ formData, onFieldChange }: TradingModeSectionProps
           // Update the settings store as well
           updateBlock('trading', { tradingMode: 'real' });
           
-          loggingService.logEvent('SETTINGS', 'Real trading mode enabled', {
+          loggingService.logEvent('SIM', 'Real trading mode enabled', {
             skippedWarning: true,
             riskLimits: currentRiskLimits
           });
@@ -77,7 +77,7 @@ const TradingModeSection = ({ formData, onFieldChange }: TradingModeSectionProps
         onFieldChange('tradingMode', 'simulation');
         updateBlock('trading', { tradingMode: 'simulation' });
         
-        loggingService.logEvent('SETTINGS', 'Switched back to simulation mode');
+        loggingService.logEvent('SIM', 'Switched back to simulation mode');
       }
       
       // Clear any previous initialization errors
@@ -95,7 +95,7 @@ const TradingModeSection = ({ formData, onFieldChange }: TradingModeSectionProps
       updateBlock('trading', { tradingMode: 'real' });
       setIsRealTradingModalOpen(false);
       
-      loggingService.logEvent('SETTINGS', 'Real trading mode confirmed via modal', {
+      loggingService.logEvent('SIM', 'Real trading mode confirmed via modal', {
         riskLimits: formData.riskLimits || settings.riskLimits
       });
     } catch (error) {
@@ -121,7 +121,7 @@ const TradingModeSection = ({ formData, onFieldChange }: TradingModeSectionProps
       // Also update the settings store
       updateBlock('trading', { riskLimits: updatedRiskLimits });
       
-      loggingService.logEvent('SETTINGS', 'Risk limit updated', {
+      loggingService.logEvent('SIM', 'Risk limit updated', {
         field,
         value,
         updatedRiskLimits
