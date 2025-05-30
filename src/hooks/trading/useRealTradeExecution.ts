@@ -7,18 +7,28 @@ import { loggingService } from '@/services/loggingService';
 import { realTradingService } from '@/services/realTradingService';
 import { kucoinWebsocketService } from '@/services/kucoinWebsocketService';
 import { useSettingsV2Store } from '@/stores/settingsV2';
-import { useAppState } from '../useAppState';
 
 export const useRealTradeExecution = () => {
   const { settings } = useSettingsV2Store();
-  const { apiKeys } = useAppState();
 
   const executeRealTrade = useCallback(async (
     signal: Signal,
     addLogEntry: (type: any, message: string) => void,
     addTradeLog: (tradeData: any) => void
   ) => {
-    if (!apiKeys) {
+    // Create API keys from centralized store
+    const apiKeys = {
+      kucoin: {
+        key: settings.kucoin.key,
+        secret: settings.kucoin.secret,
+        passphrase: settings.kucoin.passphrase
+      },
+      openRouter: {
+        apiKey: settings.openRouter.apiKey
+      }
+    };
+
+    if (!apiKeys.kucoin.key || !apiKeys.kucoin.secret || !apiKeys.kucoin.passphrase) {
       throw new Error('API Keys nicht konfiguriert für Real-Trading');
     }
 
@@ -90,7 +100,7 @@ export const useRealTradeExecution = () => {
 
       loggingService.logSuccess(`Real trade executed: Order ID ${orderResponse.orderId}`);
     }
-  }, [apiKeys, settings]);
+  }, [settings]);
 
   return { executeRealTrade };
 };

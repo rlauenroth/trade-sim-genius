@@ -1,15 +1,22 @@
-import { ApiKeys, TradeOrder, OrderResponse, RiskLimits } from '@/types/appState';
+
+import { TradeOrder, OrderResponse, RiskLimits } from '@/types/appState';
 import { createOrder, getOrderStatus, getAllOrders, getAccountBalances } from '@/utils/kucoin/trading';
 import { loggingService } from '@/services/loggingService';
+import { useSettingsV2Store } from '@/stores/settingsV2';
 
-interface KuCoinCredentials {
-  kucoinApiKey: string;
-  kucoinApiSecret: string;
-  kucoinApiPassphrase: string;
+interface ApiKeys {
+  kucoin: {
+    key: string;
+    secret: string;
+    passphrase: string;
+  };
+  openRouter: {
+    apiKey: string;
+  };
 }
 
 // Convert ApiKeys to KuCoinCredentials format
-const convertApiKeys = (apiKeys: ApiKeys): KuCoinCredentials => ({
+const convertApiKeys = (apiKeys: ApiKeys): { kucoinApiKey: string; kucoinApiSecret: string; kucoinApiPassphrase: string } => ({
   kucoinApiKey: apiKeys.kucoin.key,
   kucoinApiSecret: apiKeys.kucoin.secret,
   kucoinApiPassphrase: apiKeys.kucoin.passphrase
@@ -24,6 +31,37 @@ class RealTradingService {
     requireConfirmation: true
   };
 
+  // New method to retrieve settings from the centralized store
+  private getSettingsFromStore(): { apiKeys: ApiKeys, riskLimits: RiskLimits } {
+    try {
+      const { settings } = useSettingsV2Store.getState();
+      
+      const apiKeys: ApiKeys = {
+        kucoin: {
+          key: settings.kucoin.key,
+          secret: settings.kucoin.secret,
+          passphrase: settings.kucoin.passphrase
+        },
+        openRouter: {
+          apiKey: settings.openRouter.apiKey
+        }
+      };
+      
+      const riskLimits: RiskLimits = settings.riskLimits;
+      
+      return { apiKeys, riskLimits };
+    } catch (error) {
+      loggingService.logError('Failed to get settings from store', { 
+        error: error instanceof Error ? error.message : 'unknown' 
+      });
+      return { 
+        apiKeys: this.apiKeys || { kucoin: { key: '', secret: '', passphrase: '' }, openRouter: { apiKey: '' } },
+        riskLimits: this.riskLimits
+      };
+    }
+  }
+
+  // Set API keys (for backward compatibility)
   setApiKeys(keys: ApiKeys) {
     try {
       if (!keys || !keys.kucoin || !keys.kucoin.key || !keys.kucoin.secret || !keys.kucoin.passphrase) {
@@ -38,6 +76,7 @@ class RealTradingService {
     }
   }
 
+  // Set risk limits (for backward compatibility)
   setRiskLimits(limits: RiskLimits) {
     try {
       if (!limits || typeof limits.maxOpenOrders !== 'number' || typeof limits.maxExposure !== 'number') {
@@ -59,7 +98,14 @@ class RealTradingService {
   }
 
   async executeRealTrade(trade: TradeOrder): Promise<OrderResponse | null> {
-    if (!this.apiKeys) {
+    // Get fresh settings from the store
+    const { apiKeys: storeApiKeys, riskLimits: storeRiskLimits } = this.getSettingsFromStore();
+    
+    // Use stored api keys as a fallback only if not available in the store
+    const apiKeysToUse = storeApiKeys.kucoin.key ? storeApiKeys : this.apiKeys;
+    const riskLimitsToUse = storeRiskLimits.maxOpenOrders ? storeRiskLimits : this.riskLimits;
+    
+    if (!apiKeysToUse) {
       const error = new Error('API keys not configured for real trading');
       loggingService.logError('Real trade execution failed - no API keys');
       throw error;
@@ -67,10 +113,10 @@ class RealTradingService {
 
     try {
       // Enhanced pre-trade risk checks with real API data
-      await this.performEnhancedPreTradeChecks(trade);
+      await this.performEnhancedPreTradeChecks(trade, apiKeysToUse, riskLimitsToUse);
 
       // Convert API keys format
-      const credentials = convertApiKeys(this.apiKeys);
+      const credentials = convertApiKeys(apiKeysToUse);
 
       // Execute the trade
       console.log('Executing real trade:', trade);
@@ -93,13 +139,17 @@ class RealTradingService {
       console.error('Real trade execution failed:', error);
       loggingService.logError(`Real trade failed: ${errorMessage}`, {
         trade,
-        riskLimits: this.riskLimits
+        riskLimits: riskLimitsToUse
       });
       throw error;
     }
   }
 
-  private async performEnhancedPreTradeChecks(trade: TradeOrder): Promise<void> {
+  private async performEnhancedPreTradeChecks(
+    trade: TradeOrder, 
+    apiKeys: ApiKeys, 
+    riskLimits: RiskLimits
+  ): Promise<void> {
     try {
       console.log('Performing enhanced pre-trade checks for:', trade);
       
@@ -107,7 +157,7 @@ class RealTradingService {
         throw new Error('Invalid trade parameters - missing size or symbol');
       }
 
-      const credentials = convertApiKeys(this.apiKeys!);
+      const credentials = convertApiKeys(apiKeys);
 
       // Get real account balances
       const balances = await getAccountBalances(credentials);
@@ -116,12 +166,12 @@ class RealTradingService {
 
       loggingService.logEvent('TRADE', 'Real account balance retrieved', {
         availableUSDT,
-        minBalanceRequired: this.riskLimits.minBalance
+        minBalanceRequired: riskLimits.minBalance
       });
 
       // Check minimum balance requirement
-      if (availableUSDT < this.riskLimits.minBalance) {
-        throw new Error(`Insufficient balance. Available: $${availableUSDT.toFixed(2)}, minimum required: $${this.riskLimits.minBalance}`);
+      if (availableUSDT < riskLimits.minBalance) {
+        throw new Error(`Insufficient balance. Available: $${availableUSDT.toFixed(2)}, minimum required: $${riskLimits.minBalance}`);
       }
 
       // Get current open orders
@@ -130,12 +180,12 @@ class RealTradingService {
 
       loggingService.logEvent('TRADE', 'Current open orders retrieved', {
         openOrdersCount: currentOpenOrdersCount,
-        maxAllowed: this.riskLimits.maxOpenOrders
+        maxAllowed: riskLimits.maxOpenOrders
       });
 
       // Check max open orders limit
-      if (currentOpenOrdersCount >= this.riskLimits.maxOpenOrders) {
-        throw new Error(`Maximum open orders limit reached. Current: ${currentOpenOrdersCount}, maximum allowed: ${this.riskLimits.maxOpenOrders}`);
+      if (currentOpenOrdersCount >= riskLimits.maxOpenOrders) {
+        throw new Error(`Maximum open orders limit reached. Current: ${currentOpenOrdersCount}, maximum allowed: ${riskLimits.maxOpenOrders}`);
       }
 
       // Calculate total exposure from existing orders
@@ -149,8 +199,8 @@ class RealTradingService {
 
       // Check total exposure limit
       const newTotalExposure = totalCurrentExposure + estimatedTradeValue;
-      if (newTotalExposure > this.riskLimits.maxExposure) {
-        throw new Error(`Total exposure limit exceeded. Current: $${totalCurrentExposure.toFixed(2)}, new trade: $${estimatedTradeValue.toFixed(2)}, total would be: $${newTotalExposure.toFixed(2)}, maximum allowed: $${this.riskLimits.maxExposure}`);
+      if (newTotalExposure > riskLimits.maxExposure) {
+        throw new Error(`Total exposure limit exceeded. Current: $${totalCurrentExposure.toFixed(2)}, new trade: $${estimatedTradeValue.toFixed(2)}, total would be: $${newTotalExposure.toFixed(2)}, maximum allowed: $${riskLimits.maxExposure}`);
       }
 
       // Check if sufficient balance for trade
@@ -169,7 +219,7 @@ class RealTradingService {
         newTotalExposure,
         availableUSDT,
         currentOpenOrders: currentOpenOrdersCount,
-        limits: this.riskLimits
+        limits: riskLimits
       });
     } catch (error) {
       loggingService.logError('Enhanced pre-trade checks failed', {

@@ -1,3 +1,4 @@
+
 import { useCallback, useEffect } from 'react';
 import { Signal } from '@/types/simulation';
 import { useSimulationState } from './useSimulationState';
@@ -10,8 +11,7 @@ import { useSimulationTimers } from './useSimulationTimers';
 import { useExitScreening } from './useExitScreening';
 import { useCircuitBreakerOptimized } from './useCircuitBreakerOptimized';
 import { usePerformanceMonitoring } from './usePerformanceMonitoring';
-import { useSettingsStore } from '@/stores/settingsStore';
-import { useAppState } from './useAppState';
+import { useSettingsV2Store } from '@/stores/settingsV2';
 import { usePortfolioEvaluation } from './usePortfolioEvaluation';
 
 export const useSimulation = () => {
@@ -35,8 +35,33 @@ export const useSimulation = () => {
   } = useAISignals();
 
   const { activityLog, addLogEntry } = useActivityLog();
-  const { userSettings } = useSettingsStore();
-  const { apiKeys } = useAppState();
+  
+  // Use centralized settings store instead of legacy store
+  const { settings } = useSettingsV2Store();
+  
+  // Create userSettings object from centralized store for backwards compatibility
+  const userSettings = {
+    tradingMode: settings.tradingMode,
+    tradingStrategy: settings.tradingStrategy,
+    riskLimits: settings.riskLimits,
+    openRouterApiKey: settings.openRouter.apiKey,
+    proxyUrl: settings.proxyUrl,
+    selectedAiModelId: settings.model.id,
+    isRealTradingEnabled: settings.tradingMode === 'real',
+    maxConcurrentTrades: settings.riskLimits.maxOpenOrders,
+    tradeAllBalance: false,
+    maxUsdPerTrade: settings.riskLimits.maxExposure
+  };
+
+  // Create apiKeys object from centralized store for backwards compatibility
+  const apiKeys = {
+    kucoin: {
+      key: settings.kucoin.key,
+      secret: settings.kucoin.secret,
+      passphrase: settings.kucoin.passphrase
+    },
+    openRouter: settings.openRouter.apiKey
+  };
 
   const { executeAutoTrade, autoModeError } = useAutoTradeExecution();
   const { startSimulation: startSimulationAction, stopSimulation: stopSimulationAction, pauseSimulation: pauseSimulationAction, resumeSimulation: resumeSimulationAction } = useSimulationActions();

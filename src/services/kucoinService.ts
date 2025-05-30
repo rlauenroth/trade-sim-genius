@@ -7,6 +7,7 @@ import { ProactiveRefreshManager } from './kucoin/proactiveRefresh';
 import { CacheHealthManager } from './kucoin/cacheHealth';
 import { PingService } from './kucoin/pingService';
 import { PortfolioService } from './kucoin/portfolioService';
+import { useSettingsV2Store } from '@/stores/settingsV2';
 
 export class KuCoinService {
   private static instance: KuCoinService;
@@ -34,9 +35,30 @@ export class KuCoinService {
     return KuCoinService.instance;
   }
 
+  // Get API keys from the centralized store
+  private getApiKeys(): { apiKey: string; secret: string; passphrase: string } | null {
+    try {
+      const { settings } = useSettingsV2Store.getState();
+      const { kucoin } = settings;
+      
+      if (kucoin.key && kucoin.secret && kucoin.passphrase) {
+        return {
+          apiKey: kucoin.key,
+          secret: kucoin.secret,
+          passphrase: kucoin.passphrase
+        };
+      }
+      console.warn('⚠️ No valid API keys found in useSettingsV2Store');
+      return null;
+    } catch (error) {
+      console.error('Error getting API keys from store:', error);
+      return null;
+    }
+  }
+
   private setupProactiveRefresh(): void {
     this.proactiveRefreshManager.setupProactiveRefresh(
-      () => this.portfolioService.fetchPortfolio(),
+      () => this.portfolioService.fetchPortfolio(this.getApiKeys()),
       () => this.pingService.ping()
     );
   }
@@ -46,7 +68,8 @@ export class KuCoinService {
   }
 
   async fetchPortfolio(): Promise<PortfolioSnapshot> {
-    return this.portfolioService.fetchPortfolio();
+    const keys = this.getApiKeys();
+    return this.portfolioService.fetchPortfolio(keys);
   }
 
   async getCachedPrice(symbol: string): Promise<number> {
