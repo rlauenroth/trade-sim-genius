@@ -10,6 +10,7 @@ import { loggingService } from '@/services/loggingService';
 import { createAuthHeaders } from './auth';
 import { parseKuCoinError } from './errorHandler';
 import { ActivityLogger } from './types';
+import { useSettingsV2Store } from '@/stores/settingsV2';
 
 // Global activity logger - will be set by the component that uses this
 let globalActivityLogger: ActivityLogger | null = null;
@@ -23,6 +24,23 @@ interface KuCoinApiKeys {
   apiKey: string;
   secret: string;
   passphrase: string;
+}
+
+// Helper function to get the configured proxy URL
+function getProxyBaseUrl(): string {
+  try {
+    const { settings } = useSettingsV2Store.getState();
+    const configuredProxy = settings.proxyUrl;
+    
+    // Use configured proxy URL if available, otherwise fallback to default
+    const actualProxy = configuredProxy || KUCOIN_PROXY_BASE;
+    
+    console.log('🔗 Using proxy URL:', actualProxy, configuredProxy ? '(configured)' : '(default)');
+    return actualProxy;
+  } catch (error) {
+    console.warn('⚠️ Could not get proxy URL from settings, using default:', error);
+    return KUCOIN_PROXY_BASE;
+  }
 }
 
 // Helper function to get temporary keys during verification ONLY
@@ -69,6 +87,9 @@ export async function kucoinFetch(
 ) {
   const startTime = Date.now();
   
+  // Get the dynamic proxy base URL
+  const proxyBaseUrl = getProxyBaseUrl();
+  
   // Use provided keys or fallback to temp keys for verification scenarios
   let keys = apiKeys;
   if (!keys) {
@@ -85,7 +106,8 @@ export async function kucoinFetch(
     query,
     body: body ? JSON.stringify(body) : undefined,
     hasKeys: !!keys,
-    usingTempKeys: !apiKeys && !!keys
+    usingTempKeys: !apiKeys && !!keys,
+    proxyUrl: proxyBaseUrl
   });
   
   if (!keys) {
@@ -97,7 +119,8 @@ export async function kucoinFetch(
       method,
       error: error.message,
       duration,
-      reason: 'no_api_keys_provided'
+      reason: 'no_api_keys_provided',
+      proxyUrl: proxyBaseUrl
     });
     
     globalActivityLogger?.addKucoinErrorLog(path, error);
@@ -113,7 +136,7 @@ export async function kucoinFetch(
     .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
     .join('&');
 
-  const url = `${KUCOIN_PROXY_BASE}${normalizedPath}${qs ? (normalizedPath.includes('?') ? '&' : '?') + qs : ''}`;
+  const url = `${proxyBaseUrl}${normalizedPath}${qs ? (normalizedPath.includes('?') ? '&' : '?') + qs : ''}`;
 
   // Create the signature path (includes query string)
   const signaturePath = normalizedPath + (qs ? (normalizedPath.includes('?') ? '&' : '?') + qs : '');
@@ -124,7 +147,7 @@ export async function kucoinFetch(
   const headers = await createAuthHeaders(keys, method, signaturePath, body);
 
   try {
-    console.log(`🔗 KuCoin API Request: ${method} ${signaturePath}`);
+    console.log(`🔗 KuCoin API Request: ${method} ${signaturePath} via ${proxyBaseUrl}`);
     console.log(`🔐 Using encrypted passphrase for API v2`);
     
     const res = await fetch(url, {
@@ -144,7 +167,8 @@ export async function kucoinFetch(
         status: res.status,
         duration,
         error: 'rate_limit',
-        retryAfter: error.retryAfter
+        retryAfter: error.retryAfter,
+        proxyUrl: proxyBaseUrl
       });
       
       globalActivityLogger?.addKucoinErrorLog(signaturePath, error);
@@ -158,7 +182,8 @@ export async function kucoinFetch(
         method,
         status: res.status,
         duration,
-        payload: signaturePayload
+        payload: signaturePayload,
+        proxyUrl: proxyBaseUrl
       });
       
       await parseKuCoinError(res, signaturePath, signaturePayload);
@@ -175,7 +200,8 @@ export async function kucoinFetch(
         duration,
         kucoinCode: result.code,
         kucoinMessage: result.msg,
-        payload: signaturePayload
+        payload: signaturePayload,
+        proxyUrl: proxyBaseUrl
       });
       
       const mockResponse = new Response(JSON.stringify(result), { status: 400 });
@@ -189,10 +215,11 @@ export async function kucoinFetch(
       status: res.status,
       duration,
       responseSize: JSON.stringify(result).length,
-      kucoinCode: result.code
+      kucoinCode: result.code,
+      proxyUrl: proxyBaseUrl
     });
     
-    console.log(`✅ KuCoin API Success: ${method} ${signaturePath}`);
+    console.log(`✅ KuCoin API Success: ${method} ${signaturePath} via ${proxyBaseUrl}`);
     globalActivityLogger?.addKucoinSuccessLog(signaturePath, `${method} ${signaturePath}`);
     networkStatusService.recordSuccessfulCall(signaturePath);
     
@@ -201,14 +228,15 @@ export async function kucoinFetch(
     const duration = Date.now() - startTime;
     
     if (error instanceof TypeError && error.message.includes('fetch')) {
-      const proxyError = new ProxyError('Proxy not reachable - network error');
+      const proxyError = new ProxyError(`Proxy not reachable - network error (${proxyBaseUrl})`);
       
       loggingService.logError(`API FAIL ${method} ${signaturePath}`, {
         endpoint: signaturePath,
         method,
         duration,
         error: 'network_error',
-        details: error.message
+        details: error.message,
+        proxyUrl: proxyBaseUrl
       });
       
       globalActivityLogger?.addKucoinErrorLog(signaturePath, proxyError);
@@ -223,7 +251,8 @@ export async function kucoinFetch(
         method,
         duration,
         error: error instanceof Error ? error.message : 'unknown_error',
-        details: error
+        details: error,
+        proxyUrl: proxyBaseUrl
       });
     }
     

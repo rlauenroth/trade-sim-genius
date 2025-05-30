@@ -16,6 +16,7 @@ export class KuCoinService {
   private cacheHealthManager: CacheHealthManager;
   private pingService: PingService;
   private portfolioService: PortfolioService;
+  private lastProxyUrl: string | null = null;
 
   constructor() {
     this.apiCallTracker = new ApiCallTracker();
@@ -26,6 +27,9 @@ export class KuCoinService {
 
     // Setup proactive refresh callbacks
     this.setupProactiveRefresh();
+    
+    // Initialize proxy URL tracking
+    this.trackProxyUrlChanges();
   }
 
   static getInstance(): KuCoinService {
@@ -56,6 +60,26 @@ export class KuCoinService {
     }
   }
 
+  // Track proxy URL changes and invalidate caches when it changes
+  private trackProxyUrlChanges(): void {
+    try {
+      const { settings } = useSettingsV2Store.getState();
+      const currentProxyUrl = settings.proxyUrl;
+      
+      if (this.lastProxyUrl !== null && this.lastProxyUrl !== currentProxyUrl) {
+        console.log('🔄 Proxy URL changed, invalidating caches...', {
+          from: this.lastProxyUrl,
+          to: currentProxyUrl
+        });
+        this.invalidateCache();
+      }
+      
+      this.lastProxyUrl = currentProxyUrl;
+    } catch (error) {
+      console.warn('Could not track proxy URL changes:', error);
+    }
+  }
+
   private setupProactiveRefresh(): void {
     this.proactiveRefreshManager.setupProactiveRefresh(
       () => this.portfolioService.fetchPortfolio(this.getApiKeys()),
@@ -64,10 +88,14 @@ export class KuCoinService {
   }
 
   async ping(): Promise<boolean> {
+    // Check for proxy URL changes before pinging
+    this.trackProxyUrlChanges();
     return this.pingService.ping();
   }
 
   async fetchPortfolio(): Promise<PortfolioSnapshot> {
+    // Check for proxy URL changes before fetching
+    this.trackProxyUrlChanges();
     const keys = this.getApiKeys();
     return this.portfolioService.fetchPortfolio(keys);
   }
@@ -76,12 +104,22 @@ export class KuCoinService {
     return this.portfolioService.getCachedPrice(symbol);
   }
 
-  // Method to invalidate all caches (for manual refresh)
+  // Method to invalidate all caches (for manual refresh or proxy URL changes)
   invalidateCache(): void {
     cacheService.invalidateAll();
     throttleManager.clear();
     this.apiCallTracker.clear();
     console.log('🗑️ All KuCoin service caches invalidated');
+  }
+
+  // Get current proxy URL for debugging
+  getCurrentProxyUrl(): string {
+    try {
+      const { settings } = useSettingsV2Store.getState();
+      return settings.proxyUrl || 'default';
+    } catch (error) {
+      return 'unknown';
+    }
   }
 
   // Get cache statistics including staleness info

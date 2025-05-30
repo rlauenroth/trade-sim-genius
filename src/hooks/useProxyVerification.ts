@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { VerificationResult } from '@/types/settingsV2';
 import { loggingService } from '@/services/loggingService';
+import { testProxyConnection } from '@/utils/kucoin/connection';
 import { KUCOIN_PROXY_BASE } from '@/config';
 
 export const useProxyVerification = () => {
@@ -24,36 +25,23 @@ export const useProxyVerification = () => {
     const startTime = Date.now();
 
     try {
-      // Test proxy connection with a simple health check
-      const testUrl = `${urlToTest}/api/v1/timestamp`;
+      console.log('🔍 Verifying proxy URL:', urlToTest);
       
-      const response = await fetch(testUrl, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-
+      // Use the dynamic connection test function
+      const isConnected = await testProxyConnection(urlToTest);
       const latencyMs = Date.now() - startTime;
 
-      if (response.ok) {
-        const data = await response.json();
+      if (isConnected) {
+        setResult({ 
+          status: 'success', 
+          message: `Proxy-Verbindung erfolgreich (${urlToTest})`,
+          latencyMs 
+        });
         
-        // Check if it's a valid KuCoin response
-        if (data && (data.code === '200000' || data.data)) {
-          setResult({ 
-            status: 'success', 
-            message: 'Proxy-Verbindung erfolgreich',
-            latencyMs 
-          });
-          
-          loggingService.logEvent('API', `Proxy verification successful (${latencyMs}ms)`);
-          return true;
-        } else {
-          throw new Error('Proxy antwortet nicht mit gültigem KuCoin-Format');
-        }
+        loggingService.logEvent('API', `Proxy verification successful to ${urlToTest} (${latencyMs}ms)`);
+        return true;
       } else {
-        throw new Error(`HTTP ${response.status}`);
+        throw new Error(`Proxy ${urlToTest} ist nicht erreichbar oder antwortet nicht korrekt`);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler';
@@ -62,7 +50,7 @@ export const useProxyVerification = () => {
         message: `Proxy-Verifikation fehlgeschlagen: ${errorMessage}` 
       });
       
-      loggingService.logError(`Proxy verification failed: ${errorMessage}`);
+      loggingService.logError(`Proxy verification failed for ${urlToTest}: ${errorMessage}`);
       return false;
     } finally {
       setIsVerifying(false);
