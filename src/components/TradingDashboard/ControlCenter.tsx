@@ -2,8 +2,9 @@
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, Square } from 'lucide-react';
+import { Play, Pause, Square, AlertCircle, RefreshCw } from 'lucide-react';
 import { useSimGuard } from '@/hooks/useSimGuard';
+import { simReadinessStore } from '@/stores/simReadinessStore';
 import AutoModeIndicator from './AutoModeIndicator';
 
 interface ControlCenterProps {
@@ -27,7 +28,7 @@ const ControlCenter = ({
   autoTradeCount,
   autoModeError
 }: ControlCenterProps) => {
-  const { canStart, reason } = useSimGuard();
+  const { canStart, reason, debug } = useSimGuard();
 
   const handleStartSimulation = () => {
     if (canStart) {
@@ -39,6 +40,25 @@ const ControlCenter = ({
     if (canStart) {
       onResumeSimulation();
     }
+  };
+
+  // Manual state correction function
+  const handleForceStateCorrection = () => {
+    console.log('🔧 Manual state correction triggered');
+    simReadinessStore.forceRefresh();
+    
+    // Force state to READY if we have portfolio data
+    if (debug.centralSnapshot && !debug.centralLoading) {
+      console.log('🔧 Forcing state to READY due to valid central data');
+      // This will be handled by the auto-correction in useSimGuard
+    }
+  };
+
+  // Debug function to show detailed status
+  const handleShowDebugInfo = () => {
+    console.log('🔍 Debug Info:', debug);
+    const detailedStatus = simReadinessStore.getDetailedStatus();
+    console.log('📊 Detailed SimReadiness Status:', detailedStatus);
   };
 
   return (
@@ -68,8 +88,37 @@ const ControlCenter = ({
               Automatische Simulation starten
             </Button>
             {!canStart && (
-              <div className="mt-2 text-xs text-red-400 text-center">
-                {reason}
+              <div className="mt-2 space-y-2">
+                <div className="text-xs text-red-400 text-center">
+                  {reason}
+                </div>
+                {debug.centralSnapshot && !debug.centralLoading && (
+                  <div className="text-xs text-yellow-400 text-center bg-yellow-900/20 border border-yellow-600/30 rounded p-2">
+                    <div className="flex items-center justify-center space-x-1 mb-2">
+                      <AlertCircle className="h-3 w-3" />
+                      <span>Portfolio-Daten verfügbar - State-Problem erkannt</span>
+                    </div>
+                    <div className="flex space-x-1">
+                      <Button
+                        onClick={handleForceStateCorrection}
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-xs border-yellow-600/50 text-yellow-300 hover:bg-yellow-900/30"
+                      >
+                        <RefreshCw className="mr-1 h-3 w-3" />
+                        State korrigieren
+                      </Button>
+                      <Button
+                        onClick={handleShowDebugInfo}
+                        size="sm"
+                        variant="ghost"
+                        className="text-xs text-yellow-400 hover:bg-yellow-900/20"
+                      >
+                        Debug
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

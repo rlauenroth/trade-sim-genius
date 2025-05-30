@@ -62,13 +62,25 @@ class SimReadinessStore {
     if (centralStore.snapshot) {
       this.status.portfolio = centralStore.snapshot;
       
-      // If we have valid data but are still in FETCHING state, fix it
+      // Enhanced auto-correction: if we have valid data but are still in FETCHING state, fix it
       if (this.status.state === 'FETCHING' && centralStore.snapshot && !centralStore.isLoading) {
         console.log('🔄 SimReadiness: Auto-correcting state from FETCHING to READY (central store has data)');
         this.status.state = 'READY';
         this.status.reason = null;
         this.status.retryCount = 0;
-        this.handleStateEffects({ type: 'FETCH_SUCCESS', payload: centralStore.snapshot });
+        this.status.lastApiPing = now;
+        // Notify listeners of the state change
+        this.notifyListeners();
+      }
+      
+      // Also fix IDLE state if we have data
+      if (this.status.state === 'IDLE' && centralStore.snapshot && !centralStore.isLoading) {
+        console.log('🔄 SimReadiness: Auto-correcting state from IDLE to READY (central store has data)');
+        this.status.state = 'READY';
+        this.status.reason = null;
+        this.status.retryCount = 0;
+        this.status.lastApiPing = now;
+        this.notifyListeners();
       }
     }
     
@@ -395,6 +407,16 @@ class SimReadinessStore {
     console.log('🔄 Forcing portfolio refresh via central service...');
     useCentralPortfolioStore.getState().clearData();
     kucoinService.invalidateCache();
+    
+    // Enhanced force refresh: also trigger state correction
+    const centralStore = useCentralPortfolioStore.getState();
+    if (centralStore.snapshot && (this.status.state === 'FETCHING' || this.status.state === 'IDLE')) {
+      console.log('🔄 Force refresh: correcting state to READY due to existing data');
+      this.status.state = 'READY';
+      this.status.reason = null;
+      this.status.retryCount = 0;
+      this.notifyListeners();
+    }
     
     if (this.status.state === 'READY' || this.status.state === 'SIM_RUNNING') {
       this.fetchPortfolioData();

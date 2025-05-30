@@ -32,19 +32,13 @@ export function useSimGuard() {
     }
   }, [hasValidPortfolio, status.state, centralLoading, centralSnapshot]);
 
-  console.log('🛡️ SimGuard status:', {
-    simReadinessState: status.state,
-    hasValidPortfolio,
-    isDataLoading,
-    hasErrors,
-    centralSnapshot: !!centralSnapshot,
-    centralLoading,
-    centralError,
-    autoCorrectTriggered: hasValidPortfolio && status.state === 'FETCHING' && !centralLoading
-  });
-
-  // Determine if simulation can start
-  const canStart = hasValidPortfolio && !isDataLoading && !hasErrors && status.state === 'READY';
+  // Enhanced canStart logic with better fallback
+  // Priority: If we have valid portfolio data and no errors, allow start regardless of exact state
+  const canStartBasic = hasValidPortfolio && !isDataLoading && !hasErrors;
+  const canStartStrict = canStartBasic && status.state === 'READY';
+  
+  // Use fallback logic: if central store has data and no errors, allow start
+  const canStart = canStartStrict || (hasValidPortfolio && !hasErrors && !centralLoading);
   
   // Determine if running is blocked (more lenient)
   const isRunningBlocked = isDataLoading || (hasErrors && !hasValidPortfolio);
@@ -66,6 +60,28 @@ export function useSimGuard() {
     }
   }
 
+  // Enhanced debug logging
+  console.log('🛡️ SimGuard enhanced status:', {
+    simReadinessState: status.state,
+    hasValidPortfolio,
+    isDataLoading,
+    hasErrors,
+    centralSnapshot: !!centralSnapshot,
+    centralLoading,
+    centralError,
+    canStartBasic,
+    canStartStrict,
+    canStart,
+    reason,
+    conditions: {
+      hasValidPortfolio,
+      notDataLoading: !isDataLoading,
+      noErrors: !hasErrors,
+      stateReady: status.state === 'READY',
+      centralNotLoading: !centralLoading
+    }
+  });
+
   return {
     canStart,
     isRunningBlocked,
@@ -83,7 +99,16 @@ export function useSimGuard() {
       hasErrors,
       centralSnapshot: !!centralSnapshot,
       centralLoading,
-      centralError
+      centralError,
+      canStartBasic,
+      canStartStrict,
+      conditions: {
+        hasValidPortfolio,
+        notDataLoading: !isDataLoading,
+        noErrors: !hasErrors,
+        stateReady: status.state === 'READY',
+        centralNotLoading: !centralLoading
+      }
     }
   };
 }
