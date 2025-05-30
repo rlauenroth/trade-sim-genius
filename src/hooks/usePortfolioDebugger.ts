@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { simReadinessStore } from '@/stores/simReadinessStore';
+import { simReadinessStore } from '@/stores/simReadiness';
 import { SimReadinessStatus } from '@/types/simReadiness';
 import { loggingService } from '@/services/loggingService';
 

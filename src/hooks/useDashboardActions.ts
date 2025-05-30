@@ -2,7 +2,7 @@
 import { useCallback } from 'react';
 import { useSettingsV2Store } from '@/stores/settingsV2';
 import { serviceRegistry } from '@/services/serviceRegistry';
-import { simReadinessStore } from '@/stores/simReadinessStore';
+import { simReadinessStore } from '@/stores/simReadiness';
 import { toast } from '@/hooks/use-toast';
 import { loggingService } from '@/services/loggingService';
 
