@@ -1,50 +1,74 @@
 
 import { useState, useEffect } from 'react';
+import { useCentralPortfolioService } from './useCentralPortfolioService';
 import { simReadinessStore } from '@/stores/simReadinessStore';
 import { SimReadinessStatus } from '@/types/simReadiness';
 
 export function useSimGuard() {
   const [status, setStatus] = useState<SimReadinessStatus>(simReadinessStore.getStatus());
+  const { snapshot: centralSnapshot, isLoading: centralLoading, error: centralError } = useCentralPortfolioService();
 
   useEffect(() => {
     const unsubscribe = simReadinessStore.subscribe(setStatus);
     return unsubscribe;
   }, []);
 
-  const canStart = status.state === 'READY';
-  const isRunningBlocked = status.state === 'UNSTABLE' || status.state === 'FETCHING';
+  // Enhanced logic using both simReadiness and central portfolio data
+  const hasValidPortfolio = !!(centralSnapshot && centralSnapshot.totalValue > 0);
+  const isDataLoading = centralLoading || status.state === 'FETCHING';
+  const hasErrors = !!(centralError || (status.state === 'UNSTABLE' && status.reason));
+
+  console.log('🛡️ SimGuard status:', {
+    simReadinessState: status.state,
+    hasValidPortfolio,
+    isDataLoading,
+    hasErrors,
+    centralSnapshot: !!centralSnapshot,
+    centralLoading,
+    centralError
+  });
+
+  // Determine if simulation can start
+  const canStart = hasValidPortfolio && !isDataLoading && !hasErrors && status.state === 'READY';
+  
+  // Determine if running is blocked (more lenient)
+  const isRunningBlocked = isDataLoading || (hasErrors && !hasValidPortfolio);
   
   let reason = '';
   if (!canStart) {
-    switch (status.state) {
-      case 'IDLE':
-        reason = 'System initializing...';
-        break;
-      case 'FETCHING':
-        reason = 'Loading portfolio data...';
-        break;
-      case 'UNSTABLE':
-        reason = status.reason || 'System unstable';
-        break;
-      case 'SIM_RUNNING':
-        reason = 'Simulation already running';
-        break;
-      default:
-        reason = 'System not ready';
+    if (isDataLoading) {
+      reason = 'Loading portfolio data...';
+    } else if (!hasValidPortfolio) {
+      reason = 'No valid portfolio data available';
+    } else if (hasErrors) {
+      reason = centralError || status.reason || 'System error';
+    } else if (status.state === 'SIM_RUNNING') {
+      reason = 'Simulation already running';
+    } else if (status.state === 'IDLE') {
+      reason = 'System initializing...';
+    } else {
+      reason = 'System not ready';
     }
   }
 
-  // Be more lenient with data age - only show unstable if data is very old (5+ minutes)
-  const isDataTooOld = status.snapshotAge > 300000; // 5 minutes instead of 60 seconds
-
   return {
     canStart,
-    isRunningBlocked: isRunningBlocked && (status.state === 'FETCHING' || isDataTooOld), // Only block if actually fetching or data too old
+    isRunningBlocked,
     reason,
     snapshotAge: status.snapshotAge,
     state: status.state,
-    portfolio: status.portfolio,
+    portfolio: centralSnapshot || status.portfolio, // Prefer central data
     lastApiPing: status.lastApiPing,
-    retryCount: status.retryCount
+    retryCount: status.retryCount,
+    // Additional debug info
+    debug: {
+      simReadinessState: status.state,
+      hasValidPortfolio,
+      isDataLoading,
+      hasErrors,
+      centralSnapshot: !!centralSnapshot,
+      centralLoading,
+      centralError
+    }
   };
 }

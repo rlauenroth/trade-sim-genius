@@ -3,7 +3,7 @@ import { useSettingsV2Store } from '@/stores/settingsV2';
 import { useSimulation } from '@/hooks/useSimulation';
 import { usePortfolioData } from '@/hooks/usePortfolioData';
 import { useTradingDashboardData } from '@/hooks/useTradingDashboardData';
-import { useSimReadinessPortfolio } from '@/hooks/useSimReadinessPortfolio';
+import { useCentralPortfolioService } from '@/hooks/useCentralPortfolioService';
 
 export const useDashboardState = () => {
   const { settings, isLoading: settingsLoading } = useSettingsV2Store();
@@ -17,7 +17,13 @@ export const useDashboardState = () => {
     retryLoadPortfolioData 
   } = usePortfolioData();
 
-  const { snapshot: livePortfolio, isLoading: livePortfolioLoading, error: livePortfolioError } = useSimReadinessPortfolio();
+  // Use central portfolio service as primary data source
+  const { 
+    snapshot: livePortfolio, 
+    isLoading: livePortfolioLoading, 
+    error: livePortfolioError,
+    refresh: refreshLivePortfolio
+  } = useCentralPortfolioService();
   
   const { 
     simulationState, 
@@ -83,6 +89,13 @@ export const useDashboardState = () => {
     };
   };
 
+  console.log('📊 DashboardState: Using central portfolio data:', {
+    livePortfolio: !!livePortfolio,
+    totalValue: livePortfolio?.totalUSDValue,
+    isLoading: livePortfolioLoading,
+    error: livePortfolioError
+  });
+
   return {
     userSettings,
     apiKeys,
@@ -117,6 +130,8 @@ export const useDashboardState = () => {
     settingsLoading,
     loadPortfolioData,
     loadPortfolioDataWithCredentials,
-    logPerformanceReport
+    logPerformanceReport,
+    // Add central portfolio refresh function
+    refreshLivePortfolio
   };
 };

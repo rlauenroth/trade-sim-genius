@@ -4,7 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useSimReadinessPortfolio } from '@/hooks/useSimReadinessPortfolio';
+import { useCentralPortfolioService } from '@/hooks/useCentralPortfolioService';
 import { Skeleton } from '@/components/ui/skeleton';
 import PortfolioStatusOverlay from './PortfolioStatusOverlay';
 
@@ -21,13 +21,21 @@ const PortfolioOverviewWithStatus = ({
   totalPnL,
   totalPnLPercentage
 }: PortfolioOverviewWithStatusProps) => {
-  const { snapshot, isLoading, error, refresh, isStale, state } = useSimReadinessPortfolio();
+  const { snapshot, isLoading, error, refresh, isStale } = useCentralPortfolioService();
   const isPositive = totalPnL >= 0;
 
-  // Use live portfolio value if available, otherwise fallback to passed props
+  // Use central portfolio value if available, otherwise fallback to passed props
   const displayValue = snapshot?.totalUSDValue || currentValue;
 
-  // Show skeleton only when loading AND no data available
+  console.log('📊 PortfolioOverview render:', {
+    hasSnapshot: !!snapshot,
+    displayValue,
+    isLoading,
+    error,
+    isStale
+  });
+
+  // Show skeleton only when actually loading and no data
   if (isLoading && !snapshot) {
     return (
       <Card className="bg-slate-800 border-slate-700 relative">
@@ -35,16 +43,24 @@ const PortfolioOverviewWithStatus = ({
           <CardTitle className="text-white">Portfolio-Übersicht</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Skeleton className="h-8 w-32 bg-slate-600" />
-          <Skeleton className="h-6 w-24 bg-slate-600" />
-          <Skeleton className="h-6 w-40 bg-slate-600" />
+          <div>
+            <div className="text-sm text-slate-400">Aktueller Wert</div>
+            <Skeleton className="h-8 w-32 bg-slate-600" />
+          </div>
+          <div>
+            <div className="text-sm text-slate-400">Startwert</div>
+            <Skeleton className="h-6 w-24 bg-slate-600" />
+          </div>
+          <div className="text-xs text-slate-500">
+            Loading portfolio data...
+          </div>
         </CardContent>
         <PortfolioStatusOverlay />
       </Card>
     );
   }
 
-  // Only show error state if there's an actual error AND no data available
+  // Show error state only if error and no cached data
   if (error && !snapshot) {
     return (
       <Card className="bg-red-900/20 border-red-600/50 relative">
@@ -82,7 +98,9 @@ const PortfolioOverviewWithStatus = ({
             <div className="flex items-center space-x-2">
               {snapshot && (
                 <div className="text-xs text-slate-400">
-                  {state === 'READY' ? '✅ Bereit' : state === 'FETCHING' ? '🔄 Aktualisiert...' : '⚠️ Instabil'}
+                  {isLoading ? '🔄 Aktualisiert...' : 
+                   error ? '⚠️ Fehler' : 
+                   isStale ? '⚠️ Veraltete Daten' : '✅ Bereit'}
                 </div>
               )}
               <Button
@@ -90,8 +108,9 @@ const PortfolioOverviewWithStatus = ({
                 variant="ghost"
                 size="sm"
                 className="text-slate-400 hover:text-white"
+                disabled={isLoading}
               >
-                <RefreshCw className="h-4 w-4" />
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
               </Button>
             </div>
           </CardTitle>
@@ -110,7 +129,7 @@ const PortfolioOverviewWithStatus = ({
                 {isStale && (
                   <>
                     <span>•</span>
-                    <span className="text-yellow-400">Wird aktualisiert...</span>
+                    <span className="text-yellow-400">Veraltet</span>
                   </>
                 )}
               </div>
@@ -159,7 +178,6 @@ const PortfolioOverviewWithStatus = ({
           )}
         </CardContent>
         
-        {/* Status overlay - only shows for actual problems */}
         <PortfolioStatusOverlay />
       </Card>
     </TooltipProvider>
