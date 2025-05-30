@@ -1,6 +1,7 @@
 
 import { useEffect, useState } from 'react';
 import { simReadinessStore } from '@/stores/simReadinessStore';
+import { useSettingsV2Store } from '@/stores/settingsV2';
 import { loggingService } from '@/services/loggingService';
 
 interface DashboardInitializerProps {
@@ -8,7 +9,10 @@ interface DashboardInitializerProps {
 }
 
 const DashboardInitializer = ({ onInitializationComplete }: DashboardInitializerProps) => {
-  // Coordinated initialization - only initialize simReadinessStore once
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const { isLoading: settingsLoading } = useSettingsV2Store();
+
+  // Coordinated initialization with settings verification
   useEffect(() => {
     console.log('🔄 Starting coordinated initialization...');
     
@@ -20,14 +24,38 @@ const DashboardInitializer = ({ onInitializationComplete }: DashboardInitializer
       userAgent: navigator.userAgent
     });
     
-    simReadinessStore.initialize();
-    onInitializationComplete(true);
+    // Wait for settings to load before proceeding
+    if (!settingsLoading && !settingsLoaded) {
+      console.log('✅ Settings loaded, proceeding with initialization');
+      setSettingsLoaded(true);
+      
+      // Initialize sim readiness store after settings are available
+      simReadinessStore.initialize();
+      
+      loggingService.logInfo('Initialization completed', {
+        settingsLoaded: true,
+        simReadinessInitialized: true
+      });
+      
+      onInitializationComplete(true);
+    }
     
     return () => {
       // Cleanup on unmount
       simReadinessStore.destroy();
     };
-  }, [onInitializationComplete]);
+  }, [settingsLoading, settingsLoaded, onInitializationComplete]);
+
+  // Log settings loading state changes
+  useEffect(() => {
+    if (settingsLoading) {
+      console.log('⏳ Waiting for settings to load...');
+      loggingService.logInfo('Settings loading', { isLoading: true });
+    } else {
+      console.log('✅ Settings loading completed');
+      loggingService.logInfo('Settings loaded', { isLoading: false });
+    }
+  }, [settingsLoading]);
 
   return null; // This is a logic-only component
 };

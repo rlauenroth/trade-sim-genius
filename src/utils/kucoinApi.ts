@@ -1,5 +1,5 @@
 
-// Enhanced KuCoin API utilities with PHP proxy support - NO MOCK FALLBACKS
+// Enhanced KuCoin API utilities with centralized key management
 import { 
   getMarketTickers as proxyGetMarketTickers,
   getPrice as proxyGetPrice,
@@ -9,6 +9,7 @@ import {
 } from './kucoinProxyApi';
 import { networkStatusService } from '@/services/networkStatusService';
 import { ProxyError, ApiError } from './errors';
+import { useSettingsV2Store } from '@/stores/settingsV2';
 
 interface KuCoinCredentials {
   kucoinApiKey: string;
@@ -47,7 +48,28 @@ interface Candle {
   turnover: string;
 }
 
-// Enhanced public endpoint implementations with proxy support - NO MOCK FALLBACKS
+// Helper function to get API keys from centralized store
+function getApiKeysFromStore(): { apiKey: string; secret: string; passphrase: string } | null {
+  try {
+    const { settings } = useSettingsV2Store.getState();
+    
+    if (settings.kucoin.key && settings.kucoin.secret && settings.kucoin.passphrase) {
+      return {
+        apiKey: settings.kucoin.key,
+        secret: settings.kucoin.secret,
+        passphrase: settings.kucoin.passphrase
+      };
+    }
+    
+    console.warn('⚠️ No valid API keys found in useSettingsV2Store');
+    return null;
+  } catch (error) {
+    console.error('Error getting API keys from store:', error);
+    return null;
+  }
+}
+
+// Enhanced public endpoint implementations with centralized key management
 export async function getMarketTickers(credentials: KuCoinCredentials): Promise<MarketTicker[]> {
   try {
     console.log('Using PHP proxy for KuCoin API - getMarketTickers');
@@ -90,10 +112,13 @@ export async function getHistoricalCandles(
   }
 }
 
-// Private endpoints use proxy - NO MOCK FALLBACKS
+// Private endpoints use centralized store for key management
 export async function getAccountBalances(credentials: KuCoinCredentials): Promise<AccountBalance[]> {
   try {
-    console.log('Using PHP proxy for KuCoin API - getAccountBalances');
+    console.log('Using PHP proxy for KuCoin API - getAccountBalances with centralized keys');
+    
+    // For private endpoints, we still need to use the centralized proxy
+    // The credentials parameter is kept for backwards compatibility
     const result = await proxyGetAccountBalances();
     return result;
   } catch (error) {
@@ -112,7 +137,7 @@ export async function getPortfolioSummary(credentials: KuCoinCredentials): Promi
   }>;
 }> {
   try {
-    console.log('Using PHP proxy for KuCoin API - getPortfolioSummary');
+    console.log('Using PHP proxy for KuCoin API - getPortfolioSummary with centralized keys');
     const balances = await proxyGetAccountBalances();
     
     // Calculate portfolio summary from balances

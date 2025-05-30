@@ -1,5 +1,5 @@
 
-import { KUCOIN_PROXY_BASE, getStoredKeys } from '@/config';
+import { KUCOIN_PROXY_BASE } from '@/config';
 import { 
   RateLimitError, 
   ProxyError, 
@@ -18,13 +18,20 @@ export function setActivityLogger(logger: ActivityLogger | null) {
   globalActivityLogger = logger;
 }
 
-// Helper function to get temporary keys during verification
-function getTempKeys() {
+// Interface for API keys to be passed explicitly
+interface KuCoinApiKeys {
+  apiKey: string;
+  secret: string;
+  passphrase: string;
+}
+
+// Helper function to get temporary keys during verification ONLY
+function getTempKeysForVerification(): KuCoinApiKeys | null {
   try {
     const tempKeys = localStorage.getItem('temp_kucoin_keys');
     if (tempKeys) {
       const parsed = JSON.parse(tempKeys);
-      console.log('🔑 Retrieved temp keys:', { 
+      console.log('🔑 Retrieved temp keys for verification:', { 
         hasApiKey: !!parsed.apiKey, 
         hasSecret: !!parsed.secret, 
         hasPassphrase: !!parsed.passphrase 
@@ -43,12 +50,12 @@ function getTempKeys() {
       // Return keys with correct field names for auth functions
       return {
         apiKey: parsed.apiKey,
-        secret: parsed.secret,  // Use 'secret' field consistently
+        secret: parsed.secret,
         passphrase: parsed.passphrase
       };
     }
   } catch (error) {
-    console.warn('Could not parse temp keys:', error);
+    console.warn('Could not parse temp keys for verification:', error);
   }
   return null;
 }
@@ -58,13 +65,17 @@ export async function kucoinFetch(
   method = 'GET',
   query: Record<string, string | number | undefined> = {},
   body?: unknown,
+  apiKeys?: KuCoinApiKeys // Now requires explicit keys OR will use temp keys for verification
 ) {
   const startTime = Date.now();
   
-  // Try to get stored keys first, then temp keys for verification
-  let keys = getStoredKeys();
+  // Use provided keys or fallback to temp keys for verification scenarios
+  let keys = apiKeys;
   if (!keys) {
-    keys = getTempKeys();
+    keys = getTempKeysForVerification();
+    if (keys) {
+      console.log('🔑 Using temp keys for verification scenario');
+    }
   }
   
   // Log API call start
@@ -73,11 +84,12 @@ export async function kucoinFetch(
     method,
     query,
     body: body ? JSON.stringify(body) : undefined,
-    hasKeys: !!keys
+    hasKeys: !!keys,
+    usingTempKeys: !apiKeys && !!keys
   });
   
   if (!keys) {
-    const error = new ProxyError('No API keys available');
+    const error = new ProxyError('No API keys provided - pass keys explicitly or ensure temp keys are set for verification');
     const duration = Date.now() - startTime;
     
     loggingService.logError(`API FAIL ${method} ${path}`, {
@@ -85,7 +97,7 @@ export async function kucoinFetch(
       method,
       error: error.message,
       duration,
-      reason: 'no_api_keys'
+      reason: 'no_api_keys_provided'
     });
     
     globalActivityLogger?.addKucoinErrorLog(path, error);

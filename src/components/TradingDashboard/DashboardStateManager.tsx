@@ -12,8 +12,8 @@ import { toast } from '@/hooks/use-toast';
 import { loggingService } from '@/services/loggingService';
 
 export const useDashboardStateManager = () => {
-  // Use V2 settings store instead of old useAppState
-  const { settings } = useSettingsV2Store();
+  // Use V2 settings store as single source of truth
+  const { settings, isLoading: settingsLoading } = useSettingsV2Store();
   
   const { 
     portfolioData, 
@@ -23,7 +23,7 @@ export const useDashboardStateManager = () => {
     retryLoadPortfolioData 
   } = usePortfolioData();
 
-  // Use new centralized portfolio hook instead of usePortfolioLive
+  // Use new centralized portfolio hook
   const { snapshot: livePortfolio, isLoading: livePortfolioLoading, error: livePortfolioError } = useSimReadinessPortfolio();
   
   const { 
@@ -55,7 +55,7 @@ export const useDashboardStateManager = () => {
     hasValidSimulation
   } = useTradingDashboardData(simulationState, portfolioData, isSimulationActive);
 
-  // Create a simplified API keys object from V2 settings
+  // Create consolidated API keys object from V2 settings (centralized)
   const apiKeys = {
     kucoinApiKey: settings.kucoin.key,
     kucoinApiSecret: settings.kucoin.secret,
@@ -63,7 +63,7 @@ export const useDashboardStateManager = () => {
     openRouterApiKey: settings.openRouter.apiKey
   };
 
-  // Create userSettings object compatible with old interface
+  // Create userSettings object compatible with old interface but sourced from V2 store
   const userSettings = {
     tradingMode: settings.tradingMode,
     tradingStrategy: settings.tradingStrategy,
@@ -86,11 +86,41 @@ export const useDashboardStateManager = () => {
     startSimulation
   });
 
-  // Use the handleStartSimulation from effects which has the correct signature
+  // Enhanced start simulation with settings verification
   const handleStartSimulation = useCallback(() => {
-    console.log('🚀 DashboardStateManager: Starting simulation...');
+    console.log('🚀 DashboardStateManager: Starting simulation with centralized settings...');
     console.log('Trading mode:', settings.tradingMode);
+    console.log('Selected model:', settings.model.id);
     console.log('Live portfolio:', livePortfolio);
+    
+    // Verify settings are loaded
+    if (settingsLoading) {
+      loggingService.logError('Cannot start simulation while settings are loading', {
+        settingsLoading,
+        tradingMode: settings.tradingMode
+      });
+      toast({
+        title: "Initialisierung läuft",
+        description: "Bitte warten Sie, bis die Einstellungen geladen sind",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Verify essential settings are available
+    if (!settings.kucoin.key || !settings.openRouter.apiKey) {
+      loggingService.logError('Cannot start simulation without proper API configuration', {
+        hasKucoinKey: !!settings.kucoin.key,
+        hasOpenRouterKey: !!settings.openRouter.apiKey,
+        tradingMode: settings.tradingMode
+      });
+      toast({
+        title: "Konfiguration unvollständig",
+        description: "API-Schlüssel müssen konfiguriert sein",
+        variant: "destructive"
+      });
+      return;
+    }
     
     try {
       handleStartSimulationFromEffects();
@@ -98,7 +128,8 @@ export const useDashboardStateManager = () => {
       console.error('❌ Error starting simulation:', error);
       loggingService.logError('Simulation start failed in DashboardStateManager', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        tradingMode: settings.tradingMode
+        tradingMode: settings.tradingMode,
+        hasValidSettings: !settingsLoading
       });
       toast({
         title: "Simulation-Fehler",
@@ -106,11 +137,18 @@ export const useDashboardStateManager = () => {
         variant: "destructive"
       });
     }
-  }, [handleStartSimulationFromEffects, settings.tradingMode, livePortfolio]);
+  }, [handleStartSimulationFromEffects, settings, settingsLoading, livePortfolio]);
 
-  // Add handler for manual refresh with performance report
+  // Enhanced manual refresh with centralized logging
   const handleManualRefresh = useCallback(() => {
-    console.log('🔄 Manual refresh triggered from Dashboard');
+    console.log('🔄 Manual refresh triggered from Dashboard (centralized)');
+    
+    loggingService.logInfo('Manual refresh initiated', {
+      tradingMode: settings.tradingMode,
+      selectedModel: settings.model.id,
+      hasSimulation: isSimulationActive
+    });
+    
     simReadinessStore.forceRefresh();
     
     // Log performance report on manual refresh
@@ -122,14 +160,17 @@ export const useDashboardStateManager = () => {
       title: "Daten aktualisiert",
       description: "Portfolio und Marktdaten werden neu geladen",
     });
-  }, [isSimulationActive, logPerformanceReport]);
+  }, [isSimulationActive, logPerformanceReport, settings.tradingMode, settings.model.id]);
 
-  // Simple logout function
+  // Simple logout function with centralized cleanup
   const logoutAndClearData = useCallback(() => {
-    console.log('🚪 Logout and clear data called');
+    console.log('🚪 Logout and clear data called (centralized)');
+    loggingService.logInfo('User logout initiated', {
+      tradingMode: settings.tradingMode
+    });
     localStorage.clear();
     window.location.reload();
-  }, []);
+  }, [settings.tradingMode]);
 
   // Calculate simulation data for activity log
   const getSimulationDataForLog = () => {
@@ -180,6 +221,8 @@ export const useDashboardStateManager = () => {
     handleManualRefresh,
     getSimulationDataForLog,
     autoModeError,
-    portfolioHealthStatus
+    portfolioHealthStatus,
+    // Expose settings loading state for UI
+    settingsLoading
   };
 };

@@ -1,7 +1,7 @@
 
 export const KUCOIN_PROXY_BASE = 'https://t3h.online/kucoin-proxy.php?path=';
 
-// Memory cache for API keys with TTL
+// Memory cache for API keys with TTL - ONLY for initialization and migration
 interface ApiKeyCache {
   keys: {
     apiKey: string;
@@ -18,7 +18,9 @@ let apiKeyCache: ApiKeyCache = {
 
 const API_KEY_TTL = 15 * 60 * 1000; // 15 minutes
 
-export const getStoredKeys = () => {
+// MIGRATION ONLY: Load initial keys from legacy storage during app initialization
+// This function should NOT be used during normal app operation - use useSettingsV2Store instead
+export const loadInitialKeysFromLegacyStorage = () => {
   const now = Date.now();
   
   // Check if cache is valid
@@ -45,7 +47,7 @@ export const getStoredKeys = () => {
           timestamp: now
         };
         
-        console.log('✅ API keys loaded successfully from V2 settings');
+        console.log('✅ API keys loaded successfully from V2 settings (initialization)');
         return keys;
       }
     }
@@ -81,17 +83,21 @@ export const getStoredKeys = () => {
           timestamp: now
         };
         
-        console.log('✅ API keys loaded successfully from legacy storage');
+        console.log('✅ API keys loaded successfully from legacy storage (initialization)');
         return keys;
       }
     }
   } catch (error) {
-    console.error('Error reading API keys from storage:', error);
+    console.error('Error reading API keys from storage during initialization:', error);
   }
   
-  console.warn('⚠️ No valid API keys found in storage');
+  console.warn('⚠️ No valid API keys found in storage during initialization');
   return null;
 };
+
+// Kept for backwards compatibility during migration period - mark as deprecated
+/** @deprecated Use useSettingsV2Store.getState().settings.kucoin instead */
+export const getStoredKeys = loadInitialKeysFromLegacyStorage;
 
 // Migration helper for old proxy URLs
 export const migrateProxyUrl = (currentUrl: string): string => {
