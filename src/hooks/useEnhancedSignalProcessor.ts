@@ -30,7 +30,8 @@ export const useEnhancedSignalProcessor = (
     signal: Signal,
     currentSimulationState: any,
     updateState: any,
-    logEntry: any
+    logEntry: any,
+    userSettings: any
   ): Promise<boolean> => {
     if (!currentSimulationState || !isSimulationActive) {
       console.log('❌ Auto-trade failed: Invalid state or simulation inactive');
