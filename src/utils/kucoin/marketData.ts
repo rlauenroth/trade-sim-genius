@@ -96,5 +96,144 @@ export async function getHistoricalCandles(
   throw new ApiError(new Response(JSON.stringify(response), { status: 400 }));
 }
 
+// Enhanced trading functions that were missing
+export async function getOrderbookSnapshot(symbol: string) {
+  const cacheKey = `orderbook_${symbol}`;
+  
+  // Try cache first (short cache for orderbook)
+  const cachedOrderbook = cacheService.get<any>(cacheKey);
+  if (cachedOrderbook !== undefined) {
+    return cachedOrderbook;
+  }
+
+  const response = await kucoinFetch(`/api/v1/market/orderbook/level1?symbol=${symbol}`);
+  
+  if (response.code === '200000' && response.data) {
+    const orderbook = {
+      price: parseFloat(response.data.price),
+      bestBid: parseFloat(response.data.bestBid),
+      bestAsk: parseFloat(response.data.bestAsk),
+      size: parseFloat(response.data.size),
+      bestBidSize: parseFloat(response.data.bestBidSize),
+      bestAskSize: parseFloat(response.data.bestAskSize)
+    };
+    
+    // Cache for 5 seconds
+    cacheService.set(cacheKey, orderbook, 5000);
+    
+    globalActivityLogger?.addKucoinSuccessLog(`/api/v1/market/orderbook/level1?symbol=${symbol}`, `Orderbook für ${symbol} geladen`);
+    return orderbook;
+  }
+  
+  throw new ApiError(new Response(JSON.stringify(response), { status: 400 }));
+}
+
+export async function getSymbolInfo(symbol: string) {
+  const cacheKey = `symbol_info_${symbol}`;
+  
+  // Try cache first (long cache for symbol info)
+  const cachedInfo = cacheService.get<any>(cacheKey);
+  if (cachedInfo !== undefined) {
+    return cachedInfo;
+  }
+
+  const response = await kucoinFetch(`/api/v1/symbols/${symbol}`);
+  
+  if (response.code === '200000' && response.data) {
+    const symbolInfo = {
+      symbol: response.data.symbol,
+      name: response.data.name,
+      baseCurrency: response.data.baseCurrency,
+      quoteCurrency: response.data.quoteCurrency,
+      baseMinSize: parseFloat(response.data.baseMinSize),
+      quoteMinSize: parseFloat(response.data.quoteMinSize),
+      baseMaxSize: parseFloat(response.data.baseMaxSize),
+      quoteMaxSize: parseFloat(response.data.quoteMaxSize),
+      baseIncrement: parseFloat(response.data.baseIncrement),
+      quoteIncrement: parseFloat(response.data.quoteIncrement),
+      priceIncrement: parseFloat(response.data.priceIncrement),
+      feeCurrency: response.data.feeCurrency,
+      enableTrading: response.data.enableTrading,
+      isMarginEnabled: response.data.isMarginEnabled,
+      priceLimitRate: parseFloat(response.data.priceLimitRate)
+    };
+    
+    // Cache for 1 hour
+    cacheService.set(cacheKey, symbolInfo, 3600000);
+    
+    globalActivityLogger?.addKucoinSuccessLog(`/api/v1/symbols/${symbol}`, `Symbol-Info für ${symbol} geladen`);
+    return symbolInfo;
+  }
+  
+  throw new ApiError(new Response(JSON.stringify(response), { status: 400 }));
+}
+
+// Utility functions for tick size compliance
+export function roundToTickSize(price: number, tickSize: number, roundUp: boolean = false): number {
+  if (tickSize <= 0) return price;
+  
+  const factor = 1 / tickSize;
+  if (roundUp) {
+    return Math.ceil(price * factor) / factor;
+  } else {
+    return Math.floor(price * factor) / factor;
+  }
+}
+
+export function validateOrderSize(price: number, quantity: number, symbolInfo: any): {
+  isValid: boolean;
+  reason?: string;
+  adjustedQuantity?: number;
+} {
+  const totalValue = price * quantity;
+  
+  // Check minimum base size
+  if (quantity < symbolInfo.baseMinSize) {
+    return {
+      isValid: false,
+      reason: `Mindestmenge ${symbolInfo.baseMinSize} nicht erreicht (${quantity})`
+    };
+  }
+  
+  // Check minimum quote size
+  if (totalValue < symbolInfo.quoteMinSize) {
+    return {
+      isValid: false,
+      reason: `Mindest-Handelswert ${symbolInfo.quoteMinSize} nicht erreicht (${totalValue})`
+    };
+  }
+  
+  // Check maximum sizes
+  if (quantity > symbolInfo.baseMaxSize) {
+    return {
+      isValid: false,
+      reason: `Maximale Menge ${symbolInfo.baseMaxSize} überschritten (${quantity})`
+    };
+  }
+  
+  if (totalValue > symbolInfo.quoteMaxSize) {
+    return {
+      isValid: false,
+      reason: `Maximaler Handelswert ${symbolInfo.quoteMaxSize} überschritten (${totalValue})`
+    };
+  }
+  
+  // Round quantity to base increment
+  const baseIncrement = symbolInfo.baseIncrement;
+  if (baseIncrement > 0) {
+    const factor = 1 / baseIncrement;
+    const adjustedQuantity = Math.floor(quantity * factor) / factor;
+    
+    if (adjustedQuantity !== quantity) {
+      return {
+        isValid: true,
+        adjustedQuantity
+      };
+    }
+  }
+  
+  return { isValid: true };
+}
+
 // Legacy functions for backward compatibility
 export const getCurrentPrice = getPrice;
