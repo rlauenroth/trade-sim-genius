@@ -76,7 +76,7 @@ const CandidateList = ({
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <CandidateStatusIcon />
+                    <CandidateStatusIcon symbol={candidate.symbol} />
                     <span className="text-white text-sm font-medium">
                       {candidate.symbol}
                     </span>

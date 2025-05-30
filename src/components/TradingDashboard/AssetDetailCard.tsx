@@ -45,7 +45,7 @@ export const AssetDetailCard = ({ selectedAsset, className }: AssetDetailCardPro
       },
     });
 
-    // Add candlestick series using the correct API
+    // Add candlestick series using the correct lightweight-charts v5 API
     const candlestickSeries = chart.addCandlestickSeries({
       upColor: '#10b981',
       downColor: '#ef4444',
