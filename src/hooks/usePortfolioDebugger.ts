@@ -30,22 +30,26 @@ export const usePortfolioDebugger = () => {
       setStatus(newStatus);
       
       // Track state changes
-      setDebugInfo(prev => ({
-        ...prev,
-        stateHistory: [
-          ...prev.stateHistory.slice(-9), // Keep last 10 states
-          {
-            timestamp: Date.now(),
-            state: newStatus.state,
-            reason: newStatus.reason || undefined
-          }
-        ]
-      }));
-      
-      console.log('🔍 Portfolio state change:', {
-        from: prev.stateHistory[prev.stateHistory.length - 1]?.state,
-        to: newStatus.state,
-        reason: newStatus.reason
+      setDebugInfo(prev => {
+        const previousState = prev.stateHistory[prev.stateHistory.length - 1]?.state;
+        
+        console.log('🔍 Portfolio state change:', {
+          from: previousState,
+          to: newStatus.state,
+          reason: newStatus.reason
+        });
+        
+        return {
+          ...prev,
+          stateHistory: [
+            ...prev.stateHistory.slice(-9), // Keep last 10 states
+            {
+              timestamp: Date.now(),
+              state: newStatus.state,
+              reason: newStatus.reason || undefined
+            }
+          ]
+        };
       });
     });
     
