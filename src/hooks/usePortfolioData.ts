@@ -1,5 +1,6 @@
 
 import { useState, useCallback } from 'react';
+import { useSettingsV2Store } from '@/stores/settingsV2';
 import { getAccountBalances, getCurrentPrice } from '@/utils/kucoinApi';
 import { toast } from '@/hooks/use-toast';
 
@@ -17,12 +18,13 @@ interface PortfolioData {
 }
 
 export const usePortfolioData = () => {
+  const { settings } = useSettingsV2Store();
   const [portfolioData, setPortfolioData] = useState<PortfolioData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
-  const loadPortfolioData = useCallback(async (credentials: any, isRetry = false) => {
+  const loadPortfolioDataWithCredentials = useCallback(async (credentials: any, isRetry = false) => {
     if (!credentials) {
       setError('Keine API-Zugangsdaten verfügbar');
       return;
@@ -127,17 +129,38 @@ export const usePortfolioData = () => {
     }
   }, [retryCount]);
 
-  // Fix the retry function signature to match expected () => void
+  // No-argument version that gets credentials from settings
+  const loadPortfolioData = useCallback(() => {
+    const credentials = {
+      apiKey: settings.kucoin.key,
+      apiSecret: settings.kucoin.secret,
+      apiPassphrase: settings.kucoin.passphrase
+    };
+    
+    if (!credentials.apiKey || !credentials.apiSecret || !credentials.apiPassphrase) {
+      setError('Keine gültigen KuCoin API-Zugangsdaten verfügbar');
+      return;
+    }
+    
+    loadPortfolioDataWithCredentials(credentials);
+  }, [settings.kucoin, loadPortfolioDataWithCredentials]);
+
+  // Retry function that also gets credentials from settings
   const retryLoadPortfolioData = useCallback(() => {
     console.log(`Portfolio-Daten werden erneut geladen (Versuch ${retryCount + 1})...`);
-    // Get credentials from storage or context - this should be handled by the caller
-    const storedCredentials = JSON.parse(localStorage.getItem('kiTradingApp_apiKeys') || '{}');
-    if (storedCredentials && storedCredentials.kucoin) {
-      loadPortfolioData(storedCredentials, true);
-    } else {
-      setError('Keine API-Schlüssel verfügbar');
+    const credentials = {
+      apiKey: settings.kucoin.key,
+      apiSecret: settings.kucoin.secret,
+      apiPassphrase: settings.kucoin.passphrase
+    };
+    
+    if (!credentials.apiKey || !credentials.apiSecret || !credentials.apiPassphrase) {
+      setError('Keine gültigen KuCoin API-Zugangsdaten verfügbar');
+      return;
     }
-  }, [loadPortfolioData, retryCount]);
+    
+    loadPortfolioDataWithCredentials(credentials, true);
+  }, [settings.kucoin, loadPortfolioDataWithCredentials, retryCount]);
 
   const clearPortfolioData = useCallback(() => {
     setPortfolioData(null);
@@ -147,15 +170,16 @@ export const usePortfolioData = () => {
 
   const refreshPortfolioData = useCallback(async (credentials: any) => {
     console.log('Portfolio-Daten werden aktualisiert...');
-    await loadPortfolioData(credentials);
-  }, [loadPortfolioData]);
+    await loadPortfolioDataWithCredentials(credentials);
+  }, [loadPortfolioDataWithCredentials]);
 
   return {
     portfolioData,
     isLoading,
     error,
     retryCount,
-    loadPortfolioData,
+    loadPortfolioData, // No-argument version
+    loadPortfolioDataWithCredentials, // Version with credentials parameter
     retryLoadPortfolioData,
     clearPortfolioData,
     refreshPortfolioData

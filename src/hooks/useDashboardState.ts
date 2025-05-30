@@ -12,7 +12,8 @@ export const useDashboardState = () => {
     portfolioData, 
     isLoading: portfolioLoading, 
     error: portfolioError,
-    loadPortfolioData, 
+    loadPortfolioData,
+    loadPortfolioDataWithCredentials,
     retryLoadPortfolioData 
   } = usePortfolioData();
 
@@ -115,6 +116,7 @@ export const useDashboardState = () => {
     portfolioHealthStatus,
     settingsLoading,
     loadPortfolioData,
+    loadPortfolioDataWithCredentials,
     logPerformanceReport
   };
 };

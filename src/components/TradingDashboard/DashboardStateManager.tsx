@@ -39,6 +39,7 @@ export const useDashboardStateManager = () => {
     portfolioHealthStatus,
     settingsLoading,
     loadPortfolioData,
+    loadPortfolioDataWithCredentials,
     logPerformanceReport
   } = useDashboardState();
 
@@ -57,7 +58,7 @@ export const useDashboardStateManager = () => {
     isFirstTimeAfterSetup: false,
     decryptedApiKeys: apiKeys,
     livePortfolio,
-    loadPortfolioData,
+    loadPortfolioDataWithCredentials,
     completeFirstTimeSetup: () => {},
     startSimulation
   });

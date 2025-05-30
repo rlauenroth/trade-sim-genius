@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react';
 import { useActivityLog } from './useActivityLog';
 import { setActivityLogger, testProxyConnection } from '@/utils/kucoinProxyApi';
@@ -10,7 +9,7 @@ interface TradingDashboardEffectsProps {
   isFirstTimeAfterSetup: boolean;
   decryptedApiKeys: any;
   livePortfolio: any;
-  loadPortfolioData: (keys: any) => void;
+  loadPortfolioDataWithCredentials: (keys: any) => void;
   completeFirstTimeSetup: () => void;
   startSimulation: (portfolioData: any) => Promise<void>;
 }
@@ -19,7 +18,7 @@ export const useTradingDashboardEffects = ({
   isFirstTimeAfterSetup,
   decryptedApiKeys,
   livePortfolio,
-  loadPortfolioData,
+  loadPortfolioDataWithCredentials,
   completeFirstTimeSetup,
   startSimulation
 }: TradingDashboardEffectsProps) => {
@@ -71,9 +70,9 @@ export const useTradingDashboardEffects = ({
     if (isFirstTimeAfterSetup && decryptedApiKeys && !livePortfolio) {
       addLogEntry('INFO', 'App erfolgreich initialisiert nach Einrichtung.');
       addLogEntry('INFO', 'Lade Portfolio-Daten von KuCoin...');
-      loadPortfolioData(decryptedApiKeys);
+      loadPortfolioDataWithCredentials(decryptedApiKeys);
     }
-  }, [isFirstTimeAfterSetup, decryptedApiKeys, livePortfolio, loadPortfolioData, addLogEntry]);
+  }, [isFirstTimeAfterSetup, decryptedApiKeys, livePortfolio, loadPortfolioDataWithCredentials, addLogEntry]);
 
   // Log successful portfolio load
   useEffect(() => {
