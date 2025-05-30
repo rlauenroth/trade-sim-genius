@@ -19,7 +19,7 @@ interface SettingsDialogProps {
 }
 
 export const SettingsDialog = ({ onRefresh }: SettingsDialogProps) => {
-  const { settings, updateSettings } = useSettingsV2Store();
+  const { settings, updateKuCoinSettings, updateOpenRouterSettings } = useSettingsV2Store();
   const [isOpen, setIsOpen] = useState(false);
   const [tempSettings, setTempSettings] = useState({
     kucoinKey: settings.kucoin.key || '',
@@ -29,15 +29,16 @@ export const SettingsDialog = ({ onRefresh }: SettingsDialogProps) => {
   });
 
   const handleSave = () => {
-    updateSettings({
-      kucoin: {
-        key: tempSettings.kucoinKey,
-        secret: tempSettings.kucoinSecret,
-        passphrase: tempSettings.kucoinPassphrase,
-      },
-      openRouter: {
-        apiKey: tempSettings.openRouterKey,
-      },
+    updateKuCoinSettings({
+      key: tempSettings.kucoinKey,
+      secret: tempSettings.kucoinSecret,
+      passphrase: tempSettings.kucoinPassphrase,
+      verified: false
+    });
+
+    updateOpenRouterSettings({
+      apiKey: tempSettings.openRouterKey,
+      verified: false
     });
 
     toast({

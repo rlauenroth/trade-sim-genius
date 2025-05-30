@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Container } from '@/components/ui/container';
 import { Button } from '@/components/ui/button';
@@ -14,7 +13,7 @@ import OpenPositions from '../OpenPositions';
 import ActivityLog from '../ActivityLog';
 import { TradingModeIndicator } from '../StatusBadges/TradingModeIndicator';
 import { ApiHealthBadge } from '../StatusBadges/ApiHealthBadge';
-import { SettingsDialog } from './SettingsDialog';
+import { SettingsDialog } from '../SettingsDialog';
 
 interface DashboardGridsProps {
   displayPortfolioValue: number;
