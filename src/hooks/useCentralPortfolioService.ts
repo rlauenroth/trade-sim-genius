@@ -1,5 +1,5 @@
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useCentralPortfolioStore } from '@/stores/centralPortfolioStore';
 import { kucoinService } from '@/services/kucoinService';
 import { toast } from '@/hooks/use-toast';
@@ -16,6 +16,11 @@ export const useCentralPortfolioService = () => {
     clearData,
     isStale
   } = useCentralPortfolioStore();
+
+  // Prevent auto-fetch loops
+  const autoFetchTriggered = useRef<boolean>(false);
+  const lastAutoFetchTime = useRef<number>(0);
+  const AUTO_FETCH_COOLDOWN = 10000; // 10 seconds
 
   const fetchPortfolio = useCallback(async (forceRefresh = false) => {
     // Avoid duplicate fetches
@@ -71,11 +76,24 @@ export const useCentralPortfolioService = () => {
     }
   }, [isLoading, snapshot, isStale, setLoading, setError, setSnapshot]);
 
-  // Auto-fetch on mount if no data or stale
+  // Optimized auto-fetch on mount with debouncing
   useEffect(() => {
-    if (!snapshot || isStale()) {
-      console.log('🔄 Auto-fetching portfolio on mount (no data or stale)');
+    const now = Date.now();
+    const shouldAutoFetch = (!snapshot || isStale()) && 
+                           !autoFetchTriggered.current &&
+                           (now - lastAutoFetchTime.current > AUTO_FETCH_COOLDOWN);
+
+    if (shouldAutoFetch) {
+      console.log('🔄 Auto-fetching portfolio on mount (debounced)');
+      autoFetchTriggered.current = true;
+      lastAutoFetchTime.current = now;
+      
       fetchPortfolio();
+
+      // Reset the flag after cooldown
+      setTimeout(() => {
+        autoFetchTriggered.current = false;
+      }, AUTO_FETCH_COOLDOWN);
     }
   }, [fetchPortfolio, snapshot, isStale]);
 

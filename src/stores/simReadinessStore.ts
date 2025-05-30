@@ -1,4 +1,3 @@
-
 import { SimReadinessState, SimReadinessStatus, SimReadinessAction, PortfolioSnapshot } from '@/types/simReadiness';
 import { kucoinService } from '@/services/kucoinService';
 import { retryScheduler } from '@/services/retryScheduler';
@@ -25,6 +24,11 @@ class SimReadinessStore {
   private watchdogTimer: NodeJS.Timeout | null = null;
   private fetchInProgress: boolean = false;
   private fetchTimeout: NodeJS.Timeout | null = null;
+  
+  // Global fetch lock to prevent concurrent fetches
+  private static globalFetchLock: boolean = false;
+  private lastStateChange: number = 0;
+  private redundantDispatchPrevention: Map<string, number> = new Map();
 
   static getInstance(): SimReadinessStore {
     if (!SimReadinessStore.instance) {
@@ -36,9 +40,9 @@ class SimReadinessStore {
   subscribe(listener: (status: SimReadinessStatus) => void) {
     this.listeners.push(listener);
     
-    // Check if we can get data from central store on subscribe
+    // Only auto-populate from central store once
     const centralStore = useCentralPortfolioStore.getState();
-    if (centralStore.snapshot && this.status.state !== 'READY' && this.status.state !== 'SIM_RUNNING') {
+    if (centralStore.snapshot && this.status.state === 'IDLE') {
       console.log('🔄 SimReadiness: Found data in central store on subscribe, updating state to READY');
       this.dispatch({ type: 'FETCH_SUCCESS', payload: centralStore.snapshot });
     }
@@ -57,29 +61,23 @@ class SimReadinessStore {
   getStatus(): SimReadinessStatus {
     const now = Date.now();
     
-    // Always try to get fresh data from central store
+    // Always try to get fresh data from central store but avoid loops
     const centralStore = useCentralPortfolioStore.getState();
-    if (centralStore.snapshot) {
+    if (centralStore.snapshot && this.status.portfolio !== centralStore.snapshot) {
       this.status.portfolio = centralStore.snapshot;
       
-      // Enhanced auto-correction: if we have valid data but are still in FETCHING state, fix it
-      if (this.status.state === 'FETCHING' && centralStore.snapshot && !centralStore.isLoading) {
-        console.log('🔄 SimReadiness: Auto-correcting state from FETCHING to READY (central store has data)');
+      // Only auto-correct if significant time has passed since last state change
+      if (this.status.state === 'FETCHING' && 
+          centralStore.snapshot && 
+          !centralStore.isLoading &&
+          (now - this.lastStateChange) > 2000) { // 2 second debounce
+        
+        console.log('🔄 SimReadiness: Auto-correcting state from FETCHING to READY (debounced)');
         this.status.state = 'READY';
         this.status.reason = null;
         this.status.retryCount = 0;
         this.status.lastApiPing = now;
-        // Notify listeners of the state change
-        this.notifyListeners();
-      }
-      
-      // Also fix IDLE state if we have data
-      if (this.status.state === 'IDLE' && centralStore.snapshot && !centralStore.isLoading) {
-        console.log('🔄 SimReadiness: Auto-correcting state from IDLE to READY (central store has data)');
-        this.status.state = 'READY';
-        this.status.reason = null;
-        this.status.retryCount = 0;
-        this.status.lastApiPing = now;
+        this.lastStateChange = now;
         this.notifyListeners();
       }
     }
@@ -93,25 +91,35 @@ class SimReadinessStore {
   }
 
   dispatch(action: SimReadinessAction): void {
-    console.log('🔄 SimReadiness dispatch:', action.type, action);
+    // Prevent redundant dispatches of the same action type
+    const actionKey = action.type;
+    const now = Date.now();
+    const lastDispatch = this.redundantDispatchPrevention.get(actionKey) || 0;
+    
+    if (action.type === 'FETCH_SUCCESS' && (now - lastDispatch) < 1000) {
+      console.log('🔄 Preventing redundant FETCH_SUCCESS dispatch (debounced)');
+      return;
+    }
+    
+    this.redundantDispatchPrevention.set(actionKey, now);
+    
+    console.log('🔄 SimReadiness dispatch:', action.type);
     loggingService.logEvent('SIM', `SimReadiness action: ${action.type}`, { action });
     
     const oldState = this.status.state;
     const newState = this.reducer(this.status, action);
     
     if (newState !== this.status) {
-      console.log('🔄 State transition:', oldState, '->', newState.state, 'reason:', newState.reason);
+      console.log('🔄 State transition:', oldState, '->', newState.state);
       loggingService.logEvent('SIM', `State transition: ${oldState} -> ${newState.state}`, {
         oldState,
-        newState: newState.state,
-        reason: newState.reason
+        newState: newState.state
       });
       
       this.status = newState;
+      this.lastStateChange = now;
       this.notifyListeners();
       this.handleStateEffects(action);
-    } else {
-      console.log('🔄 No state change for action:', action.type, 'current state:', this.status.state);
     }
   }
 
@@ -143,10 +151,21 @@ class SimReadinessStore {
         };
 
       case 'FETCH_SUCCESS':
-        console.log('✅ Reducer: FETCH_SUCCESS - updating both stores, transitioning to READY');
+        // Prevent state change if we're already READY with the same data
+        if (state.state === 'READY' && 
+            state.portfolio && 
+            state.portfolio.fetchedAt === action.payload.fetchedAt) {
+          console.log('🔄 Skipping redundant FETCH_SUCCESS - already READY with same data');
+          return state;
+        }
         
-        // Update central store
-        useCentralPortfolioStore.getState().setSnapshot(action.payload);
+        console.log('✅ Reducer: FETCH_SUCCESS - transitioning to READY');
+        
+        // Update central store only if not already updated
+        const currentCentralData = useCentralPortfolioStore.getState().snapshot;
+        if (!currentCentralData || currentCentralData.fetchedAt !== action.payload.fetchedAt) {
+          useCentralPortfolioStore.getState().setSnapshot(action.payload);
+        }
         
         return {
           ...state,
@@ -159,11 +178,7 @@ class SimReadinessStore {
 
       case 'FETCH_FAIL':
       case 'API_DOWN':
-        console.log('❌ Reducer: FETCH_FAIL/API_DOWN with reason:', action.payload);
-        
-        // Update central store error
         useCentralPortfolioStore.getState().setError(action.payload);
-        
         return {
           ...state,
           state: 'UNSTABLE',
@@ -172,7 +187,6 @@ class SimReadinessStore {
         };
 
       case 'AGE_EXCEEDED':
-        console.log('⏰ Reducer: AGE_EXCEEDED');
         return {
           ...state,
           state: 'UNSTABLE',
@@ -180,7 +194,6 @@ class SimReadinessStore {
         };
 
       case 'API_UP':
-        console.log('🔄 Reducer: API_UP - attempting reconnection');
         return {
           ...state,
           state: 'FETCHING',
@@ -189,14 +202,12 @@ class SimReadinessStore {
         };
 
       case 'START_SIMULATION':
-        console.log('🎮 Reducer: START_SIMULATION');
         return {
           ...state,
           state: 'SIM_RUNNING'
         };
 
       case 'STOP_SIMULATION':
-        console.log('🛑 Reducer: STOP_SIMULATION');
         return {
           ...state,
           state: state.portfolio && (now - state.portfolio.fetchedAt) < SIM_CONFIG.SNAPSHOT_TTL ? 'READY' : 'UNSTABLE'
@@ -208,42 +219,43 @@ class SimReadinessStore {
   }
 
   private async fetchPortfolioData(): Promise<void> {
-    // Use central portfolio service instead of direct kucoin service
-    if (this.fetchInProgress) {
-      console.log('⚠️ Fetch already in progress, skipping...');
+    // Global fetch lock to prevent concurrent fetches from any source
+    if (this.fetchInProgress || SimReadinessStore.globalFetchLock) {
+      console.log('⚠️ Fetch already in progress globally, skipping...');
       return;
     }
     
     this.fetchInProgress = true;
-    console.log('🔄 Starting fetchPortfolioData via central service...');
+    SimReadinessStore.globalFetchLock = true;
+    console.log('🔄 Starting fetchPortfolioData...');
     
     try {
-      // Update central store loading state
       useCentralPortfolioStore.getState().setLoading(true);
       
       const portfolio = await kucoinService.fetchPortfolio();
       
-      console.log('✅ Portfolio data fetched via central service:', {
+      console.log('✅ Portfolio data fetched:', {
         totalValue: portfolio.totalValue,
         positionCount: portfolio.positions.length
       });
       
-      this.fetchInProgress = false;
       this.dispatch({ type: 'FETCH_SUCCESS', payload: portfolio });
       
     } catch (error) {
-      this.fetchInProgress = false;
-      
       const reason = error instanceof Error ? error.message : 'Unknown error';
       console.log('❌ Portfolio fetch failed:', reason);
-      
       this.dispatch({ type: 'FETCH_FAIL', payload: reason });
+    } finally {
+      this.fetchInProgress = false;
+      SimReadinessStore.globalFetchLock = false;
     }
   }
 
-  
   private handleStateEffects(action: SimReadinessAction): void {
     console.log('🎯 HandleStateEffects for state:', this.status.state);
+    
+    // Stop all timers first to prevent conflicts
+    this.stopAllTimers();
     
     switch (this.status.state) {
       case 'FETCHING':
@@ -252,6 +264,7 @@ class SimReadinessStore {
         
       case 'READY':
         this.startTTLTimer();
+        // Only start refresh timer if not already running
         this.startPortfolioRefresh();
         break;
         
@@ -262,18 +275,17 @@ class SimReadinessStore {
         break;
         
       case 'UNSTABLE':
-        this.stopAllTimers();
         this.scheduleRetry();
         break;
         
       case 'IDLE':
-        this.stopAllTimers();
+        // No timers needed for IDLE state
         break;
     }
   }
 
   private startTTLTimer(): void {
-    this.stopTTLTimer();
+    if (this.ttlTimer) return; // Prevent duplicate timers
     console.log('⏰ Starting TTL timer');
     this.ttlTimer = setTimeout(() => {
       console.log('⏰ Portfolio snapshot TTL exceeded');
@@ -282,7 +294,7 @@ class SimReadinessStore {
   }
 
   private startHealthChecks(): void {
-    this.stopHealthChecks();
+    if (this.healthCheckTimer) return;
     console.log('🏥 Starting health checks');
     this.healthCheckTimer = setInterval(async () => {
       try {
@@ -296,10 +308,11 @@ class SimReadinessStore {
   }
 
   private startPortfolioRefresh(): void {
-    this.stopPortfolioRefresh();
+    if (this.refreshTimer) return; // Prevent duplicate timers
     console.log('🔄 Starting portfolio refresh timer');
     this.refreshTimer = setInterval(() => {
-      if (this.status.state === 'READY' || this.status.state === 'SIM_RUNNING') {
+      if ((this.status.state === 'READY' || this.status.state === 'SIM_RUNNING') && 
+          !this.fetchInProgress && !SimReadinessStore.globalFetchLock) {
         console.log('🔄 Scheduled portfolio refresh...');
         this.fetchPortfolioData();
       }
@@ -307,10 +320,13 @@ class SimReadinessStore {
   }
 
   private startWatchdog(): void {
-    this.stopWatchdog();
+    if (this.watchdogTimer) return;
     console.log('🐕 Starting watchdog timer');
     this.watchdogTimer = setInterval(() => {
-      if (this.status.state === 'SIM_RUNNING' && this.status.portfolio) {
+      if (this.status.state === 'SIM_RUNNING' && 
+          this.status.portfolio && 
+          !this.fetchInProgress && 
+          !SimReadinessStore.globalFetchLock) {
         const now = Date.now();
         const age = now - this.status.portfolio.fetchedAt;
         const dangerZone = SIM_CONFIG.SNAPSHOT_TTL - SIM_CONFIG.REFRESH_MARGIN;
@@ -384,7 +400,6 @@ class SimReadinessStore {
     this.listeners.forEach(listener => listener(status));
   }
 
-  // Public methods
   initialize(): void {
     this.dispatch({ type: 'INIT' });
   }
@@ -401,22 +416,13 @@ class SimReadinessStore {
     this.stopAllTimers();
     retryScheduler.clearRetry('sim-readiness');
     this.listeners = [];
+    SimReadinessStore.globalFetchLock = false;
   }
 
   forceRefresh(): void {
-    console.log('🔄 Forcing portfolio refresh via central service...');
+    console.log('🔄 Forcing portfolio refresh...');
     useCentralPortfolioStore.getState().clearData();
     kucoinService.invalidateCache();
-    
-    // Enhanced force refresh: also trigger state correction
-    const centralStore = useCentralPortfolioStore.getState();
-    if (centralStore.snapshot && (this.status.state === 'FETCHING' || this.status.state === 'IDLE')) {
-      console.log('🔄 Force refresh: correcting state to READY due to existing data');
-      this.status.state = 'READY';
-      this.status.reason = null;
-      this.status.retryCount = 0;
-      this.notifyListeners();
-    }
     
     if (this.status.state === 'READY' || this.status.state === 'SIM_RUNNING') {
       this.fetchPortfolioData();
@@ -439,7 +445,8 @@ class SimReadinessStore {
         error: centralStore.error,
         isStale: centralStore.isStale()
       },
-      fetchInProgress: this.fetchInProgress
+      fetchInProgress: this.fetchInProgress,
+      globalFetchLock: SimReadinessStore.globalFetchLock
     };
   }
 }
