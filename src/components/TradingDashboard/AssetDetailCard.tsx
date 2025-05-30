@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { createChart, IChartApi } from 'lightweight-charts';
@@ -46,7 +45,7 @@ export const AssetDetailCard = ({ selectedAsset, className }: AssetDetailCardPro
     });
 
     // Add candlestick series using the correct lightweight-charts v5 API
-    const candlestickSeries = chart.addCandlestickSeries({
+    const candlestickSeries = (chart as any).addCandlestickSeries({
       upColor: '#10b981',
       downColor: '#ef4444',
       borderDownColor: '#ef4444',
