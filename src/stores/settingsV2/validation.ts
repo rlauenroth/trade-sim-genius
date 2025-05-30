@@ -3,30 +3,30 @@ import { z } from 'zod';
 import { loggingService } from '@/services/loggingService';
 
 const KuCoinSettingsSchema = z.object({
-  key: z.string(),
-  secret: z.string(),
-  passphrase: z.string(),
-  verified: z.boolean()
+  key: z.string().default(''),
+  secret: z.string().default(''),
+  passphrase: z.string().default(''),
+  verified: z.boolean().default(false)
 });
 
 const OpenRouterSettingsSchema = z.object({
-  apiKey: z.string(),
-  verified: z.boolean()
+  apiKey: z.string().default(''),
+  verified: z.boolean().default(false)
 });
 
 const ModelSettingsSchema = z.object({
-  id: z.string(),
-  provider: z.string(),
-  priceUsdPer1k: z.number(),
-  latencyMs: z.number(),
-  verified: z.boolean()
+  id: z.string().default(''),
+  provider: z.string().default(''),
+  priceUsdPer1k: z.number().default(0),
+  latencyMs: z.number().default(0),
+  verified: z.boolean().default(false)
 });
 
 const RiskLimitsSchema = z.object({
-  maxOpenOrders: z.number().min(1).max(50),
-  maxExposure: z.number().min(100).max(1000000),
-  minBalance: z.number().min(10).max(10000),
-  requireConfirmation: z.boolean()
+  maxOpenOrders: z.number().min(1).max(50).default(5),
+  maxExposure: z.number().min(100).max(1000000).default(1000),
+  minBalance: z.number().min(10).max(10000).default(100),
+  requireConfirmation: z.boolean().default(true)
 });
 
 const VerifiedSettingsSchema = z.object({
@@ -34,10 +34,10 @@ const VerifiedSettingsSchema = z.object({
   openRouter: OpenRouterSettingsSchema,
   model: ModelSettingsSchema,
   riskLimits: RiskLimitsSchema,
-  tradingMode: z.enum(['simulation', 'real']),
-  tradingStrategy: z.enum(['conservative', 'moderate', 'aggressive']),
-  proxyUrl: z.string().url(),
-  lastUpdated: z.number()
+  tradingMode: z.enum(['simulation', 'real']).default('simulation'),
+  tradingStrategy: z.enum(['conservative', 'moderate', 'aggressive']).default('conservative'),
+  proxyUrl: z.string().url().default('https://api.kucoin.com'),
+  lastUpdated: z.number().default(() => Date.now())
 });
 
 export type ValidatedSettings = z.infer<typeof VerifiedSettingsSchema>;
@@ -60,18 +60,24 @@ export const validateSettings = (settings: any): { isValid: boolean; settings?: 
   }
 };
 
-export const sanitizeSettings = (settings: any, defaults: any): any => {
+export const sanitizeSettings = (settings: any, defaults: any): ValidatedSettings => {
   try {
-    // First try to validate
-    const validation = validateSettings(settings);
-    if (validation.isValid && validation.settings) {
-      return validation.settings;
-    }
-    
-    // If validation fails, merge with defaults and validate again
+    // First try to validate with defaults applied
     const mergedSettings = {
       ...defaults,
       ...settings,
+      kucoin: {
+        ...defaults.kucoin,
+        ...(settings.kucoin || {})
+      },
+      openRouter: {
+        ...defaults.openRouter,
+        ...(settings.openRouter || {})
+      },
+      model: {
+        ...defaults.model,
+        ...(settings.model || {})
+      },
       riskLimits: {
         ...defaults.riskLimits,
         ...(settings.riskLimits || {})
@@ -79,19 +85,28 @@ export const sanitizeSettings = (settings: any, defaults: any): any => {
       lastUpdated: Date.now()
     };
     
-    const secondValidation = validateSettings(mergedSettings);
-    if (secondValidation.isValid && secondValidation.settings) {
+    const validation = validateSettings(mergedSettings);
+    if (validation.isValid && validation.settings) {
       loggingService.logInfo('Settings sanitized successfully');
-      return secondValidation.settings;
+      return validation.settings;
     }
     
-    // If still invalid, return defaults
-    loggingService.logError('Settings could not be sanitized, using defaults');
-    return defaults;
+    // If still invalid, return parsed defaults
+    const defaultValidation = validateSettings(defaults);
+    if (defaultValidation.isValid && defaultValidation.settings) {
+      loggingService.logError('Settings could not be sanitized, using validated defaults');
+      return defaultValidation.settings;
+    }
+    
+    // Fallback to schema defaults
+    loggingService.logError('Critical: Could not validate defaults, using schema defaults');
+    return VerifiedSettingsSchema.parse({});
+    
   } catch (error) {
     loggingService.logError('Settings sanitization error', {
       error: error instanceof Error ? error.message : 'Unknown error'
     });
-    return defaults;
+    // Return schema defaults as last resort
+    return VerifiedSettingsSchema.parse({});
   }
 };

@@ -87,7 +87,11 @@ export const useDashboardStateManager = () => {
           'portfolioService',
           async () => {
             try {
-              await loadPortfolioData();
+              // Call loadPortfolioData with proper arguments if needed, or handle the function signature
+              if (typeof loadPortfolioData === 'function') {
+                // Check if loadPortfolioData expects arguments or is a no-arg function
+                await loadPortfolioData();
+              }
               return true;
             } catch (error) {
               loggingService.logError('Portfolio service initialization failed', {

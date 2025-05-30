@@ -37,15 +37,16 @@ export const createLoadActions = (get: GetState, set: SetState) => ({
           loggingService.logError('Failed to parse stored settings', {
             error: parseError instanceof Error ? parseError.message : 'Parse error'
           });
-          settings = getDefaultSettings();
+          settings = sanitizeSettings({}, getDefaultSettings());
           wasCorrupted = true;
         }
       } else {
         // Try to migrate from old settings
         const { settings: migrated, shouldMarkVerified } = migrateFromOldSettings();
         if (Object.keys(migrated).length > 0) {
-          // Validate migrated settings
-          const validation = validateSettings({ ...settings, ...migrated });
+          // Merge with defaults and validate
+          const mergedSettings = { ...settings, ...migrated };
+          const validation = validateSettings(mergedSettings);
           if (validation.isValid && validation.settings) {
             settings = validation.settings;
             shouldMarkAllVerified = shouldMarkVerified;
@@ -54,7 +55,7 @@ export const createLoadActions = (get: GetState, set: SetState) => ({
             loggingService.logError('Migrated settings are invalid', {
               errors: validation.errors
             });
-            settings = sanitizeSettings({ ...settings, ...migrated }, getDefaultSettings());
+            settings = sanitizeSettings(mergedSettings, getDefaultSettings());
           }
           
           // Clean up old storage keys after successful migration
