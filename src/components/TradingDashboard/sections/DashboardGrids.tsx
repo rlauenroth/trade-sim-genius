@@ -1,6 +1,14 @@
 
+
 import React from 'react';
-import { ProfessionalDashboardLayout } from '../ProfessionalDashboardLayout';
+import PortfolioOverviewWithStatus from '../PortfolioOverviewWithStatus';
+import ControlCenter from '../ControlCenter';
+import ProgressTracker from '../ProgressTracker';
+import CandidateList from '../CandidateList';
+import SignalDisplay from '../SignalDisplay';
+import ActivityLog from '../ActivityLog';
+import OpenPositions from '../OpenPositions';
+import PerformanceMetrics from '../PerformanceMetrics';
 
 interface DashboardGridsProps {
   displayPortfolioValue: number;
@@ -28,8 +36,98 @@ interface DashboardGridsProps {
   apiKeys: any;
 }
 
-const DashboardGrids = (props: DashboardGridsProps) => {
-  return <ProfessionalDashboardLayout {...props} />;
+const DashboardGrids = ({
+  displayPortfolioValue,
+  displayStartValue,
+  totalPnL,
+  totalPnLPercentage,
+  progressValue,
+  portfolioHealthStatus,
+  simulationState,
+  isSimulationActive,
+  isPaused,
+  onStartSimulation,
+  onPauseSimulation,
+  onResumeSimulation,
+  onStopSimulation,
+  autoTradeCount,
+  candidates,
+  openPositions,
+  currentSignal,
+  onAcceptSignal,
+  onIgnoreSignal,
+  activityLog,
+  simulationDataForLog,
+  userSettings,
+  apiKeys
+}: DashboardGridsProps) => {
+  // Ensure portfolioHealthStatus matches the expected type
+  const normalizeHealthStatus = (status: string): 'HEALTHY' | 'WARNING' | 'CRITICAL' => {
+    const upperStatus = status.toUpperCase();
+    if (upperStatus === 'HEALTHY' || upperStatus === 'WARNING' || upperStatus === 'CRITICAL') {
+      return upperStatus as 'HEALTHY' | 'WARNING' | 'CRITICAL';
+    }
+    return 'HEALTHY'; // Default fallback
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+      {/* Left Column */}
+      <div className="space-y-6">
+        <PortfolioOverviewWithStatus
+          currentValue={displayPortfolioValue}
+          startValue={displayStartValue}
+          totalPnL={totalPnL}
+          totalPnLPercentage={totalPnLPercentage}
+        />
+        
+        <ControlCenter
+          isSimulationActive={isSimulationActive}
+          isPaused={isPaused}
+          onStartSimulation={onStartSimulation}
+          onPauseSimulation={onPauseSimulation}
+          onResumeSimulation={onResumeSimulation}
+          onStopSimulation={onStopSimulation}
+          autoTradeCount={autoTradeCount}
+        />
+        
+        <ProgressTracker
+          startValue={displayStartValue}
+          currentValue={displayPortfolioValue}
+          progressValue={progressValue}
+          isSimulationActive={isSimulationActive}
+        />
+      </div>
+
+      {/* Middle Column */}
+      <div className="space-y-6">
+        <CandidateList 
+          candidates={candidates} 
+          openPositions={openPositions}
+        />
+        
+        <SignalDisplay
+          currentSignal={currentSignal}
+          onAcceptSignal={onAcceptSignal}
+          onIgnoreSignal={onIgnoreSignal}
+        />
+        
+        <PerformanceMetrics portfolioHealthStatus={normalizeHealthStatus(portfolioHealthStatus)} />
+      </div>
+
+      {/* Right Column */}
+      <div className="lg:col-span-2 xl:col-span-1 space-y-6">
+        <ActivityLog
+          activityLog={activityLog}
+          simulationData={simulationDataForLog}
+        />
+        
+        <OpenPositions
+          positions={simulationState?.openPositions || []}
+        />
+      </div>
+    </div>
+  );
 };
 
 export default DashboardGrids;
