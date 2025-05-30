@@ -19,59 +19,44 @@ export const useSignalGeneration = () => {
   const generateSignals = useCallback(async (
     isActive: boolean, 
     simulationState: any, 
-    addLogEntry: (type: any, message: string) => void
+    addLogEntry: (type: any, message: string) => void,
+    executeAutoTrade?: (signal: Signal, simulationState: any, updateSimulationState: any, addLogEntry: any) => Promise<boolean>,
+    updateSimulationState?: (state: any) => void
   ) => {
     // Guard against multiple concurrent executions
     if (isFetchingSignals) {
       console.log('🔄 Signal generation skipped - already in progress');
-      loggingService.logEvent('AI', 'Signal generation skipped - already in progress');
       return;
     }
 
-    // Debounce rapid calls (minimum 10 seconds between generations)
+    // Debounce rapid calls
     const now = Date.now();
     const timeSinceLastGeneration = now - lastGenerationTime.current;
     if (timeSinceLastGeneration < 10000) {
-      console.log('🔄 Signal generation debounced - too frequent calls:', {
-        timeSinceLastGeneration,
-        minimumInterval: 10000
-      });
-      loggingService.logEvent('AI', 'Signal generation debounced', {
-        timeSinceLastGeneration,
-        minimumInterval: 10000
-      });
+      console.log('🔄 Signal generation debounced - too frequent calls');
       return;
     }
 
     if (!isActive) {
       console.log('🔄 Signal generation skipped - simulation inactive');
-      loggingService.logEvent('AI', 'Signal generation skipped - simulation inactive', {
-        isActive
-      });
       return;
     }
 
-    console.trace('🔍 Signal generation called from:');
-    
     setIsFetchingSignals(true);
     lastGenerationTime.current = now;
     
     try {
+      // Clear candidates at start of new cycle
       clearCandidates();
       
-      console.log('🚀 Starting comprehensive AI market analysis:', {
+      console.log('🚀 Starting comprehensive AI market analysis with auto-execution:', {
         portfolioValue: simulationState?.currentPortfolioValue,
         availableUSDT: simulationState?.paperAssets.find((asset: any) => asset.symbol === 'USDT')?.quantity,
-        openPositions: simulationState?.openPositions?.length || 0
+        openPositions: simulationState?.openPositions?.length || 0,
+        hasAutoExecution: !!executeAutoTrade
       });
       
-      loggingService.logEvent('AI', 'Starting comprehensive AI market analysis', {
-        portfolioValue: simulationState?.currentPortfolioValue,
-        availableUSDT: simulationState?.paperAssets.find((asset: any) => asset.symbol === 'USDT')?.quantity,
-        openPositions: simulationState?.openPositions?.length || 0
-      });
-      
-      addLogEntry('AI', 'Starte umfassende KI-Marktanalyse...');
+      addLogEntry('AI', 'Starte KI-Analyse mit automatischer Ausführung...');
       
       // Validate API keys
       const validation = validateAPIKeys(addLogEntry);
@@ -84,12 +69,6 @@ export const useSignalGeneration = () => {
       const availableUSDT = simulationState?.paperAssets.find((asset: any) => asset.symbol === 'USDT')?.quantity || null;
       
       if (!portfolioValue || !availableUSDT) {
-        loggingService.logError('AI analysis failed - missing portfolio data', {
-          hasPortfolioValue: !!portfolioValue,
-          hasAvailableUSDT: !!availableUSDT,
-          portfolioValue,
-          availableUSDT
-        });
         addLogEntry('ERROR', 'Portfolio-Daten nicht verfügbar für KI-Analyse');
         return;
       }
@@ -105,71 +84,59 @@ export const useSignalGeneration = () => {
 
       const { signals } = result;
       
-      console.log('📊 Multi-signal generation completed:', {
+      console.log('📊 Signal generation completed:', {
         signalsGenerated: signals.length,
-        signalTypes: signals.map(s => s.signalType),
-        assetPairs: signals.map(s => s.assetPair),
-        avgConfidence: signals.reduce((sum, s) => sum + (s.confidenceScore || 0), 0) / signals.length
-      });
-      
-      loggingService.logEvent('AI', 'Multi-signal generation completed', {
-        signalsGenerated: signals.length,
-        signalTypes: signals.map(s => s.signalType),
-        assetPairs: signals.map(s => s.assetPair),
-        avgConfidence: signals.reduce((sum, s) => sum + (s.confidenceScore || 0), 0) / signals.length
+        actionableSignals: signals.filter(s => s.signalType === 'BUY' || s.signalType === 'SELL').length
       });
       
       if (signals.length > 0) {
-        setAvailableSignals(signals);
+        // Filter for actionable signals only
+        const actionableSignals = signals.filter(s => s.signalType === 'BUY' || s.signalType === 'SELL');
         
-        const primarySignal = signals[0];
-        setCurrentSignal(primarySignal);
-        
-        console.log('🎯 Primary signal selected:', {
-          signalType: primarySignal.signalType,
-          assetPair: primarySignal.assetPair,
-          confidenceScore: primarySignal.confidenceScore,
-          totalSignalsAvailable: signals.length
-        });
-        
-        loggingService.logEvent('AI', 'Primary signal selected', {
-          signalType: primarySignal.signalType,
-          assetPair: primarySignal.assetPair,
-          confidenceScore: primarySignal.confidenceScore,
-          totalSignalsAvailable: signals.length
-        });
-        
-        addLogEntry('AI', `KI-Signale generiert: ${signals.length} Assets analysiert`);
-        addLogEntry('AI', `Primär-Signal: ${primarySignal.signalType} ${primarySignal.assetPair}`);
-        
-        if (signals.length > 1) {
-          const otherSignals = signals.slice(1).map(s => `${s.signalType} ${s.assetPair}`).join(', ');
-          addLogEntry('AI', `Weitere Signale verfügbar: ${otherSignals}`);
-        }
-        
-        if (primarySignal.reasoning) {
-          addLogEntry('AI', `KI-Begründung: ${primarySignal.reasoning}`);
+        if (actionableSignals.length > 0) {
+          setAvailableSignals(actionableSignals);
+          
+          const primarySignal = actionableSignals[0];
+          setCurrentSignal(primarySignal);
+          
+          addLogEntry('AI', `${actionableSignals.length} handelbare Signale generiert`);
+          addLogEntry('AI', `Primär-Signal: ${primarySignal.signalType} ${primarySignal.assetPair}`);
+          
+          // Auto-execute the primary signal if executeAutoTrade is provided
+          if (executeAutoTrade && updateSimulationState && simulationState) {
+            addLogEntry('AUTO_TRADE', `Automatische Ausführung startet: ${primarySignal.signalType} ${primarySignal.assetPair}`);
+            
+            try {
+              const success = await executeAutoTrade(primarySignal, simulationState, updateSimulationState, addLogEntry);
+              
+              if (success) {
+                addLogEntry('SUCCESS', `Auto-Trade erfolgreich: ${primarySignal.signalType} ${primarySignal.assetPair}`);
+                // Clear the current signal after successful execution
+                setCurrentSignal(null);
+              } else {
+                addLogEntry('WARNING', `Auto-Trade fehlgeschlagen: ${primarySignal.assetPair}`);
+              }
+            } catch (error) {
+              addLogEntry('ERROR', `Auto-Trade Fehler: ${error instanceof Error ? error.message : 'Unbekannt'}`);
+            }
+          }
+          
+          if (primarySignal.reasoning) {
+            addLogEntry('AI', `KI-Begründung: ${primarySignal.reasoning}`);
+          }
+        } else {
+          addLogEntry('INFO', 'Keine handelbaren Signale in diesem Zyklus');
+          setAvailableSignals([]);
+          setCurrentSignal(null);
         }
       } else {
-        console.log('ℹ️ No tradable signals generated this cycle');
-        loggingService.logEvent('AI', 'No tradable signals generated', {
-          reason: 'no_signals_this_cycle'
-        });
-        addLogEntry('INFO', 'No tradable signals this cycle');
+        addLogEntry('INFO', 'Keine Signale generiert');
         setAvailableSignals([]);
         setCurrentSignal(null);
       }
       
     } catch (error) {
       console.error('❌ AI signal generation error:', error);
-      
-      loggingService.logError('AI signal generation error', {
-        error: error instanceof Error ? error.message : 'unknown',
-        stack: error instanceof Error ? error.stack : undefined,
-        portfolioValue: simulationState?.currentPortfolioValue,
-        availableUSDT: simulationState?.paperAssets.find((asset: any) => asset.symbol === 'USDT')?.quantity
-      });
-      
       addLogEntry('ERROR', `KI-Service Fehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
       setAvailableSignals([]);
       setCurrentSignal(null);

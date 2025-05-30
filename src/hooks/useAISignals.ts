@@ -1,7 +1,6 @@
 
 import { useSignalGeneration } from './ai/useSignalGeneration';
-import { useCandidates } from '@/hooks/useCandidates';
-import { useSettingsV2Store } from '@/stores/settingsV2';
+import { useCandidates } from './useCandidates';
 
 export const useAISignals = () => {
   const {
@@ -9,19 +8,36 @@ export const useAISignals = () => {
     setCurrentSignal,
     availableSignals,
     setAvailableSignals,
-    generateSignals
+    generateSignals,
+    isFetchingSignals
   } = useSignalGeneration();
-
+  
   const { candidates } = useCandidates();
-  const { settings } = useSettingsV2Store();
+
+  // Enhanced signal generation with auto-execution support
+  const startAISignalGeneration = async (
+    isActive: boolean,
+    simulationState: any,
+    addLogEntry: (type: any, message: string) => void,
+    executeAutoTrade?: (signal: any, simulationState: any, updateSimulationState: any, addLogEntry: any) => Promise<boolean>,
+    updateSimulationState?: (state: any) => void
+  ) => {
+    await generateSignals(
+      isActive,
+      simulationState,
+      addLogEntry,
+      executeAutoTrade,
+      updateSimulationState
+    );
+  };
 
   return {
     currentSignal,
     setCurrentSignal,
     availableSignals,
     setAvailableSignals,
-    startAISignalGeneration: generateSignals,
+    startAISignalGeneration,
     candidates,
-    selectedModelId: settings.model.id // Expose the selected model ID
+    isFetchingSignals
   };
 };

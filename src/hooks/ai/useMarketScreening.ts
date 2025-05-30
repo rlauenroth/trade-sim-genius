@@ -25,42 +25,37 @@ export const useMarketScreening = () => {
       strategy: params.strategy,
       simulatedPortfolioValue: params.portfolioValue,
       availableUSDT: params.availableUSDT,
-      selectedModelId: selectedModelId // Pass the selected model ID
+      selectedModelId: selectedModelId
     });
 
-    // Check if API is properly configured
-    loggingService.logEvent('AI', 'Validating comprehensive API configuration', {
-      hasKucoinKeys: true,
-      hasOpenRouterKey: true,
-      strategy: params.strategy
-    });
-    
+    // Check API configuration
     const isValidConfig = await aiService.isApiConfigurationValid();
     if (!isValidConfig) {
-      loggingService.logError('AI analysis failed - invalid API configuration', {
-        reason: 'api_validation_failed'
-      });
-      addLogEntry('ERROR', 'OpenRouter API-Schlüssel ungültig oder Konfiguration fehlerhaft');
-      addLogEntry('INFO', 'Keine Demo-Signale verfügbar - nur echte KI-Analyse');
+      addLogEntry('ERROR', 'OpenRouter API-Schlüssel ungültig');
       return { selectedPairs: [], signals: [] };
     }
 
-    addLogEntry('INFO', `Verwende umfassende KI-Analyse mit ${params.strategy} Strategie`);
+    addLogEntry('INFO', `KI-Analyse mit ${params.strategy} Strategie gestartet`);
     
-    // Stage 1: Market screening
-    addLogEntry('AI', 'Stage 1: Market-Screening wird gestartet...');
+    // Stage 1: Market screening with real-time candidate updates
+    addLogEntry('AI', 'Market-Screening läuft...');
     const selectedPairs = await aiService.performMarketScreening();
     
-    // Add all screened pairs as candidates
-    selectedPairs.forEach(pair => addCandidate(pair));
-    addLogEntry('AI', `${selectedPairs.length} Assets für Detailanalyse ausgewählt`);
+    // Add candidates immediately with screening status
+    selectedPairs.forEach(pair => {
+      addCandidate(pair);
+      addLogEntry('AI', `Asset hinzugefügt: ${pair}`);
+    });
     
-    // Stage 2: Generate detailed signals
+    addLogEntry('AI', `${selectedPairs.length} Assets für Analyse ausgewählt`);
+    
+    // Stage 2: Generate detailed signals with live candidate updates
     const signals: any[] = [];
     
     for (let i = 0; i < selectedPairs.length; i++) {
       const pair = selectedPairs[i];
       
+      // Update candidate status to analyzing
       updateCandidateStatus(pair, 'analyzed');
       addLogEntry('AI', `Analysiere ${pair} (${i + 1}/${selectedPairs.length})...`);
       
@@ -69,6 +64,7 @@ export const useMarketScreening = () => {
         if (signal) {
           signals.push(signal);
           
+          // Update candidate with signal information
           updateCandidateStatus(
             pair, 
             'signal', 
@@ -76,27 +72,34 @@ export const useMarketScreening = () => {
             signal.confidenceScore
           );
           
+          addLogEntry('AI', `Signal generiert: ${signal.signalType} ${pair} (${Math.round((signal.confidenceScore || 0) * 100)}%)`);
+          
           loggingService.logEvent('AI', 'Signal generated for pair', {
             pair,
             signalType: signal.signalType,
             confidence: signal.confidenceScore
           });
         } else {
+          // Keep as analyzed if no signal generated
           updateCandidateStatus(pair, 'analyzed');
+          addLogEntry('AI', `Kein Signal für ${pair}`);
         }
       } catch (error) {
         updateCandidateStatus(pair, 'analyzed');
+        addLogEntry('WARNING', `Analyse fehlgeschlagen für ${pair}`);
         loggingService.logError('Signal generation failed for pair', {
           pair,
           error: error instanceof Error ? error.message : 'unknown'
         });
       }
       
-      // Add delay between requests to avoid rate limiting
+      // Rate limiting delay
       if (i < selectedPairs.length - 1) {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
+
+    addLogEntry('SUCCESS', `Analyse abgeschlossen: ${signals.length} Signale generiert`);
 
     return { selectedPairs, signals };
   }, [addCandidate, updateCandidateStatus, settings.model.id]);

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bot, Clock, TrendingUp, BarChart3, CheckCircle } from 'lucide-react';
+import { Bot, Clock, TrendingUp, BarChart3, CheckCircle, Play } from 'lucide-react';
 import { formatCurrency } from '@/utils/formatters';
 import { useRiskManagement } from '@/hooks/useRiskManagement';
 import { useAppState } from '@/hooks/useAppState';
@@ -37,11 +37,15 @@ const SignalDisplay = ({
   const { getTradeDisplayInfo } = useRiskManagement(userSettings.tradingStrategy || 'balanced');
   const [selectedSignalIndex, setSelectedSignalIndex] = useState(0);
 
-  // Use available signals if provided, otherwise fall back to current signal
-  const displaySignals = availableSignals.length > 0 ? availableSignals : (currentSignal ? [currentSignal] : []);
-  const activeSignal = displaySignals[selectedSignalIndex] || currentSignal;
+  // Clear priority: use availableSignals if they exist, otherwise currentSignal
+  // This prevents duplicates by having a single source of truth
+  const displaySignals = availableSignals.length > 0 ? availableSignals : [];
+  const primarySignal = displaySignals[selectedSignalIndex] || currentSignal;
 
-  if (!activeSignal && displaySignals.length === 0) {
+  // Only show if we have actionable signals (BUY/SELL)
+  const hasActionableSignals = primarySignal && (primarySignal.signalType === 'BUY' || primarySignal.signalType === 'SELL');
+
+  if (!hasActionableSignals) {
     return (
       <Card className="bg-slate-800 border-slate-700">
         <CardHeader>
@@ -52,9 +56,9 @@ const SignalDisplay = ({
         </CardHeader>
         <CardContent>
           <div className="text-center py-4">
-            <div className="text-slate-400 mb-2">Kein Signal im aktuellen Intervall</div>
+            <div className="text-slate-400 mb-2">Warte auf handelbare Signale...</div>
             <div className="text-sm text-slate-500">
-              Nur echte KI-Analysen werden angezeigt - keine Demo-Signale
+              Nur echte KI-Analysen werden angezeigt
             </div>
           </div>
         </CardContent>
@@ -64,8 +68,8 @@ const SignalDisplay = ({
 
   const displayInfo = portfolioValue ? getTradeDisplayInfo(portfolioValue, userSettings.tradingStrategy || 'balanced') : null;
 
-  // Render single signal view
-  const renderSignalCard = (signal: Signal, isMultiple: boolean = false) => (
+  // Render single signal view with clear auto-execution indication
+  const renderSignalCard = (signal: Signal) => (
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div>
@@ -120,9 +124,9 @@ const SignalDisplay = ({
         </div>
       )}
       
-      {/* Automatic execution indicator */}
-      <div className="flex items-center justify-center py-3 bg-green-600/20 rounded-lg">
-        <CheckCircle className="h-5 w-5 text-green-400 mr-2" />
+      {/* Enhanced automatic execution indicator */}
+      <div className="flex items-center justify-center py-3 bg-green-600/20 rounded-lg border border-green-500/30">
+        <Play className="h-5 w-5 text-green-400 mr-2 animate-pulse" />
         <span className="text-green-400 font-medium">
           Signal wird automatisch ausgeführt
         </span>
@@ -135,8 +139,8 @@ const SignalDisplay = ({
       <CardHeader>
         <CardTitle className="text-white flex items-center space-x-2">
           <Bot className="h-5 w-5 text-green-400" />
-          <span>Automatische KI-Signale</span>
-          <Badge className="bg-green-600 text-xs">AUTOMATISCH</Badge>
+          <span>Aktives KI-Signal</span>
+          <Badge className="bg-green-600 text-xs animate-pulse">AUTO-MODUS</Badge>
           {displaySignals.length > 1 && (
             <Badge variant="outline" className="text-xs">
               {displaySignals.length} Signale
@@ -164,12 +168,12 @@ const SignalDisplay = ({
             
             {displaySignals.slice(0, 3).map((signal, index) => (
               <TabsContent key={index} value={index.toString()}>
-                {renderSignalCard(signal, true)}
+                {renderSignalCard(signal)}
               </TabsContent>
             ))}
           </Tabs>
         ) : (
-          activeSignal && renderSignalCard(activeSignal)
+          primarySignal && renderSignalCard(primarySignal)
         )}
       </CardContent>
     </Card>

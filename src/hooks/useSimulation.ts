@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect } from 'react';
 import { Signal } from '@/types/simulation';
 import { useSimulationState } from './useSimulationState';
@@ -76,8 +75,8 @@ export const useSimulation = () => {
     updateSimulationState
   );
 
-  // Use extracted hooks
-  const { handleProcessSignal } = useEnhancedSignalProcessor(
+  // Use extracted hooks with enhanced auto-execution
+  const { handleProcessSignal, executeDirectAutoTrade } = useEnhancedSignalProcessor(
     simulationState,
     isSimulationActive,
     updateSimulationState,
@@ -106,22 +105,34 @@ export const useSimulation = () => {
 
   const { portfolioHealthStatus } = usePortfolioHealthMonitor(simulationState, userSettings);
 
-  // Enhanced signal processing wrapper
+  // Enhanced signal processing wrapper with direct auto-execution
   const processSignal = useCallback(async (signal: Signal) => {
     await handleProcessSignal(signal, userSettings);
   }, [handleProcessSignal, userSettings]);
 
-  // Update timer interval - centralized timer management
+  // Update timer interval with auto-execution integration
   useEffect(() => {
     console.log('🔄 Timer update effect triggered:', { isSimulationActive, simulationState: simulationState?.isActive });
+    
+    // Enhanced timer with direct auto-execution
+    const enhancedStartAISignalGeneration = async () => {
+      await startAISignalGeneration(
+        isSimulationActive,
+        simulationState,
+        addLogEntry,
+        executeDirectAutoTrade, // Pass the direct auto-execution function
+        updateSimulationState
+      );
+    };
+
     updateTimerInterval(
       isSimulationActive,
       true, // Always automatic mode
       simulationState,
-      startAISignalGeneration,
+      enhancedStartAISignalGeneration,
       addLogEntry
     );
-  }, [updateTimerInterval, isSimulationActive, simulationState?.isActive, simulationState?.isPaused, startAISignalGeneration, addLogEntry]);
+  }, [updateTimerInterval, isSimulationActive, simulationState?.isActive, simulationState?.isPaused, startAISignalGeneration, addLogEntry, executeDirectAutoTrade, updateSimulationState]);
 
   // Accept signal manually (kept for compatibility but simplified)
   const acceptSignal = useCallback(async (signal: Signal) => {
