@@ -2,7 +2,9 @@
 import { STORAGE_KEY } from './types';
 import { getDefaultSettings, getDefaultBlocks } from './defaults';
 import { migrateFromOldSettings, cleanupOldStorage } from './migration';
+import { validateSettings, sanitizeSettings } from './validation';
 import { loggingService } from '@/services/loggingService';
+import { toast } from '@/hooks/use-toast';
 import { GetState, SetState } from './actionTypes';
 
 export const createLoadActions = (get: GetState, set: SetState) => ({
@@ -13,21 +15,47 @@ export const createLoadActions = (get: GetState, set: SetState) => ({
       const stored = localStorage.getItem(STORAGE_KEY);
       let settings = getDefaultSettings();
       let shouldMarkAllVerified = false;
+      let wasCorrupted = false;
       
       if (stored) {
-        const parsed = JSON.parse(stored);
-        settings = {
-          ...settings,
-          ...parsed,
-          lastUpdated: parsed.lastUpdated || Date.now()
-        };
+        try {
+          const parsed = JSON.parse(stored);
+          
+          // Validate and sanitize loaded settings
+          const validation = validateSettings(parsed);
+          if (validation.isValid && validation.settings) {
+            settings = validation.settings;
+          } else {
+            // Settings are corrupted, sanitize them
+            loggingService.logError('Corrupted settings detected, sanitizing...', {
+              errors: validation.errors
+            });
+            settings = sanitizeSettings(parsed, getDefaultSettings());
+            wasCorrupted = true;
+          }
+        } catch (parseError) {
+          loggingService.logError('Failed to parse stored settings', {
+            error: parseError instanceof Error ? parseError.message : 'Parse error'
+          });
+          settings = getDefaultSettings();
+          wasCorrupted = true;
+        }
       } else {
         // Try to migrate from old settings
         const { settings: migrated, shouldMarkVerified } = migrateFromOldSettings();
         if (Object.keys(migrated).length > 0) {
-          settings = { ...settings, ...migrated };
-          shouldMarkAllVerified = shouldMarkVerified;
-          console.log('✅ Successfully migrated old settings to V2 format');
+          // Validate migrated settings
+          const validation = validateSettings({ ...settings, ...migrated });
+          if (validation.isValid && validation.settings) {
+            settings = validation.settings;
+            shouldMarkAllVerified = shouldMarkVerified;
+            console.log('✅ Successfully migrated and validated old settings to V2 format');
+          } else {
+            loggingService.logError('Migrated settings are invalid', {
+              errors: validation.errors
+            });
+            settings = sanitizeSettings({ ...settings, ...migrated }, getDefaultSettings());
+          }
           
           // Clean up old storage keys after successful migration
           cleanupOldStorage();
@@ -58,19 +86,37 @@ export const createLoadActions = (get: GetState, set: SetState) => ({
         isLoading: false 
       });
       
-      // Save the settings immediately if migration was successful
-      if (shouldMarkAllVerified) {
+      // Save the settings immediately if they were sanitized or migrated
+      if (shouldMarkAllVerified || wasCorrupted) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-        console.log('💾 Auto-saved migrated settings');
+        console.log('💾 Auto-saved validated settings');
+        
+        if (wasCorrupted) {
+          toast({
+            title: "Einstellungen repariert",
+            description: "Beschädigte Einstellungen wurden automatisch repariert.",
+            variant: "default"
+          });
+        }
       }
       
-      loggingService.logEvent('API', 'Settings V2 loaded successfully');
+      loggingService.logEvent('API', 'Settings V2 loaded and validated successfully');
     } catch (error) {
       console.error('Error loading settings V2:', error);
+      loggingService.logError('Critical error loading settings', {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
       set({ 
         settings: getDefaultSettings(),
         blocks: getDefaultBlocks(),
         isLoading: false 
+      });
+      
+      toast({
+        title: "Einstellungen-Fehler",
+        description: "Einstellungen konnten nicht geladen werden. Standard-Werte werden verwendet.",
+        variant: "destructive"
       });
     }
   }

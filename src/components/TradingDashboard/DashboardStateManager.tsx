@@ -7,8 +7,9 @@ import { useTradingDashboardData } from '@/hooks/useTradingDashboardData';
 import { useTradingDashboardEffects } from '@/hooks/useTradingDashboardEffects';
 import { useSimGuard } from '@/hooks/useSimGuard';
 import { useSimReadinessPortfolio } from '@/hooks/useSimReadinessPortfolio';
+import { useRealTradingManager } from '@/hooks/useRealTradingManager';
 import { simReadinessStore } from '@/stores/simReadinessStore';
-import { realTradingService } from '@/services/realTradingService';
+import { serviceRegistry } from '@/services/serviceRegistry';
 import { toast } from '@/hooks/use-toast';
 import { loggingService } from '@/services/loggingService';
 
@@ -25,7 +26,6 @@ export const useDashboardStateManager = () => {
     retryLoadPortfolioData 
   } = usePortfolioData();
 
-  // Use new centralized portfolio hook
   const { snapshot: livePortfolio, isLoading: livePortfolioLoading, error: livePortfolioError } = useSimReadinessPortfolio();
   
   const { 
@@ -47,6 +47,14 @@ export const useDashboardStateManager = () => {
 
   const { state: readinessState, isRunningBlocked, reason } = useSimGuard();
 
+  // Use real trading manager for real trading mode
+  const { 
+    isInitialized: realTradingInitialized, 
+    initializationError: realTradingError,
+    retryInitialization: retryRealTradingInit,
+    isRealTradingMode 
+  } = useRealTradingManager();
+
   const {
     timeElapsed,
     getProgressValue,
@@ -57,7 +65,7 @@ export const useDashboardStateManager = () => {
     hasValidSimulation
   } = useTradingDashboardData(simulationState, portfolioData, isSimulationActive);
 
-  // Enhanced initialization logic with proper error handling
+  // Enhanced initialization logic with service registry
   useEffect(() => {
     const initializeDashboard = async () => {
       console.log('🚀 DashboardStateManager: Initializing dashboard...', {
@@ -66,66 +74,62 @@ export const useDashboardStateManager = () => {
         isInitialized
       });
 
-      // Skip initialization if settings are still loading
-      if (settingsLoading) {
-        console.log('DashboardStateManager: Waiting for settings to load...');
-        return;
-      }
-
-      // Skip if already initialized
-      if (isInitialized) {
+      if (settingsLoading || isInitialized) {
         return;
       }
 
       try {
-        // Validate essential settings
-        if (!settings.kucoin.key || !settings.openRouter.apiKey) {
-          throw new Error('Essential API keys missing');
+        // Clear previous services
+        serviceRegistry.clear();
+
+        // Register core services
+        await serviceRegistry.registerService(
+          'portfolioService',
+          async () => {
+            try {
+              await loadPortfolioData();
+              return true;
+            } catch (error) {
+              loggingService.logError('Portfolio service initialization failed', {
+                error: error instanceof Error ? error.message : 'Unknown error'
+              });
+              return false;
+            }
+          },
+          2
+        );
+
+        // Register real trading services only if in real mode
+        if (isRealTradingMode) {
+          await serviceRegistry.registerService(
+            'realTradingService',
+            async () => {
+              // Real trading manager handles its own initialization
+              return realTradingInitialized && !realTradingError;
+            },
+            3
+          );
         }
 
-        // Validate risk limits for real trading mode
-        if (settings.tradingMode === 'real') {
-          if (!settings.riskLimits || typeof settings.riskLimits.maxOpenOrders !== 'number') {
-            throw new Error('Risk limits not properly configured for real trading');
-          }
-
-          // Initialize real trading service with current settings
-          try {
-            const apiKeys = {
-              kucoin: {
-                key: settings.kucoin.key,
-                secret: settings.kucoin.secret,
-                passphrase: settings.kucoin.passphrase
-              },
-              openRouter: {
-                apiKey: settings.openRouter.apiKey
-              }
-            };
-
-            realTradingService.setApiKeys(apiKeys);
-            realTradingService.setRiskLimits(settings.riskLimits);
-
-            loggingService.logEvent('SIM', 'Real trading service initialized', {
-              riskLimits: settings.riskLimits,
-              timestamp: Date.now()
-            });
-          } catch (serviceError) {
-            console.error('Failed to initialize real trading service:', serviceError);
-            loggingService.logError('Real trading service initialization failed', {
-              error: serviceError instanceof Error ? serviceError.message : 'Unknown error'
-            });
-            // Don't throw here - allow dashboard to load but with limited functionality
-          }
+        // Check if essential services are ready
+        const essentialServices = ['portfolioService'];
+        if (isRealTradingMode) {
+          essentialServices.push('realTradingService');
         }
 
-        console.log('✅ DashboardStateManager: Initialization successful');
-        setIsInitialized(true);
-        setInitializationError(null);
+        const allServicesReady = serviceRegistry.getAllServicesReady(essentialServices);
+        
+        if (allServicesReady) {
+          console.log('✅ DashboardStateManager: All services initialized');
+          setIsInitialized(true);
+          setInitializationError(null);
+        } else {
+          throw new Error('Essential services failed to initialize');
+        }
 
         loggingService.logEvent('SIM', 'Dashboard initialized successfully', {
           tradingMode: settings.tradingMode,
-          hasKucoinKeys: !!settings.kucoin.key,
-          hasOpenRouterKey: !!settings.openRouter.apiKey,
+          servicesReady: serviceRegistry.getServicesStatus().map(s => ({ name: s.name, ready: s.initialized })),
           timestamp: Date.now()
         });
 
@@ -140,7 +144,6 @@ export const useDashboardStateManager = () => {
           timestamp: Date.now()
         });
 
-        // Show user-friendly error
         toast({
           title: "Initialisierungsfehler",
           description: `Dashboard konnte nicht initialisiert werden: ${errorMessage}`,
@@ -150,7 +153,7 @@ export const useDashboardStateManager = () => {
     };
 
     initializeDashboard();
-  }, [settings, settingsLoading, isInitialized]);
+  }, [settings, settingsLoading, isInitialized, loadPortfolioData, isRealTradingMode, realTradingInitialized, realTradingError]);
 
   // Reset initialization when trading mode changes
   useEffect(() => {
@@ -181,24 +184,23 @@ export const useDashboardStateManager = () => {
     selectedAiModelId: settings.model.id,
     isRealTradingEnabled: settings.tradingMode === 'real',
     maxConcurrentTrades: settings.riskLimits.maxOpenOrders,
-    tradeAllBalance: false, // Default value
+    tradeAllBalance: false,
     maxUsdPerTrade: settings.riskLimits.maxExposure
   };
 
   const { handleStartSimulation: handleStartSimulationFromEffects, handleOpenSettings } = useTradingDashboardEffects({
-    isFirstTimeAfterSetup: false, // Simplified for now
+    isFirstTimeAfterSetup: false,
     decryptedApiKeys: apiKeys,
     livePortfolio,
     loadPortfolioData,
-    completeFirstTimeSetup: () => {}, // Simplified
+    completeFirstTimeSetup: () => {},
     startSimulation
   });
 
-  // Enhanced start simulation with settings verification
+  // Enhanced start simulation with improved validation
   const handleStartSimulation = useCallback(() => {
-    console.log('🚀 DashboardStateManager: Starting simulation with centralized settings...');
+    console.log('🚀 DashboardStateManager: Starting simulation with enhanced validation...');
     
-    // Check initialization status
     if (!isInitialized) {
       loggingService.logError('Cannot start simulation - dashboard not initialized', {
         initializationError,
@@ -221,30 +223,16 @@ export const useDashboardStateManager = () => {
       return;
     }
 
-    // Verify settings are loaded
-    if (settingsLoading) {
-      loggingService.logError('Cannot start simulation while settings are loading', {
-        settingsLoading,
-        tradingMode: settings.tradingMode
-      });
-      toast({
-        title: "Initialisierung läuft",
-        description: "Bitte warten Sie, bis die Einstellungen geladen sind",
-        variant: "destructive"
-      });
-      return;
+    // Check service readiness
+    const essentialServices = ['portfolioService'];
+    if (isRealTradingMode) {
+      essentialServices.push('realTradingService');
     }
 
-    // Verify essential settings are available
-    if (!settings.kucoin.key || !settings.openRouter.apiKey) {
-      loggingService.logError('Cannot start simulation without proper API configuration', {
-        hasKucoinKey: !!settings.kucoin.key,
-        hasOpenRouterKey: !!settings.openRouter.apiKey,
-        tradingMode: settings.tradingMode
-      });
+    if (!serviceRegistry.getAllServicesReady(essentialServices)) {
       toast({
-        title: "Konfiguration unvollständig",
-        description: "API-Schlüssel müssen konfiguriert sein",
+        title: "Services nicht bereit",
+        description: "Warten Sie, bis alle Services initialisiert sind",
         variant: "destructive"
       });
       return;
@@ -265,41 +253,64 @@ export const useDashboardStateManager = () => {
         variant: "destructive"
       });
     }
-  }, [handleStartSimulationFromEffects, settings, settingsLoading, livePortfolio, isInitialized, initializationError]);
+  }, [handleStartSimulationFromEffects, settings, settingsLoading, livePortfolio, isInitialized, initializationError, isRealTradingMode]);
 
-  // Enhanced manual refresh with centralized logging
+  // Enhanced manual refresh with service status check
   const handleManualRefresh = useCallback(() => {
-    console.log('🔄 Manual refresh triggered from Dashboard (centralized)');
+    console.log('🔄 Manual refresh triggered from Dashboard (enhanced)');
     
     loggingService.logInfo('Manual refresh initiated', {
       tradingMode: settings.tradingMode,
       selectedModel: settings.model.id,
       hasSimulation: isSimulationActive,
-      isInitialized
+      isInitialized,
+      servicesStatus: serviceRegistry.getServicesStatus()
     });
     
     simReadinessStore.forceRefresh();
     
-    // Log performance report on manual refresh
+    // Retry failed services
+    const failedServices = serviceRegistry.getServicesStatus().filter(s => s.error);
+    failedServices.forEach(service => {
+      if (service.name === 'realTradingService' && isRealTradingMode) {
+        retryRealTradingInit();
+      }
+    });
+    
     if (isSimulationActive) {
       logPerformanceReport();
     }
     
     toast({
       title: "Daten aktualisiert",
-      description: "Portfolio und Marktdaten werden neu geladen",
+      description: "Portfolio und Services werden neu geladen",
     });
-  }, [isSimulationActive, logPerformanceReport, settings.tradingMode, settings.model.id, isInitialized]);
+  }, [isSimulationActive, logPerformanceReport, settings.tradingMode, settings.model.id, isInitialized, isRealTradingMode, retryRealTradingInit]);
 
-  // Simple logout function with centralized cleanup
+  // Simple logout function with enhanced cleanup
   const logoutAndClearData = useCallback(() => {
-    console.log('🚪 Logout and clear data called (centralized)');
+    console.log('🚪 Logout and clear data called (enhanced)');
     loggingService.logInfo('User logout initiated', {
       tradingMode: settings.tradingMode
     });
+    
+    // Clear service registry
+    serviceRegistry.clear();
+    
     localStorage.clear();
     window.location.reload();
   }, [settings.tradingMode]);
+
+  // Retry service initialization
+  const retryServiceInitialization = useCallback((serviceName: string) => {
+    loggingService.logInfo('Retrying service initialization', { serviceName });
+    
+    if (serviceName === 'realTradingService' && isRealTradingMode) {
+      retryRealTradingInit();
+    } else if (serviceName === 'portfolioService') {
+      retryLoadPortfolioData();
+    }
+  }, [isRealTradingMode, retryRealTradingInit, retryLoadPortfolioData]);
 
   // Calculate simulation data for activity log
   const getSimulationDataForLog = () => {
@@ -319,7 +330,7 @@ export const useDashboardStateManager = () => {
   return {
     userSettings,
     logoutAndClearData,
-    isFirstTimeAfterSetup: false, // Simplified
+    isFirstTimeAfterSetup: false,
     apiKeys,
     portfolioData,
     portfolioLoading,
@@ -351,9 +362,14 @@ export const useDashboardStateManager = () => {
     getSimulationDataForLog,
     autoModeError,
     portfolioHealthStatus,
-    // Expose initialization state for UI
+    // Enhanced state exposure
     settingsLoading,
     isInitialized,
-    initializationError
+    initializationError,
+    retryServiceInitialization,
+    // Real trading specific
+    isRealTradingMode,
+    realTradingInitialized,
+    realTradingError
   };
 };
