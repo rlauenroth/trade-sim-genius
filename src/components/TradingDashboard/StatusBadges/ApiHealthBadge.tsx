@@ -2,7 +2,7 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Wifi, WifiOff, AlertTriangle } from 'lucide-react';
-import { useNetworkStatus } from '@/services/networkStatusService';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 
 interface ApiHealthBadgeProps {
   className?: string;

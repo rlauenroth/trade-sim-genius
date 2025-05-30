@@ -41,6 +41,16 @@ const CandidateList = ({
     return `${Math.floor(minutes / 60)}h`;
   };
 
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'screening': return 'Screening';
+      case 'analyzed': return 'Analysiert';
+      case 'signal': return 'Signal generiert';
+      case 'exit-screening': return 'Exit-Screening';
+      default: return 'Unbekannt';
+    }
+  };
+
   return (
     <Card className="bg-slate-800 border-slate-700">
       <CardHeader className="pb-3">
@@ -66,7 +76,7 @@ const CandidateList = ({
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <CandidateStatusIcon status={candidate.status} />
+                    <CandidateStatusIcon />
                     <span className="text-white text-sm font-medium">
                       {candidate.symbol}
                     </span>
@@ -87,10 +97,7 @@ const CandidateList = ({
                 
                 <div className="flex items-center justify-between mt-1">
                   <span className="text-slate-300 text-xs">
-                    Status: {candidate.status === 'screening' ? 'Screening' : 
-                            candidate.status === 'analyzing' ? 'Analyse läuft' :
-                            candidate.status === 'signal_generated' ? 'Signal generiert' :
-                            candidate.status === 'processed' ? 'Verarbeitet' : 'Unbekannt'}
+                    Status: {getStatusText(candidate.status)}
                   </span>
                   <div className="flex items-center gap-1 text-slate-400 text-xs">
                     <Clock className="h-3 w-3" />
