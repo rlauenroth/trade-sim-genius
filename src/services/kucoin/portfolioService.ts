@@ -24,10 +24,9 @@ export class PortfolioService {
     if (!apiKeys) {
       return {
         totalValue: 0,
-        assets: [],
-        timestamp: Date.now(),
-        source: 'mock',
-        error: 'No API keys provided'
+        positions: [],
+        cashUSDT: 0,
+        fetchedAt: Date.now()
       };
     }
 
@@ -43,11 +42,12 @@ export class PortfolioService {
       const balances = await getAccountBalances(credentials);
       
       // Track API call
-      this.apiCallTracker.track('PortfolioService', 'accounts');
+      this.apiCallTracker.trackApiCall('PortfolioService', 'accounts');
       
       // Process balances to calculate USD values
-      const assets = [];
+      const positions = [];
       let totalValue = 0;
+      let cashUSDT = 0;
       
       for (const balance of balances) {
         if (parseFloat(balance.balance) <= 0) continue;
@@ -57,21 +57,21 @@ export class PortfolioService {
           
           if (balance.currency === 'USDT') {
             usdValue = parseFloat(balance.balance);
+            cashUSDT = usdValue;
           } else {
             const symbol = `${balance.currency}-USDT`;
             const price = await this.getCachedPrice(symbol);
             if (price) {
               usdValue = parseFloat(balance.balance) * price;
               // Track the price lookup
-              this.apiCallTracker.track('PortfolioService', `price-${symbol}`);
+              this.apiCallTracker.trackApiCall('PortfolioService', `price-${symbol}`);
             }
           }
           
-          assets.push({
-            symbol: balance.currency,
-            quantity: parseFloat(balance.balance),
+          positions.push({
+            currency: balance.currency,
+            balance: parseFloat(balance.balance),
             available: parseFloat(balance.available),
-            inOrder: parseFloat(balance.holds),
             usdValue: usdValue
           });
           
@@ -90,9 +90,9 @@ export class PortfolioService {
       
       return {
         totalValue,
-        assets,
-        timestamp: Date.now(),
-        source: 'api'
+        positions,
+        cashUSDT,
+        fetchedAt: Date.now()
       };
     } catch (error) {
       console.error('Failed to fetch portfolio:', error);
@@ -103,10 +103,9 @@ export class PortfolioService {
       
       return {
         totalValue: 0,
-        assets: [],
-        timestamp: Date.now(),
-        source: 'error',
-        error: error instanceof Error ? error.message : 'Unknown error'
+        positions: [],
+        cashUSDT: 0,
+        fetchedAt: Date.now()
       };
     }
   }
