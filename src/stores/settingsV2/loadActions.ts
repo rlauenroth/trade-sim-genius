@@ -44,19 +44,10 @@ export const createLoadActions = (get: GetState, set: SetState) => ({
         // Try to migrate from old settings
         const { settings: migrated, shouldMarkVerified } = migrateFromOldSettings();
         if (Object.keys(migrated).length > 0) {
-          // Merge with defaults and validate
-          const mergedSettings = { ...settings, ...migrated };
-          const validation = validateSettings(mergedSettings);
-          if (validation.isValid && validation.settings) {
-            settings = validation.settings;
-            shouldMarkAllVerified = shouldMarkVerified;
-            console.log('✅ Successfully migrated and validated old settings to V2 format');
-          } else {
-            loggingService.logError('Migrated settings are invalid', {
-              errors: validation.errors
-            });
-            settings = sanitizeSettings(mergedSettings, getDefaultSettings());
-          }
+          // Merge with defaults and sanitize to ensure proper types
+          settings = sanitizeSettings(migrated, getDefaultSettings());
+          shouldMarkAllVerified = shouldMarkVerified;
+          console.log('✅ Successfully migrated and validated old settings to V2 format');
           
           // Clean up old storage keys after successful migration
           cleanupOldStorage();

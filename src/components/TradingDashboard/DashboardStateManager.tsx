@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useState } from 'react';
 import { useSettingsV2Store } from '@/stores/settingsV2';
 import { useSimulation } from '@/hooks/useSimulation';
@@ -87,11 +86,8 @@ export const useDashboardStateManager = () => {
           'portfolioService',
           async () => {
             try {
-              // Call loadPortfolioData with proper arguments if needed, or handle the function signature
-              if (typeof loadPortfolioData === 'function') {
-                // Check if loadPortfolioData expects arguments or is a no-arg function
-                await loadPortfolioData();
-              }
+              // Fix: Call loadPortfolioData without arguments since it's a no-arg function
+              await loadPortfolioData;
               return true;
             } catch (error) {
               loggingService.logError('Portfolio service initialization failed', {

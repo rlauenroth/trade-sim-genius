@@ -35,7 +35,7 @@ const VerifiedSettingsSchema = z.object({
   model: ModelSettingsSchema,
   riskLimits: RiskLimitsSchema,
   tradingMode: z.enum(['simulation', 'real']).default('simulation'),
-  tradingStrategy: z.enum(['conservative', 'moderate', 'aggressive']).default('conservative'),
+  tradingStrategy: z.enum(['conservative', 'balanced', 'aggressive']).default('conservative'),
   proxyUrl: z.string().url().default('https://api.kucoin.com'),
   lastUpdated: z.number().default(() => Date.now())
 });
@@ -60,53 +60,47 @@ export const validateSettings = (settings: any): { isValid: boolean; settings?: 
   }
 };
 
-export const sanitizeSettings = (settings: any, defaults: any): ValidatedSettings => {
+export const sanitizeSettings = (settings: any, defaults: ValidatedSettings): ValidatedSettings => {
   try {
-    // First try to validate with defaults applied
-    const mergedSettings = {
-      ...defaults,
-      ...settings,
+    // Use Zod's parse method with defaults to ensure all required fields are present
+    const settingsWithDefaults = VerifiedSettingsSchema.parse({
       kucoin: {
-        ...defaults.kucoin,
-        ...(settings.kucoin || {})
+        key: settings?.kucoin?.key || defaults.kucoin.key,
+        secret: settings?.kucoin?.secret || defaults.kucoin.secret,
+        passphrase: settings?.kucoin?.passphrase || defaults.kucoin.passphrase,
+        verified: settings?.kucoin?.verified || defaults.kucoin.verified
       },
       openRouter: {
-        ...defaults.openRouter,
-        ...(settings.openRouter || {})
+        apiKey: settings?.openRouter?.apiKey || defaults.openRouter.apiKey,
+        verified: settings?.openRouter?.verified || defaults.openRouter.verified
       },
       model: {
-        ...defaults.model,
-        ...(settings.model || {})
+        id: settings?.model?.id || defaults.model.id,
+        provider: settings?.model?.provider || defaults.model.provider,
+        priceUsdPer1k: settings?.model?.priceUsdPer1k || defaults.model.priceUsdPer1k,
+        latencyMs: settings?.model?.latencyMs || defaults.model.latencyMs,
+        verified: settings?.model?.verified || defaults.model.verified
       },
       riskLimits: {
-        ...defaults.riskLimits,
-        ...(settings.riskLimits || {})
+        maxOpenOrders: settings?.riskLimits?.maxOpenOrders || defaults.riskLimits.maxOpenOrders,
+        maxExposure: settings?.riskLimits?.maxExposure || defaults.riskLimits.maxExposure,
+        minBalance: settings?.riskLimits?.minBalance || defaults.riskLimits.minBalance,
+        requireConfirmation: settings?.riskLimits?.requireConfirmation ?? defaults.riskLimits.requireConfirmation
       },
+      tradingMode: settings?.tradingMode || defaults.tradingMode,
+      tradingStrategy: settings?.tradingStrategy || defaults.tradingStrategy,
+      proxyUrl: settings?.proxyUrl || defaults.proxyUrl,
       lastUpdated: Date.now()
-    };
+    });
     
-    const validation = validateSettings(mergedSettings);
-    if (validation.isValid && validation.settings) {
-      loggingService.logInfo('Settings sanitized successfully');
-      return validation.settings;
-    }
-    
-    // If still invalid, return parsed defaults
-    const defaultValidation = validateSettings(defaults);
-    if (defaultValidation.isValid && defaultValidation.settings) {
-      loggingService.logError('Settings could not be sanitized, using validated defaults');
-      return defaultValidation.settings;
-    }
-    
-    // Fallback to schema defaults
-    loggingService.logError('Critical: Could not validate defaults, using schema defaults');
-    return VerifiedSettingsSchema.parse({});
+    loggingService.logInfo('Settings sanitized successfully');
+    return settingsWithDefaults;
     
   } catch (error) {
     loggingService.logError('Settings sanitization error', {
       error: error instanceof Error ? error.message : 'Unknown error'
     });
-    // Return schema defaults as last resort
-    return VerifiedSettingsSchema.parse({});
+    // Return defaults as last resort, parsed through schema to ensure type safety
+    return VerifiedSettingsSchema.parse(defaults);
   }
 };
