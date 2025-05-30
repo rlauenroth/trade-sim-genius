@@ -79,16 +79,6 @@ export function useSimGuard() {
     }
   }
 
-  // Reduced debug logging (only in development)
-  if (process.env.NODE_ENV === 'development') {
-    console.log('🛡️ SimGuard status:', {
-      simReadinessState: status.state,
-      hasValidPortfolio,
-      canStart,
-      reason
-    });
-  }
-
   return {
     canStart,
     isRunningBlocked,
@@ -98,11 +88,13 @@ export function useSimGuard() {
     portfolio: centralSnapshot || status.portfolio,
     lastApiPing: status.lastApiPing,
     retryCount: status.retryCount,
-    // Reduced debug info
+    // Enhanced debug info with central store data
     debug: {
       simReadinessState: status.state,
       hasValidPortfolio,
-      canStart
+      canStart,
+      centralSnapshot,
+      centralLoading
     }
   };
 }
