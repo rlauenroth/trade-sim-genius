@@ -38,8 +38,8 @@ export class PortfolioService {
         kucoinApiPassphrase: apiKeys.passphrase
       };
       
-      // Get account balances
-      const balances = await getAccountBalances(credentials);
+      // Get account balances - no credentials needed as it uses centralized store
+      const balances = await getAccountBalances();
       
       // Track API call
       this.apiCallTracker.trackApiCall('PortfolioService', 'accounts');
