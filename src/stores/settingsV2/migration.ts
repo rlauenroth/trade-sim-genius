@@ -3,9 +3,10 @@ import { VerifiedSettings } from '@/types/settingsV2';
 import { OLD_STORAGE_KEYS } from './types';
 import { modelProviderService } from '@/services/settingsV2/modelProviderService';
 import { loggingService } from '@/services/loggingService';
+import { getDefaultSettings } from './defaults';
 
 interface MigrationResult {
-  settings: Partial<VerifiedSettings>;
+  settings: VerifiedSettings;
   shouldMarkVerified: boolean;
 }
 
@@ -14,7 +15,8 @@ export const migrateFromOldSettings = (): MigrationResult => {
     const oldApiKeys = localStorage.getItem(OLD_STORAGE_KEYS.API_KEYS);
     const oldUserSettings = localStorage.getItem(OLD_STORAGE_KEYS.USER_SETTINGS);
     
-    const migration: Partial<VerifiedSettings> = {};
+    // Start with default settings
+    const migration = getDefaultSettings();
     let hasKucoinData = false;
     let hasOpenRouterData = false;
     
@@ -52,9 +54,9 @@ export const migrateFromOldSettings = (): MigrationResult => {
         const provider = modelProviderService.getOptimalProvider(userSettings.selectedAiModelId);
         migration.model = {
           id: userSettings.selectedAiModelId,
-          provider: provider?.name || 'OpenAI',
-          priceUsdPer1k: provider?.priceUsdPer1k || 0,
-          latencyMs: provider?.latencyMs || 500,
+          provider: provider?.name || 'Meta',
+          priceUsdPer1k: provider?.priceUsdPer1k || 0.18,
+          latencyMs: provider?.latencyMs || 350,
           verified: true // Mark as verified since this was a working model
         };
       }
@@ -72,7 +74,7 @@ export const migrateFromOldSettings = (): MigrationResult => {
     return { settings: migration, shouldMarkVerified };
   } catch (error) {
     console.warn('Could not migrate old settings:', error);
-    return { settings: {}, shouldMarkVerified: false };
+    return { settings: getDefaultSettings(), shouldMarkVerified: false };
   }
 };
 

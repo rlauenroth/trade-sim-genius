@@ -41,14 +41,13 @@ export const createLoadActions = (get: GetState, set: SetState) => ({
           wasCorrupted = true;
         }
       } else {
-        // Try to migrate from old settings
-        const { settings: migrated, shouldMarkVerified } = migrateFromOldSettings();
-        if (Object.keys(migrated).length > 0) {
-          // Merge with defaults and sanitize to ensure proper types
-          settings = sanitizeSettings(migrated, getDefaultSettings());
-          shouldMarkAllVerified = shouldMarkVerified;
+        // Try to migrate from old settings - this now returns complete settings
+        const { settings: migratedSettings, shouldMarkVerified } = migrateFromOldSettings();
+        settings = migratedSettings; // This is now always a complete VerifiedSettings object
+        shouldMarkAllVerified = shouldMarkVerified;
+        
+        if (Object.keys(migratedSettings.kucoin).length > 0 || migratedSettings.openRouter.apiKey) {
           console.log('✅ Successfully migrated and validated old settings to V2 format');
-          
           // Clean up old storage keys after successful migration
           cleanupOldStorage();
         }
