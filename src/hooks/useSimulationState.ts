@@ -73,20 +73,72 @@ export const useSimulationState = () => {
 
   // Add missing methods
   const initializeSimulation = useCallback((portfolioData: any): SimulationState => {
+    // Enhanced portfolio data extraction for initialization
+    const portfolioValue = portfolioData.totalValue || portfolioData.totalUSDValue || 0;
+    
+    loggingService.logEvent('SIM', 'Initializing simulation state', {
+      portfolioValue,
+      portfolioDataStructure: {
+        hasPositions: !!portfolioData.positions,
+        positionsCount: portfolioData.positions?.length || 0,
+        hasProperties: Object.keys(portfolioData || {}),
+        positions: portfolioData.positions?.map((pos: any) => ({
+          currency: pos.currency,
+          balance: pos.balance,
+          available: pos.available
+        })) || []
+      }
+    });
+
+    // Create paper assets from portfolio positions with proper fallbacks
+    const paperAssets = [];
+    
+    if (portfolioData.positions && Array.isArray(portfolioData.positions)) {
+      portfolioData.positions.forEach((pos: any) => {
+        const balance = parseFloat(pos.balance || pos.available || pos.quantity || 0);
+        if (balance > 0) {
+          paperAssets.push({
+            symbol: pos.currency || pos.symbol,
+            quantity: balance,
+            entryPrice: pos.currency === 'USDT' || pos.symbol === 'USDT' ? 1 : undefined
+          });
+        }
+      });
+    }
+
+    // Ensure USDT exists in paper assets (fallback)
+    const hasUSDT = paperAssets.some(asset => asset.symbol === 'USDT');
+    if (!hasUSDT && portfolioValue > 0) {
+      paperAssets.push({
+        symbol: 'USDT',
+        quantity: portfolioValue,
+        entryPrice: 1
+      });
+      
+      loggingService.logEvent('SIM', 'Added USDT fallback to paper assets', {
+        usdtQuantity: portfolioValue
+      });
+    }
+
     const initialState: SimulationState = {
       isActive: true,
       isPaused: false,
       startTime: Date.now(),
-      startPortfolioValue: portfolioData.totalUSDValue,
-      currentPortfolioValue: portfolioData.totalUSDValue,
+      startPortfolioValue: portfolioValue,
+      currentPortfolioValue: portfolioValue,
       realizedPnL: 0,
       openPositions: [],
-      paperAssets: portfolioData.positions.map((pos: any) => ({
-        symbol: pos.currency,
-        quantity: pos.balance,
-        entryPrice: pos.currency === 'USDT' ? 1 : undefined
-      }))
+      paperAssets
     };
+    
+    loggingService.logSuccess('Simulation state initialized successfully', {
+      startPortfolioValue: initialState.startPortfolioValue,
+      paperAssetsCount: initialState.paperAssets.length,
+      paperAssets: initialState.paperAssets.map(asset => ({
+        symbol: asset.symbol,
+        quantity: asset.quantity
+      }))
+    });
     
     saveSimulationState(initialState);
     setIsSimulationActive(true);
