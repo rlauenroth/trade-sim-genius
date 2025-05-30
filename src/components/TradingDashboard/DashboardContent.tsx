@@ -1,9 +1,9 @@
+
 import React from 'react';
 import { Container } from '@/components/ui/container';
 import DashboardHeaderSection from './sections/DashboardHeader';
 import LoadingErrorStates from './sections/LoadingErrorStates';
 import DashboardGrids from './sections/DashboardGrids';
-import DashboardTrading from './sections/DashboardTrading';
 import SettingsManagerV2 from '@/components/settingsV2/SettingsManagerV2';
 
 interface DashboardContentProps {
@@ -79,30 +79,26 @@ const DashboardContent = ({
 }: DashboardContentProps) => {
   const isPaused = simulationState?.isPaused;
 
+  // Show loading states if needed
+  if ((portfolioLoading || livePortfolioLoading) && isFirstTimeAfterSetup) {
+    return (
+      <Container className="py-8 space-y-8">
+        <LoadingErrorStates
+          isFirstTimeAfterSetup={isFirstTimeAfterSetup}
+          portfolioLoading={portfolioLoading}
+          livePortfolioLoading={livePortfolioLoading}
+          portfolioError={portfolioError}
+          livePortfolioError={livePortfolioError}
+          apiKeys={apiKeys}
+          onRetry={retryLoadPortfolioData}
+        />
+      </Container>
+    );
+  }
+
   return (
-    <Container className="py-8 space-y-8">
-      <DashboardHeaderSection
-        isSimulationActive={isSimulationActive}
-        isPaused={isPaused}
-        isFirstTimeAfterSetup={isFirstTimeAfterSetup}
-        livePortfolio={livePortfolio}
-        userSettings={userSettings}
-        onLogout={logoutAndClearData}
-        onRefresh={handleManualRefresh}
-        onStartSimulation={handleStartSimulation}
-        onOpenSettings={() => setShowSettings(true)}
-      />
-
-      <LoadingErrorStates
-        isFirstTimeAfterSetup={isFirstTimeAfterSetup}
-        portfolioLoading={portfolioLoading}
-        livePortfolioLoading={livePortfolioLoading}
-        portfolioError={portfolioError}
-        livePortfolioError={livePortfolioError}
-        apiKeys={apiKeys}
-        onRetry={retryLoadPortfolioData}
-      />
-
+    <>
+      {/* Professional Dashboard Layout replaces the old grid system */}
       <DashboardGrids
         displayPortfolioValue={displayPortfolioValue}
         displayStartValue={displayStartValue}
@@ -129,19 +125,11 @@ const DashboardContent = ({
         apiKeys={apiKeys}
       />
 
-      <DashboardTrading
-        currentSignal={currentSignal}
-        candidates={candidates}
-        simulationState={simulationState}
-        onAcceptSignal={acceptSignal}
-        onIgnoreSignal={ignoreSignal}
-      />
-
       <SettingsManagerV2
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
       />
-    </Container>
+    </>
   );
 };
 
