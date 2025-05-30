@@ -2,7 +2,7 @@
 import React from 'react';
 import { Container } from '@/components/ui/container';
 import { Button } from '@/components/ui/button';
-import { Settings, RefreshCw, LogOut } from 'lucide-react';
+import { RefreshCw, LogOut } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { AIHealthBadge } from '@/components/AIHealthBadge';
 import PortfolioOverviewWithStatus from '../PortfolioOverviewWithStatus';
@@ -14,6 +14,7 @@ import OpenPositions from '../OpenPositions';
 import ActivityLog from '../ActivityLog';
 import { TradingModeIndicator } from '../StatusBadges/TradingModeIndicator';
 import { ApiHealthBadge } from '../StatusBadges/ApiHealthBadge';
+import { SettingsDialog } from './SettingsDialog';
 
 interface DashboardGridsProps {
   displayPortfolioValue: number;
@@ -67,11 +68,6 @@ const DashboardGrids = ({
   apiKeys
 }: DashboardGridsProps) => {
   
-  const handleSettingsClick = () => {
-    // This will be handled by parent component
-    console.log('Settings clicked');
-  };
-
   const handleRefreshClick = () => {
     // Force refresh portfolio data
     window.location.reload();
@@ -108,15 +104,7 @@ const DashboardGrids = ({
           
           <Separator orientation="vertical" className="h-6" />
           
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSettingsClick}
-            className="flex items-center gap-2 text-white border-slate-600 hover:bg-slate-700"
-          >
-            <Settings className="h-4 w-4" />
-            Einstellungen
-          </Button>
+          <SettingsDialog onRefresh={handleRefreshClick} />
           
           <Button
             variant="outline"

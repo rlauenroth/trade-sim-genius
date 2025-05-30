@@ -18,19 +18,27 @@ export function useSimGuard() {
   if (!canStart) {
     switch (status.state) {
       case 'IDLE':
-        reason = 'System initializing...';
+        reason = 'System wird initialisiert...';
         break;
       case 'FETCHING':
-        reason = 'Loading portfolio data...';
+        reason = 'Portfolio-Daten werden geladen...';
         break;
       case 'UNSTABLE':
-        reason = status.reason || 'System unstable';
+        if (status.reason?.includes('Portfolio data expired')) {
+          reason = 'Portfolio-Daten sind veraltet - wird aktualisiert...';
+        } else if (status.reason?.includes('API')) {
+          reason = 'KuCoin API nicht erreichbar - prüfen Sie Ihre Internetverbindung';
+        } else if (status.reason?.includes('Invalid portfolio')) {
+          reason = 'Portfolio-Daten ungültig - API-Schlüssel überprüfen';
+        } else {
+          reason = status.reason || 'System instabil - Portfolio wird neu geladen';
+        }
         break;
       case 'SIM_RUNNING':
-        reason = 'Simulation already running';
+        reason = 'Simulation läuft bereits';
         break;
       default:
-        reason = 'System not ready';
+        reason = 'System nicht bereit - Portfolio-Daten werden geladen';
     }
   }
 
@@ -39,7 +47,7 @@ export function useSimGuard() {
 
   return {
     canStart,
-    isRunningBlocked: isRunningBlocked && (status.state === 'FETCHING' || isDataTooOld), // Only block if actually fetching or data too old
+    isRunningBlocked: isRunningBlocked && (status.state === 'FETCHING' || isDataTooOld),
     reason,
     snapshotAge: status.snapshotAge,
     state: status.state,
