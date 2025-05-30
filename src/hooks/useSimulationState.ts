@@ -1,6 +1,6 @@
-
 import { useState, useCallback } from 'react';
 import { SimulationState } from '@/types/simulation';
+import { loggingService } from '@/services/loggingService';
 
 export const useSimulationState = () => {
   const [simulationState, setSimulationState] = useState<SimulationState | null>(null);
