@@ -1,6 +1,7 @@
 
 import { z } from 'zod';
 import { loggingService } from '@/services/loggingService';
+import { VerifiedSettings } from './types';
 
 const KuCoinSettingsSchema = z.object({
   key: z.string().default(''),
@@ -40,9 +41,7 @@ const VerifiedSettingsSchema = z.object({
   lastUpdated: z.number().default(() => Date.now())
 });
 
-export type ValidatedSettings = z.infer<typeof VerifiedSettingsSchema>;
-
-export const validateSettings = (settings: any): { isValid: boolean; settings?: ValidatedSettings; errors?: string[] } => {
+export const validateSettings = (settings: any): { isValid: boolean; settings?: VerifiedSettings; errors?: string[] } => {
   try {
     const validatedSettings = VerifiedSettingsSchema.parse(settings);
     return { isValid: true, settings: validatedSettings };
@@ -60,36 +59,36 @@ export const validateSettings = (settings: any): { isValid: boolean; settings?: 
   }
 };
 
-export const sanitizeSettings = (settings: any, defaults: ValidatedSettings): ValidatedSettings => {
+export const sanitizeSettings = (settings: any, defaults: VerifiedSettings): VerifiedSettings => {
   try {
     // Use Zod's parse method with defaults to ensure all required fields are present
     const settingsWithDefaults = VerifiedSettingsSchema.parse({
       kucoin: {
-        key: settings?.kucoin?.key || defaults.kucoin.key,
-        secret: settings?.kucoin?.secret || defaults.kucoin.secret,
-        passphrase: settings?.kucoin?.passphrase || defaults.kucoin.passphrase,
-        verified: settings?.kucoin?.verified || defaults.kucoin.verified
+        key: settings?.kucoin?.key ?? defaults.kucoin.key,
+        secret: settings?.kucoin?.secret ?? defaults.kucoin.secret,
+        passphrase: settings?.kucoin?.passphrase ?? defaults.kucoin.passphrase,
+        verified: settings?.kucoin?.verified ?? defaults.kucoin.verified
       },
       openRouter: {
-        apiKey: settings?.openRouter?.apiKey || defaults.openRouter.apiKey,
-        verified: settings?.openRouter?.verified || defaults.openRouter.verified
+        apiKey: settings?.openRouter?.apiKey ?? defaults.openRouter.apiKey,
+        verified: settings?.openRouter?.verified ?? defaults.openRouter.verified
       },
       model: {
-        id: settings?.model?.id || defaults.model.id,
-        provider: settings?.model?.provider || defaults.model.provider,
-        priceUsdPer1k: settings?.model?.priceUsdPer1k || defaults.model.priceUsdPer1k,
-        latencyMs: settings?.model?.latencyMs || defaults.model.latencyMs,
-        verified: settings?.model?.verified || defaults.model.verified
+        id: settings?.model?.id ?? defaults.model.id,
+        provider: settings?.model?.provider ?? defaults.model.provider,
+        priceUsdPer1k: settings?.model?.priceUsdPer1k ?? defaults.model.priceUsdPer1k,
+        latencyMs: settings?.model?.latencyMs ?? defaults.model.latencyMs,
+        verified: settings?.model?.verified ?? defaults.model.verified
       },
       riskLimits: {
-        maxOpenOrders: settings?.riskLimits?.maxOpenOrders || defaults.riskLimits.maxOpenOrders,
-        maxExposure: settings?.riskLimits?.maxExposure || defaults.riskLimits.maxExposure,
-        minBalance: settings?.riskLimits?.minBalance || defaults.riskLimits.minBalance,
+        maxOpenOrders: settings?.riskLimits?.maxOpenOrders ?? defaults.riskLimits.maxOpenOrders,
+        maxExposure: settings?.riskLimits?.maxExposure ?? defaults.riskLimits.maxExposure,
+        minBalance: settings?.riskLimits?.minBalance ?? defaults.riskLimits.minBalance,
         requireConfirmation: settings?.riskLimits?.requireConfirmation ?? defaults.riskLimits.requireConfirmation
       },
-      tradingMode: settings?.tradingMode || defaults.tradingMode,
-      tradingStrategy: settings?.tradingStrategy || defaults.tradingStrategy,
-      proxyUrl: settings?.proxyUrl || defaults.proxyUrl,
+      tradingMode: settings?.tradingMode ?? defaults.tradingMode,
+      tradingStrategy: settings?.tradingStrategy ?? defaults.tradingStrategy,
+      proxyUrl: settings?.proxyUrl ?? defaults.proxyUrl,
       lastUpdated: Date.now()
     });
     
