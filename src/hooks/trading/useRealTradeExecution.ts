@@ -4,7 +4,7 @@ import { Signal } from '@/types/simulation';
 import { toast } from '@/hooks/use-toast';
 import { useRiskManagement } from '../useRiskManagement';
 import { loggingService } from '@/services/loggingService';
-import { realTradingService } from '@/services/realTradingService';
+import { realTradingService } from '@/services/realTrading';
 import { kucoinWebsocketService } from '@/services/kucoinWebsocketService';
 import { useSettingsV2Store } from '@/stores/settingsV2';
 
