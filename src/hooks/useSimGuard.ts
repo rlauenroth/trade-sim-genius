@@ -12,7 +12,7 @@ export function useSimGuard() {
   }, []);
 
   const canStart = status.state === 'READY';
-  const isRunningBlocked = status.state === 'UNSTABLE';
+  const isRunningBlocked = status.state === 'UNSTABLE' || status.state === 'FETCHING';
   
   let reason = '';
   if (!canStart) {
@@ -39,7 +39,7 @@ export function useSimGuard() {
 
   return {
     canStart,
-    isRunningBlocked: isRunningBlocked && isDataTooOld, // Only block if data is actually too old
+    isRunningBlocked: isRunningBlocked && (status.state === 'FETCHING' || isDataTooOld), // Only block if actually fetching or data too old
     reason,
     snapshotAge: status.snapshotAge,
     state: status.state,

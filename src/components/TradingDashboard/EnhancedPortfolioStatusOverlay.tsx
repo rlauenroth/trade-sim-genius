@@ -6,7 +6,7 @@ import { useSimGuard } from '@/hooks/useSimGuard';
 import { simReadinessStore } from '@/stores/simReadinessStore';
 
 const EnhancedPortfolioStatusOverlay = () => {
-  const { state, reason, snapshotAge } = useSimGuard();
+  const { state, reason, snapshotAge, portfolio } = useSimGuard();
 
   const handleRetry = () => {
     console.log('🔄 Manual retry triggered');
@@ -18,6 +18,7 @@ const EnhancedPortfolioStatusOverlay = () => {
     console.log('📊 Detailed status:', detailedStatus);
   };
 
+  // Only show overlay for FETCHING state
   if (state === 'FETCHING') {
     return (
       <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center rounded-lg">
@@ -55,31 +56,33 @@ const EnhancedPortfolioStatusOverlay = () => {
     );
   }
 
-  // Show detailed error information for UNSTABLE state
+  // Show overlay for UNSTABLE state ONLY if there's actually a serious problem
   if (state === 'UNSTABLE') {
     const ageMinutes = Math.floor(snapshotAge / 60000);
     const isDataTooOld = snapshotAge > 300000; // 5 minutes
+    const hasTimeoutError = reason?.includes('timeout');
+    const hasConnectionError = reason?.includes('unreachable') || reason?.includes('proxy');
     
-    // Only show overlay for serious issues
-    if (!isDataTooOld && !reason?.includes('timeout') && !reason?.includes('unreachable')) {
+    // Only show overlay for serious issues that block functionality
+    if (!isDataTooOld && !hasTimeoutError && !hasConnectionError) {
       return null;
     }
 
     const getErrorIcon = () => {
-      if (reason?.includes('unreachable') || reason?.includes('proxy')) {
+      if (hasConnectionError) {
         return <WifiOff className="h-12 w-12 text-red-400 mx-auto" />;
       }
-      if (reason?.includes('timeout')) {
+      if (hasTimeoutError) {
         return <Clock className="h-12 w-12 text-orange-400 mx-auto" />;
       }
       return <AlertTriangle className="h-12 w-12 text-red-400 mx-auto" />;
     };
 
     const getErrorTitle = () => {
-      if (reason?.includes('unreachable') || reason?.includes('proxy')) {
+      if (hasConnectionError) {
         return 'Verbindungsfehler';
       }
-      if (reason?.includes('timeout')) {
+      if (hasTimeoutError) {
         return 'Zeitüberschreitung';
       }
       if (isDataTooOld) {
@@ -89,14 +92,11 @@ const EnhancedPortfolioStatusOverlay = () => {
     };
 
     const getErrorDescription = () => {
-      if (reason?.includes('unreachable')) {
+      if (hasConnectionError) {
         return 'KuCoin API ist nicht erreichbar. Prüfen Sie Ihre Internetverbindung oder Proxy-Einstellungen.';
       }
-      if (reason?.includes('timeout')) {
+      if (hasTimeoutError) {
         return 'Das Laden der Portfolio-Daten hat zu lange gedauert. Dies kann bei langsamen Verbindungen auftreten.';
-      }
-      if (reason?.includes('Invalid portfolio')) {
-        return 'Die empfangenen Portfolio-Daten sind unvollständig oder fehlerhaft.';
       }
       if (isDataTooOld) {
         return `Die Portfolio-Daten sind ${ageMinutes} Minuten alt und müssen aktualisiert werden.`;
@@ -153,6 +153,7 @@ const EnhancedPortfolioStatusOverlay = () => {
     );
   }
 
+  // For READY and SIM_RUNNING states, don't show any overlay
   return null;
 };
 

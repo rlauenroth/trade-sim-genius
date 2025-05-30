@@ -21,13 +21,13 @@ const PortfolioOverviewWithStatus = ({
   totalPnL,
   totalPnLPercentage
 }: PortfolioOverviewWithStatusProps) => {
-  // Use centralized portfolio hook instead of usePortfolioLive
-  const { snapshot, isLoading, error, refresh, isStale } = useSimReadinessPortfolio();
+  const { snapshot, isLoading, error, refresh, isStale, state } = useSimReadinessPortfolio();
   const isPositive = totalPnL >= 0;
 
   // Use live portfolio value if available, otherwise fallback to passed props
   const displayValue = snapshot?.totalUSDValue || currentValue;
 
+  // Show skeleton only when loading AND no data available
   if (isLoading && !snapshot) {
     return (
       <Card className="bg-slate-800 border-slate-700 relative">
@@ -44,7 +44,7 @@ const PortfolioOverviewWithStatus = ({
     );
   }
 
-  // Only show error state for actual errors, not just stale data
+  // Only show error state if there's an actual error AND no data available
   if (error && !snapshot) {
     return (
       <Card className="bg-red-900/20 border-red-600/50 relative">
@@ -79,7 +79,12 @@ const PortfolioOverviewWithStatus = ({
         <CardHeader>
           <CardTitle className="text-white flex items-center justify-between">
             <span>Portfolio-Übersicht</span>
-            {snapshot && (
+            <div className="flex items-center space-x-2">
+              {snapshot && (
+                <div className="text-xs text-slate-400">
+                  {state === 'READY' ? '✅ Bereit' : state === 'FETCHING' ? '🔄 Aktualisiert...' : '⚠️ Instabil'}
+                </div>
+              )}
               <Button
                 onClick={refresh}
                 variant="ghost"
@@ -88,7 +93,7 @@ const PortfolioOverviewWithStatus = ({
               >
                 <RefreshCw className="h-4 w-4" />
               </Button>
-            )}
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -154,7 +159,7 @@ const PortfolioOverviewWithStatus = ({
           )}
         </CardContent>
         
-        {/* Status overlay - now only shows when data is actually problematic */}
+        {/* Status overlay - only shows for actual problems */}
         <PortfolioStatusOverlay />
       </Card>
     </TooltipProvider>
