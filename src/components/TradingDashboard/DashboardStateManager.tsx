@@ -1,5 +1,5 @@
 
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSettingsV2Store } from '@/stores/settingsV2';
 import { useSimulation } from '@/hooks/useSimulation';
 import { usePortfolioData } from '@/hooks/usePortfolioData';
@@ -8,12 +8,14 @@ import { useTradingDashboardEffects } from '@/hooks/useTradingDashboardEffects';
 import { useSimGuard } from '@/hooks/useSimGuard';
 import { useSimReadinessPortfolio } from '@/hooks/useSimReadinessPortfolio';
 import { simReadinessStore } from '@/stores/simReadinessStore';
+import { realTradingService } from '@/services/realTradingService';
 import { toast } from '@/hooks/use-toast';
 import { loggingService } from '@/services/loggingService';
 
 export const useDashboardStateManager = () => {
-  // Use V2 settings store as single source of truth
   const { settings, isLoading: settingsLoading } = useSettingsV2Store();
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [initializationError, setInitializationError] = useState<string | null>(null);
   
   const { 
     portfolioData, 
@@ -55,6 +57,112 @@ export const useDashboardStateManager = () => {
     hasValidSimulation
   } = useTradingDashboardData(simulationState, portfolioData, isSimulationActive);
 
+  // Enhanced initialization logic with proper error handling
+  useEffect(() => {
+    const initializeDashboard = async () => {
+      console.log('🚀 DashboardStateManager: Initializing dashboard...', {
+        tradingMode: settings.tradingMode,
+        settingsLoading,
+        isInitialized
+      });
+
+      // Skip initialization if settings are still loading
+      if (settingsLoading) {
+        console.log('DashboardStateManager: Waiting for settings to load...');
+        return;
+      }
+
+      // Skip if already initialized
+      if (isInitialized) {
+        return;
+      }
+
+      try {
+        // Validate essential settings
+        if (!settings.kucoin.key || !settings.openRouter.apiKey) {
+          throw new Error('Essential API keys missing');
+        }
+
+        // Validate risk limits for real trading mode
+        if (settings.tradingMode === 'real') {
+          if (!settings.riskLimits || typeof settings.riskLimits.maxOpenOrders !== 'number') {
+            throw new Error('Risk limits not properly configured for real trading');
+          }
+
+          // Initialize real trading service with current settings
+          try {
+            const apiKeys = {
+              kucoin: {
+                key: settings.kucoin.key,
+                secret: settings.kucoin.secret,
+                passphrase: settings.kucoin.passphrase
+              },
+              openRouter: {
+                apiKey: settings.openRouter.apiKey
+              }
+            };
+
+            realTradingService.setApiKeys(apiKeys);
+            realTradingService.setRiskLimits(settings.riskLimits);
+
+            loggingService.logEvent('SIM', 'Real trading service initialized', {
+              riskLimits: settings.riskLimits,
+              timestamp: Date.now()
+            });
+          } catch (serviceError) {
+            console.error('Failed to initialize real trading service:', serviceError);
+            loggingService.logError('Real trading service initialization failed', {
+              error: serviceError instanceof Error ? serviceError.message : 'Unknown error'
+            });
+            // Don't throw here - allow dashboard to load but with limited functionality
+          }
+        }
+
+        console.log('✅ DashboardStateManager: Initialization successful');
+        setIsInitialized(true);
+        setInitializationError(null);
+
+        loggingService.logEvent('SIM', 'Dashboard initialized successfully', {
+          tradingMode: settings.tradingMode,
+          hasKucoinKeys: !!settings.kucoin.key,
+          hasOpenRouterKey: !!settings.openRouter.apiKey,
+          timestamp: Date.now()
+        });
+
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown initialization error';
+        console.error('❌ DashboardStateManager: Initialization failed:', error);
+        
+        setInitializationError(errorMessage);
+        loggingService.logError('Dashboard initialization failed', {
+          error: errorMessage,
+          tradingMode: settings.tradingMode,
+          timestamp: Date.now()
+        });
+
+        // Show user-friendly error
+        toast({
+          title: "Initialisierungsfehler",
+          description: `Dashboard konnte nicht initialisiert werden: ${errorMessage}`,
+          variant: "destructive"
+        });
+      }
+    };
+
+    initializeDashboard();
+  }, [settings, settingsLoading, isInitialized]);
+
+  // Reset initialization when trading mode changes
+  useEffect(() => {
+    if (!settingsLoading) {
+      console.log('DashboardStateManager: Trading mode changed, resetting initialization...', {
+        tradingMode: settings.tradingMode
+      });
+      setIsInitialized(false);
+      setInitializationError(null);
+    }
+  }, [settings.tradingMode, settingsLoading]);
+
   // Create consolidated API keys object from V2 settings (centralized)
   const apiKeys = {
     kucoinApiKey: settings.kucoin.key,
@@ -89,10 +197,30 @@ export const useDashboardStateManager = () => {
   // Enhanced start simulation with settings verification
   const handleStartSimulation = useCallback(() => {
     console.log('🚀 DashboardStateManager: Starting simulation with centralized settings...');
-    console.log('Trading mode:', settings.tradingMode);
-    console.log('Selected model:', settings.model.id);
-    console.log('Live portfolio:', livePortfolio);
     
+    // Check initialization status
+    if (!isInitialized) {
+      loggingService.logError('Cannot start simulation - dashboard not initialized', {
+        initializationError,
+        tradingMode: settings.tradingMode
+      });
+      toast({
+        title: "Initialisierung erforderlich",
+        description: "Dashboard wird noch initialisiert, bitte warten Sie einen Moment",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (initializationError) {
+      toast({
+        title: "Initialisierungsfehler",
+        description: `Kann Simulation nicht starten: ${initializationError}`,
+        variant: "destructive"
+      });
+      return;
+    }
+
     // Verify settings are loaded
     if (settingsLoading) {
       loggingService.logError('Cannot start simulation while settings are loading', {
@@ -137,7 +265,7 @@ export const useDashboardStateManager = () => {
         variant: "destructive"
       });
     }
-  }, [handleStartSimulationFromEffects, settings, settingsLoading, livePortfolio]);
+  }, [handleStartSimulationFromEffects, settings, settingsLoading, livePortfolio, isInitialized, initializationError]);
 
   // Enhanced manual refresh with centralized logging
   const handleManualRefresh = useCallback(() => {
@@ -146,7 +274,8 @@ export const useDashboardStateManager = () => {
     loggingService.logInfo('Manual refresh initiated', {
       tradingMode: settings.tradingMode,
       selectedModel: settings.model.id,
-      hasSimulation: isSimulationActive
+      hasSimulation: isSimulationActive,
+      isInitialized
     });
     
     simReadinessStore.forceRefresh();
@@ -160,7 +289,7 @@ export const useDashboardStateManager = () => {
       title: "Daten aktualisiert",
       description: "Portfolio und Marktdaten werden neu geladen",
     });
-  }, [isSimulationActive, logPerformanceReport, settings.tradingMode, settings.model.id]);
+  }, [isSimulationActive, logPerformanceReport, settings.tradingMode, settings.model.id, isInitialized]);
 
   // Simple logout function with centralized cleanup
   const logoutAndClearData = useCallback(() => {
@@ -222,7 +351,9 @@ export const useDashboardStateManager = () => {
     getSimulationDataForLog,
     autoModeError,
     portfolioHealthStatus,
-    // Expose settings loading state for UI
-    settingsLoading
+    // Expose initialization state for UI
+    settingsLoading,
+    isInitialized,
+    initializationError
   };
 };

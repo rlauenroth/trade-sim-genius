@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -26,9 +25,9 @@ const SettingsDrawerV2 = ({ isOpen, onClose, isOnboarding = false }: SettingsDra
   const { formData, handleFieldChange } = useSettingsForm();
   const verificationHandlers = useVerificationHandlers(formData);
 
-  // Save handler with improved state management
+  // Enhanced save handler with proper state synchronization
   const handleSave = async () => {
-    console.log('SettingsDrawerV2: Saving settings...', {
+    console.log('SettingsDrawerV2: Starting save process...', {
       isOnboarding,
       canSave: canSave(),
       currentTradingMode: settings.tradingMode,
@@ -42,33 +41,60 @@ const SettingsDrawerV2 = ({ isOpen, onClose, isOnboarding = false }: SettingsDra
         loggingService.logEvent('SIM', 'Settings saved successfully', {
           isOnboarding,
           tradingMode: settings.tradingMode,
-          riskLimits: settings.riskLimits
+          riskLimits: settings.riskLimits,
+          timestamp: Date.now()
         });
 
-        console.log('SettingsDrawerV2: Settings saved successfully');
+        console.log('SettingsDrawerV2: Settings saved successfully, waiting for state propagation...');
         
-        // Use a small delay to ensure state updates are complete
-        setTimeout(() => {
-          onClose();
-        }, 100);
+        // Wait for state to propagate properly before closing
+        // Use a Promise-based approach instead of setTimeout for better reliability
+        await new Promise(resolve => {
+          const checkStateUpdate = () => {
+            const { settings: latestSettings } = useSettingsV2Store.getState();
+            
+            // Verify that the settings have been properly updated
+            if (latestSettings.lastUpdated > Date.now() - 5000) {
+              console.log('SettingsDrawerV2: State propagation confirmed');
+              resolve(true);
+            } else {
+              // Retry after a short delay
+              setTimeout(checkStateUpdate, 100);
+            }
+          };
+          
+          // Start checking immediately, but with a maximum wait time
+          checkStateUpdate();
+          
+          // Fallback timeout after 2 seconds
+          setTimeout(() => {
+            console.log('SettingsDrawerV2: State propagation timeout, proceeding anyway');
+            resolve(true);
+          }, 2000);
+        });
+        
+        console.log('SettingsDrawerV2: Closing drawer after successful save');
+        onClose();
         
         if (isOnboarding) {
-          console.log('SettingsDrawerV2: Onboarding completed, letting parent handle transition');
+          console.log('SettingsDrawerV2: Onboarding completed, parent will handle transition');
         } else {
-          console.log('SettingsDrawerV2: Regular settings save, returning to dashboard');
+          console.log('SettingsDrawerV2: Regular settings save completed');
         }
       } else {
         console.error('SettingsDrawerV2: Failed to save settings');
         loggingService.logError('Settings save failed', {
           isOnboarding,
-          canSave: canSave()
+          canSave: canSave(),
+          timestamp: Date.now()
         });
       }
     } catch (error) {
       console.error('SettingsDrawerV2: Error saving settings:', error);
       loggingService.logError('Settings save error', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        isOnboarding
+        isOnboarding,
+        timestamp: Date.now()
       });
     }
   };
