@@ -3,10 +3,12 @@ import React from 'react';
 import { AlertTriangle, Clock, Loader2, RefreshCw, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSimGuard } from '@/hooks/useSimGuard';
+import { useCentralPortfolioService } from '@/hooks/useCentralPortfolioService';
 import { simReadinessStore } from '@/stores/simReadinessStore';
 
 const EnhancedPortfolioStatusOverlay = () => {
   const { state, reason, snapshotAge, portfolio } = useSimGuard();
+  const { snapshot: centralSnapshot, isLoading: centralLoading } = useCentralPortfolioService();
 
   const handleRetry = () => {
     console.log('🔄 Manual retry triggered');
@@ -18,8 +20,19 @@ const EnhancedPortfolioStatusOverlay = () => {
     console.log('📊 Detailed status:', detailedStatus);
   };
 
-  // Only show overlay for FETCHING state
-  if (state === 'FETCHING') {
+  // Enhanced logic: Don't show FETCHING overlay if central store has valid data
+  const shouldShowFetchingOverlay = state === 'FETCHING' && !centralSnapshot && centralLoading;
+
+  console.log('🖥️ PortfolioStatusOverlay decision:', {
+    state,
+    shouldShowFetchingOverlay,
+    hasCentralSnapshot: !!centralSnapshot,
+    centralLoading,
+    reason
+  });
+
+  // Only show overlay for FETCHING state IF we don't have data in central store
+  if (shouldShowFetchingOverlay) {
     return (
       <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center rounded-lg">
         <div className="text-center space-y-4 max-w-md p-6">

@@ -15,8 +15,22 @@ export function useSimGuard() {
 
   // Enhanced logic using both simReadiness and central portfolio data
   const hasValidPortfolio = !!(centralSnapshot && centralSnapshot.totalValue > 0);
-  const isDataLoading = centralLoading || status.state === 'FETCHING';
+  
+  // If central store is not loading and we have data, don't consider system as loading
+  const isDataLoading = centralLoading || (status.state === 'FETCHING' && !centralSnapshot);
+  
   const hasErrors = !!(centralError || (status.state === 'UNSTABLE' && status.reason));
+
+  // Auto-correct state if we have valid data but simReadiness is stuck in FETCHING
+  useEffect(() => {
+    if (hasValidPortfolio && status.state === 'FETCHING' && !centralLoading) {
+      console.log('🔄 SimGuard: Auto-correcting stuck FETCHING state - triggering FETCH_SUCCESS');
+      simReadinessStore.dispatch({ 
+        type: 'FETCH_SUCCESS', 
+        payload: centralSnapshot! 
+      });
+    }
+  }, [hasValidPortfolio, status.state, centralLoading, centralSnapshot]);
 
   console.log('🛡️ SimGuard status:', {
     simReadinessState: status.state,
@@ -25,7 +39,8 @@ export function useSimGuard() {
     hasErrors,
     centralSnapshot: !!centralSnapshot,
     centralLoading,
-    centralError
+    centralError,
+    autoCorrectTriggered: hasValidPortfolio && status.state === 'FETCHING' && !centralLoading
   });
 
   // Determine if simulation can start

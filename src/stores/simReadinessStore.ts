@@ -1,3 +1,4 @@
+
 import { SimReadinessState, SimReadinessStatus, SimReadinessAction, PortfolioSnapshot } from '@/types/simReadiness';
 import { kucoinService } from '@/services/kucoinService';
 import { retryScheduler } from '@/services/retryScheduler';
@@ -37,8 +38,8 @@ class SimReadinessStore {
     
     // Check if we can get data from central store on subscribe
     const centralStore = useCentralPortfolioStore.getState();
-    if (centralStore.snapshot && this.status.state !== 'READY') {
-      console.log('🔄 SimReadiness: Found data in central store, updating state');
+    if (centralStore.snapshot && this.status.state !== 'READY' && this.status.state !== 'SIM_RUNNING') {
+      console.log('🔄 SimReadiness: Found data in central store on subscribe, updating state to READY');
       this.dispatch({ type: 'FETCH_SUCCESS', payload: centralStore.snapshot });
     }
     
@@ -60,6 +61,15 @@ class SimReadinessStore {
     const centralStore = useCentralPortfolioStore.getState();
     if (centralStore.snapshot) {
       this.status.portfolio = centralStore.snapshot;
+      
+      // If we have valid data but are still in FETCHING state, fix it
+      if (this.status.state === 'FETCHING' && centralStore.snapshot && !centralStore.isLoading) {
+        console.log('🔄 SimReadiness: Auto-correcting state from FETCHING to READY (central store has data)');
+        this.status.state = 'READY';
+        this.status.reason = null;
+        this.status.retryCount = 0;
+        this.handleStateEffects({ type: 'FETCH_SUCCESS', payload: centralStore.snapshot });
+      }
     }
     
     const snapshotAge = this.status.portfolio ? now - this.status.portfolio.fetchedAt : 0;
@@ -71,14 +81,16 @@ class SimReadinessStore {
   }
 
   dispatch(action: SimReadinessAction): void {
-    console.log('🔄 SimReadiness action:', action.type, action);
+    console.log('🔄 SimReadiness dispatch:', action.type, action);
     loggingService.logEvent('SIM', `SimReadiness action: ${action.type}`, { action });
     
+    const oldState = this.status.state;
     const newState = this.reducer(this.status, action);
+    
     if (newState !== this.status) {
-      console.log('🔄 State transition:', this.status.state, '->', newState.state);
-      loggingService.logEvent('SIM', `State transition: ${this.status.state} -> ${newState.state}`, {
-        oldState: this.status.state,
+      console.log('🔄 State transition:', oldState, '->', newState.state, 'reason:', newState.reason);
+      loggingService.logEvent('SIM', `State transition: ${oldState} -> ${newState.state}`, {
+        oldState,
         newState: newState.state,
         reason: newState.reason
       });
@@ -86,6 +98,8 @@ class SimReadinessStore {
       this.status = newState;
       this.notifyListeners();
       this.handleStateEffects(action);
+    } else {
+      console.log('🔄 No state change for action:', action.type, 'current state:', this.status.state);
     }
   }
 
@@ -97,7 +111,7 @@ class SimReadinessStore {
         // Check if central store already has data
         const centralStore = useCentralPortfolioStore.getState();
         if (centralStore.snapshot && !centralStore.isLoading) {
-          console.log('✅ Reducer: INIT - found existing data in central store');
+          console.log('✅ Reducer: INIT - found existing data in central store, going to READY');
           return {
             ...state,
             state: 'READY',
@@ -117,7 +131,7 @@ class SimReadinessStore {
         };
 
       case 'FETCH_SUCCESS':
-        console.log('✅ Reducer: FETCH_SUCCESS - updating both stores');
+        console.log('✅ Reducer: FETCH_SUCCESS - updating both stores, transitioning to READY');
         
         // Update central store
         useCentralPortfolioStore.getState().setSnapshot(action.payload);
