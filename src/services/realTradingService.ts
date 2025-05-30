@@ -1,4 +1,3 @@
-
 import { TradeOrder, OrderResponse, RiskLimits } from '@/types/appState';
 import { createOrder, getOrderStatus, getAllOrders, getAccountBalances } from '@/utils/kucoin/trading';
 import { loggingService } from '@/services/loggingService';
@@ -15,8 +14,15 @@ interface ApiKeys {
   };
 }
 
+// KuCoin credentials type for trading operations
+interface KuCoinCredentials {
+  kucoinApiKey: string;
+  kucoinApiSecret: string;
+  kucoinApiPassphrase: string;
+}
+
 // Convert ApiKeys to KuCoinCredentials format
-const convertApiKeys = (apiKeys: ApiKeys): { kucoinApiKey: string; kucoinApiSecret: string; kucoinApiPassphrase: string } => ({
+const convertApiKeys = (apiKeys: ApiKeys): KuCoinCredentials => ({
   kucoinApiKey: apiKeys.kucoin.key,
   kucoinApiSecret: apiKeys.kucoin.secret,
   kucoinApiPassphrase: apiKeys.kucoin.passphrase

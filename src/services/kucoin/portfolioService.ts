@@ -23,7 +23,7 @@ export class PortfolioService {
   async fetchPortfolio(apiKeys: ApiKeys | null): Promise<PortfolioSnapshot> {
     if (!apiKeys) {
       return {
-        totalUSDValue: 0,
+        totalValue: 0,
         assets: [],
         timestamp: Date.now(),
         source: 'mock',
@@ -47,7 +47,7 @@ export class PortfolioService {
       
       // Process balances to calculate USD values
       const assets = [];
-      let totalUSDValue = 0;
+      let totalValue = 0;
       
       for (const balance of balances) {
         if (parseFloat(balance.balance) <= 0) continue;
@@ -75,7 +75,7 @@ export class PortfolioService {
             usdValue: usdValue
           });
           
-          totalUSDValue += usdValue;
+          totalValue += usdValue;
         } catch (assetError) {
           console.error(`Error calculating USD value for ${balance.currency}:`, assetError);
           loggingService.logError(`Portfolio asset valuation failed for ${balance.currency}`, {
@@ -89,7 +89,7 @@ export class PortfolioService {
       networkStatusService.recordSuccessfulCall('/accounts');
       
       return {
-        totalUSDValue,
+        totalValue,
         assets,
         timestamp: Date.now(),
         source: 'api'
@@ -102,7 +102,7 @@ export class PortfolioService {
       networkStatusService.recordError(error as Error, '/accounts');
       
       return {
-        totalUSDValue: 0,
+        totalValue: 0,
         assets: [],
         timestamp: Date.now(),
         source: 'error',

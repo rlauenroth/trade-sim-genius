@@ -1,3 +1,4 @@
+
 interface ApiCall {
   source: string;
   timestamp: number;
@@ -7,7 +8,7 @@ interface ApiCall {
 export class ApiCallTracker {
   private apiCallTracker: ApiCall[] = [];
 
-  trackApiCall(source: string, endpoint: string): void {
+  track(source: string, endpoint: string): void {
     const now = Date.now();
     this.apiCallTracker.push({ source, timestamp: now, endpoint });
     
@@ -25,6 +26,11 @@ export class ApiCallTracker {
     }, {} as Record<string, number>);
     
     console.log('📊 API call breakdown:', breakdown);
+  }
+
+  // Legacy method name for backward compatibility
+  trackApiCall(source: string, endpoint: string): void {
+    this.track(source, endpoint);
   }
 
   getApiCallTracker(): ApiCall[] {
