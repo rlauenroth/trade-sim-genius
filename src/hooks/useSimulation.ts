@@ -114,13 +114,14 @@ export const useSimulation = () => {
   useEffect(() => {
     console.log('🔄 Timer update effect triggered:', { isSimulationActive, simulationState: simulationState?.isActive });
     
-    // Enhanced timer with direct auto-execution
+    // Enhanced timer with direct auto-execution - now passing userSettings
     const enhancedStartAISignalGeneration = async () => {
       await startAISignalGeneration(
         isSimulationActive,
         simulationState,
         addLogEntry,
-        executeDirectAutoTrade, // Pass the direct auto-execution function
+        (signal, currentSimulationState, updateState, logEntry) => 
+          executeDirectAutoTrade(signal, currentSimulationState, updateState, logEntry, userSettings), // Pass userSettings here
         updateSimulationState
       );
     };
@@ -132,7 +133,7 @@ export const useSimulation = () => {
       enhancedStartAISignalGeneration,
       addLogEntry
     );
-  }, [updateTimerInterval, isSimulationActive, simulationState?.isActive, simulationState?.isPaused, startAISignalGeneration, addLogEntry, executeDirectAutoTrade, updateSimulationState]);
+  }, [updateTimerInterval, isSimulationActive, simulationState?.isActive, simulationState?.isPaused, startAISignalGeneration, addLogEntry, executeDirectAutoTrade, updateSimulationState, userSettings]);
 
   // Accept signal manually (kept for compatibility but simplified)
   const acceptSignal = useCallback(async (signal: Signal) => {
