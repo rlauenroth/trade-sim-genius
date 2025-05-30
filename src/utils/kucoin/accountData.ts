@@ -10,6 +10,7 @@ export function setAccountDataActivityLogger(logger: ActivityLogger | null) {
   globalActivityLogger = logger;
 }
 
+// Enhanced account data fetching with automatic API key usage from store
 export async function getAccountBalances() {
   const response = await kucoinFetch('/api/v1/accounts');
   

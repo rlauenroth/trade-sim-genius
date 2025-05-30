@@ -26,7 +26,7 @@ interface KuCoinApiKeys {
   passphrase: string;
 }
 
-// Helper function to get the configured proxy URL
+// Helper function to get the configured proxy URL dynamically
 function getProxyBaseUrl(): string {
   try {
     const { settings } = useSettingsV2Store.getState();
@@ -35,11 +35,33 @@ function getProxyBaseUrl(): string {
     // Use configured proxy URL if available, otherwise fallback to default
     const actualProxy = configuredProxy || KUCOIN_PROXY_BASE;
     
-    console.log('🔗 Using proxy URL:', actualProxy, configuredProxy ? '(configured)' : '(default)');
+    console.log('🔗 Dynamic proxy URL usage:', actualProxy, configuredProxy ? '(configured)' : '(default)');
     return actualProxy;
   } catch (error) {
     console.warn('⚠️ Could not get proxy URL from settings, using default:', error);
     return KUCOIN_PROXY_BASE;
+  }
+}
+
+// Helper function to get API keys from the centralized store
+function getApiKeysFromStore(): KuCoinApiKeys | null {
+  try {
+    const { settings } = useSettingsV2Store.getState();
+    
+    if (settings.kucoin.key && settings.kucoin.secret && settings.kucoin.passphrase) {
+      console.log('🔑 Retrieved API keys from settings store');
+      return {
+        apiKey: settings.kucoin.key,
+        secret: settings.kucoin.secret,
+        passphrase: settings.kucoin.passphrase
+      };
+    }
+    
+    console.warn('⚠️ No valid API keys found in settings store');
+    return null;
+  } catch (error) {
+    console.error('Error getting API keys from store:', error);
+    return null;
   }
 }
 
@@ -83,19 +105,25 @@ export async function kucoinFetch(
   method = 'GET',
   query: Record<string, string | number | undefined> = {},
   body?: unknown,
-  apiKeys?: KuCoinApiKeys // Now requires explicit keys OR will use temp keys for verification
+  apiKeys?: KuCoinApiKeys // Optional parameter, will use store if not provided
 ) {
   const startTime = Date.now();
   
   // Get the dynamic proxy base URL
   const proxyBaseUrl = getProxyBaseUrl();
   
-  // Use provided keys or fallback to temp keys for verification scenarios
+  // Use provided keys or get from store or temp keys for verification
   let keys = apiKeys;
   if (!keys) {
-    keys = getTempKeysForVerification();
-    if (keys) {
-      console.log('🔑 Using temp keys for verification scenario');
+    // First try to get from settings store
+    keys = getApiKeysFromStore();
+    
+    // If not found, try temp keys for verification scenarios
+    if (!keys) {
+      keys = getTempKeysForVerification();
+      if (keys) {
+        console.log('🔑 Using temp keys for verification scenario');
+      }
     }
   }
   
@@ -111,7 +139,7 @@ export async function kucoinFetch(
   });
   
   if (!keys) {
-    const error = new ProxyError('No API keys provided - pass keys explicitly or ensure temp keys are set for verification');
+    const error = new ProxyError('No API keys available - please configure API keys in settings or use temp keys for verification');
     const duration = Date.now() - startTime;
     
     loggingService.logError(`API FAIL ${method} ${path}`, {
@@ -119,7 +147,7 @@ export async function kucoinFetch(
       method,
       error: error.message,
       duration,
-      reason: 'no_api_keys_provided',
+      reason: 'no_api_keys_available',
       proxyUrl: proxyBaseUrl
     });
     
