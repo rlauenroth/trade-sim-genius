@@ -4,7 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Play, Pause, Square, AlertCircle, RefreshCw } from 'lucide-react';
 import { useSimGuard } from '@/hooks/useSimGuard';
-import { simReadinessStore } from '@/stores/simReadinessStore';
+import { simReadinessStore } from '@/stores/simReadiness';
 import AutoModeIndicator from './AutoModeIndicator';
 
 interface ControlCenterProps {

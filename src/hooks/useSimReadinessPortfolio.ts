@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { simReadinessStore } from '@/stores/simReadinessStore';
+import { simReadinessStore } from '@/stores/simReadiness';
 import { SimReadinessStatus, PortfolioSnapshot } from '@/types/simReadiness';
 
 export const useSimReadinessPortfolio = () => {

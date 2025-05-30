@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useCentralPortfolioService } from './useCentralPortfolioService';
-import { simReadinessStore } from '@/stores/simReadinessStore';
+import { simReadinessStore } from '@/stores/simReadiness';
 import { SimReadinessStatus } from '@/types/simReadiness';
 
 export function useSimGuard() {

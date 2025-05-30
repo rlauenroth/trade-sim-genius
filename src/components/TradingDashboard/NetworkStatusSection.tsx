@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Clock, Wifi, Activity, AlertCircle } from 'lucide-react';
 import { useSimGuard } from '@/hooks/useSimGuard';
 import { Button } from '@/components/ui/button';
-import { simReadinessStore } from '@/stores/simReadinessStore';
+import { simReadinessStore } from '@/stores/simReadiness';
 
 const NetworkStatusSection = () => {
   const { state, reason, snapshotAge, portfolio, lastApiPing, retryCount } = useSimGuard();

@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from 'react';
-import { simReadinessStore } from '@/stores/simReadinessStore';
+import { simReadinessStore } from '@/stores/simReadiness';
 import { useSettingsV2Store } from '@/stores/settingsV2';
 import { loggingService } from '@/services/loggingService';
 

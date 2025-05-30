@@ -4,7 +4,7 @@ import { AlertTriangle, Clock, Loader2, RefreshCw, WifiOff } from 'lucide-react'
 import { Button } from '@/components/ui/button';
 import { useSimGuard } from '@/hooks/useSimGuard';
 import { useCentralPortfolioService } from '@/hooks/useCentralPortfolioService';
-import { simReadinessStore } from '@/stores/simReadinessStore';
+import { simReadinessStore } from '@/stores/simReadiness';
 
 const EnhancedPortfolioStatusOverlay = () => {
   const { state, reason, snapshotAge, portfolio } = useSimGuard();
