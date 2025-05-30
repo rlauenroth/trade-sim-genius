@@ -1,5 +1,5 @@
 
-import { VerifiedSettings } from '@/types/settingsV2';
+import { VerifiedSettings } from './types';
 import { OLD_STORAGE_KEYS } from './types';
 import { modelProviderService } from '@/services/settingsV2/modelProviderService';
 import { loggingService } from '@/services/loggingService';
@@ -15,8 +15,8 @@ export const migrateFromOldSettings = (): MigrationResult => {
     const oldApiKeys = localStorage.getItem(OLD_STORAGE_KEYS.API_KEYS);
     const oldUserSettings = localStorage.getItem(OLD_STORAGE_KEYS.USER_SETTINGS);
     
-    // Start with default settings
-    const migration = getDefaultSettings();
+    // Start with default settings to ensure all required fields
+    const migration: VerifiedSettings = { ...getDefaultSettings() };
     let hasKucoinData = false;
     let hasOpenRouterData = false;
     
@@ -24,20 +24,19 @@ export const migrateFromOldSettings = (): MigrationResult => {
       const apiKeys = JSON.parse(oldApiKeys);
       console.log('🔄 Migrating old API keys:', { hasKucoin: !!(apiKeys.kucoinApiKey || apiKeys.kucoinApiSecret), hasOpenRouter: !!apiKeys.openRouterApiKey });
       
-      // Use the correct field names for migration
       if (apiKeys.kucoinApiKey || apiKeys.kucoinApiSecret || apiKeys.kucoinApiPassphrase) {
         migration.kucoin = {
           key: apiKeys.kucoinApiKey || '',
-          secret: apiKeys.kucoinApiSecret || '', // Map apiSecret to secret
+          secret: apiKeys.kucoinApiSecret || '',
           passphrase: apiKeys.kucoinApiPassphrase || '',
-          verified: true // Mark as verified since these were working keys
+          verified: true
         };
         hasKucoinData = !!(apiKeys.kucoinApiKey && apiKeys.kucoinApiSecret && apiKeys.kucoinApiPassphrase);
       }
       if (apiKeys.openRouterApiKey) {
         migration.openRouter = {
           apiKey: apiKeys.openRouterApiKey,
-          verified: true // Mark as verified since these were working keys
+          verified: true
         };
         hasOpenRouterData = true;
       }
@@ -57,7 +56,7 @@ export const migrateFromOldSettings = (): MigrationResult => {
           provider: provider?.name || 'Meta',
           priceUsdPer1k: provider?.priceUsdPer1k || 0.18,
           latencyMs: provider?.latencyMs || 350,
-          verified: true // Mark as verified since this was a working model
+          verified: true
         };
       }
     }

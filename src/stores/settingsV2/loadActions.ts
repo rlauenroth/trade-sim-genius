@@ -6,6 +6,7 @@ import { validateSettings, sanitizeSettings } from './validation';
 import { loggingService } from '@/services/loggingService';
 import { toast } from '@/hooks/use-toast';
 import { GetState, SetState } from './actionTypes';
+import { VerifiedSettings } from './types';
 
 export const createLoadActions = (get: GetState, set: SetState) => ({
   load: () => {
@@ -13,7 +14,7 @@ export const createLoadActions = (get: GetState, set: SetState) => ({
     
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      let settings = getDefaultSettings();
+      let settings: VerifiedSettings = getDefaultSettings();
       let shouldMarkAllVerified = false;
       let wasCorrupted = false;
       
@@ -41,14 +42,13 @@ export const createLoadActions = (get: GetState, set: SetState) => ({
           wasCorrupted = true;
         }
       } else {
-        // Try to migrate from old settings - this now returns complete settings
+        // Try to migrate from old settings
         const { settings: migratedSettings, shouldMarkVerified } = migrateFromOldSettings();
-        settings = migratedSettings; // This is now always a complete VerifiedSettings object
+        settings = migratedSettings;
         shouldMarkAllVerified = shouldMarkVerified;
         
-        if (Object.keys(migratedSettings.kucoin).length > 0 || migratedSettings.openRouter.apiKey) {
+        if (Object.keys(migratedSettings.kucoin).some(key => migratedSettings.kucoin[key as keyof typeof migratedSettings.kucoin]) || migratedSettings.openRouter.apiKey) {
           console.log('✅ Successfully migrated and validated old settings to V2 format');
-          // Clean up old storage keys after successful migration
           cleanupOldStorage();
         }
       }

@@ -3,31 +3,32 @@ import { z } from 'zod';
 import { loggingService } from '@/services/loggingService';
 import { VerifiedSettings } from './types';
 
+// Create schemas that match the exact VerifiedSettings interface
 const KuCoinSettingsSchema = z.object({
-  key: z.string().default(''),
-  secret: z.string().default(''),
-  passphrase: z.string().default(''),
-  verified: z.boolean().default(false)
+  key: z.string(),
+  secret: z.string(), 
+  passphrase: z.string(),
+  verified: z.boolean()
 });
 
 const OpenRouterSettingsSchema = z.object({
-  apiKey: z.string().default(''),
-  verified: z.boolean().default(false)
+  apiKey: z.string(),
+  verified: z.boolean()
 });
 
 const ModelSettingsSchema = z.object({
-  id: z.string().default(''),
-  provider: z.string().default(''),
-  priceUsdPer1k: z.number().default(0),
-  latencyMs: z.number().default(0),
-  verified: z.boolean().default(false)
+  id: z.string(),
+  provider: z.string(),
+  priceUsdPer1k: z.number(),
+  latencyMs: z.number(),
+  verified: z.boolean()
 });
 
 const RiskLimitsSchema = z.object({
-  maxOpenOrders: z.number().min(1).max(50).default(5),
-  maxExposure: z.number().min(100).max(1000000).default(1000),
-  minBalance: z.number().min(10).max(10000).default(100),
-  requireConfirmation: z.boolean().default(true)
+  maxOpenOrders: z.number().min(1).max(50),
+  maxExposure: z.number().min(100).max(1000000),
+  minBalance: z.number().min(10).max(10000),
+  requireConfirmation: z.boolean()
 });
 
 const VerifiedSettingsSchema = z.object({
@@ -35,15 +36,15 @@ const VerifiedSettingsSchema = z.object({
   openRouter: OpenRouterSettingsSchema,
   model: ModelSettingsSchema,
   riskLimits: RiskLimitsSchema,
-  tradingMode: z.enum(['simulation', 'real']).default('simulation'),
-  tradingStrategy: z.enum(['conservative', 'balanced', 'aggressive']).default('conservative'),
-  proxyUrl: z.string().url().default('https://api.kucoin.com'),
-  lastUpdated: z.number().default(() => Date.now())
+  tradingMode: z.enum(['simulation', 'real']),
+  tradingStrategy: z.enum(['conservative', 'balanced', 'aggressive']),
+  proxyUrl: z.string().url(),
+  lastUpdated: z.number()
 });
 
 export const validateSettings = (settings: any): { isValid: boolean; settings?: VerifiedSettings; errors?: string[] } => {
   try {
-    const validatedSettings = VerifiedSettingsSchema.parse(settings);
+    const validatedSettings = VerifiedSettingsSchema.parse(settings) as VerifiedSettings;
     return { isValid: true, settings: validatedSettings };
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -61,8 +62,8 @@ export const validateSettings = (settings: any): { isValid: boolean; settings?: 
 
 export const sanitizeSettings = (settings: any, defaults: VerifiedSettings): VerifiedSettings => {
   try {
-    // Use Zod's parse method with defaults to ensure all required fields are present
-    const settingsWithDefaults = VerifiedSettingsSchema.parse({
+    // Build a complete settings object ensuring all required fields are present
+    const completeSettings: VerifiedSettings = {
       kucoin: {
         key: settings?.kucoin?.key ?? defaults.kucoin.key,
         secret: settings?.kucoin?.secret ?? defaults.kucoin.secret,
@@ -90,16 +91,19 @@ export const sanitizeSettings = (settings: any, defaults: VerifiedSettings): Ver
       tradingStrategy: settings?.tradingStrategy ?? defaults.tradingStrategy,
       proxyUrl: settings?.proxyUrl ?? defaults.proxyUrl,
       lastUpdated: Date.now()
-    });
+    };
     
     loggingService.logInfo('Settings sanitized successfully');
-    return settingsWithDefaults;
+    return completeSettings;
     
   } catch (error) {
     loggingService.logError('Settings sanitization error', {
       error: error instanceof Error ? error.message : 'Unknown error'
     });
-    // Return defaults as last resort, parsed through schema to ensure type safety
-    return VerifiedSettingsSchema.parse(defaults);
+    // Return defaults with updated timestamp as last resort
+    return {
+      ...defaults,
+      lastUpdated: Date.now()
+    };
   }
 };
