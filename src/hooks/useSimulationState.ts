@@ -48,10 +48,20 @@ export const useSimulationState = () => {
 
   const saveSimulationState = useCallback((state: SimulationState) => {
     try {
+      console.log('💾 Saving simulation state:', {
+        isActive: state.isActive,
+        isPaused: state.isPaused,
+        portfolioValue: state.currentPortfolioValue,
+        openPositions: state.openPositions.length,
+        paperAssets: state.paperAssets.map(a => ({ symbol: a.symbol, quantity: a.quantity }))
+      });
+      
       localStorage.setItem('kiTradingApp_simulationState', JSON.stringify(state));
       setSimulationState(state);
+      
+      console.log('✅ Simulation state saved successfully');
     } catch (error) {
-      console.error('Error saving simulation state:', error);
+      console.error('❌ Error saving simulation state:', error);
     }
   }, []);
 
@@ -84,8 +94,13 @@ export const useSimulationState = () => {
   }, [saveSimulationState]);
 
   const updateSimulationState = useCallback((newState: SimulationState) => {
+    console.log('🔄 Updating simulation state:', {
+      from: simulationState?.currentPortfolioValue,
+      to: newState.currentPortfolioValue,
+      openPositions: newState.openPositions.length
+    });
     saveSimulationState(newState);
-  }, [saveSimulationState]);
+  }, [saveSimulationState, simulationState]);
 
   const pauseSimulation = useCallback(() => {
     if (simulationState) {

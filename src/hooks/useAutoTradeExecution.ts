@@ -19,13 +19,24 @@ export const useAutoTradeExecution = () => {
     updateSimulationState: (state: SimulationState) => void,
     addLogEntry: (type: any, message: string, source?: string, details?: any) => void
   ): Promise<boolean> => {
-    if (!simulationState) return false;
+    if (!simulationState) {
+      console.log('❌ Auto-trade failed: No simulation state');
+      return false;
+    }
 
     try {
+      console.log('🔄 Auto-trade execution started:', {
+        signal: signal.assetPair,
+        signalType: signal.signalType,
+        portfolioValue: simulationState.currentPortfolioValue,
+        availableUSDT: simulationState.paperAssets.find(asset => asset.symbol === 'USDT')?.quantity
+      });
+
       loggingService.logEvent('AUTO_TRADE', 'Auto-trade execution started', {
         assetPair: signal.assetPair,
         signalType: signal.signalType,
-        confidence: signal.confidenceScore
+        confidence: signal.confidenceScore,
+        portfolioValueBefore: simulationState.currentPortfolioValue
       });
 
       addLogEntry('AUTO_TRADE', `AUTO-TRADE: ${signal.signalType} ${signal.assetPair} wird automatisch ausgeführt...`);
@@ -33,37 +44,57 @@ export const useAutoTradeExecution = () => {
       // Validate risk before executing
       const riskValidation = validateTradeRisk(signal, simulationState);
       if (!riskValidation.isValid) {
+        console.log('❌ Auto-trade rejected by risk validation:', riskValidation.reason);
         addLogEntry('WARNING', `AUTO-TRADE abgelehnt: ${riskValidation.reason}`);
         return false;
       }
 
       // Execute the trade
       const tradeResult = await executeTradeFromSignal(signal, simulationState);
+      
+      console.log('📊 Trade result:', tradeResult);
 
       if (tradeResult.success) {
-        // Update simulation state with new trade
-        const updatedState = {
+        // Calculate updated portfolio value (subtract fees and update for new positions)
+        const portfolioValueBefore = simulationState.currentPortfolioValue;
+        const portfolioValueAfter = portfolioValueBefore - (tradeResult.fee || 0);
+        
+        // Create updated simulation state with all changes
+        const updatedState: SimulationState = {
           ...simulationState,
           openPositions: [...(simulationState.openPositions || []), tradeResult.position],
           paperAssets: tradeResult.updatedAssets,
+          currentPortfolioValue: portfolioValueAfter,
           autoTradeCount: (simulationState.autoTradeCount || 0) + 1,
           lastAutoTradeTime: Date.now()
         };
 
+        console.log('💾 Updating simulation state:', {
+          portfolioValueBefore,
+          portfolioValueAfter,
+          newPositions: updatedState.openPositions.length,
+          updatedAssets: updatedState.paperAssets.map(a => ({ symbol: a.symbol, quantity: a.quantity }))
+        });
+
+        // Update the simulation state
         updateSimulationState(updatedState);
         
-        addLogEntry('AUTO_TRADE', `AUTO-TRADE erfolgreich ausgeführt: ${signal.signalType} ${tradeResult.position.quantity} ${signal.assetPair}`, 'AutoMode', {
+        // Log the successful trade
+        addLogEntry('AUTO_TRADE', `AUTO-TRADE erfolgreich ausgeführt: ${signal.signalType} ${tradeResult.position.quantity.toFixed(6)} ${signal.assetPair}`, 'AutoMode', {
           tradeData: {
             id: tradeResult.position.id,
             assetPair: signal.assetPair,
             type: signal.signalType as 'BUY' | 'SELL',
             quantity: tradeResult.position.quantity,
             price: tradeResult.position.entryPrice,
-            fee: 0,
+            fee: tradeResult.fee || 0,
             totalValue: tradeResult.position.quantity * tradeResult.position.entryPrice,
             auto: true
           }
         });
+
+        // Log portfolio value change
+        addLogEntry('PORTFOLIO_UPDATE', `Portfolio-Wert: $${portfolioValueBefore.toFixed(2)} → $${portfolioValueAfter.toFixed(2)} (Gebühr: -$${(tradeResult.fee || 0).toFixed(2)})`);
 
         toast({
           title: "Auto-Trade ausgeführt",
@@ -74,11 +105,13 @@ export const useAutoTradeExecution = () => {
         setRetryCount(0);
         setAutoModeError(null);
         
+        console.log('✅ Auto-trade completed successfully');
         return true;
       } else {
         throw new Error(tradeResult.error);
       }
     } catch (error) {
+      console.error('❌ Auto-trade execution failed:', error);
       return handleAutoTradeError(error, signal, addLogEntry, updateSimulationState, simulationState);
     }
   }, [executeTradeFromSignal, validateTradeRisk, retryCount]);
