@@ -1,4 +1,3 @@
-
 import { useSettingsV2Store } from '@/stores/settingsV2';
 import { useSimulation } from '@/hooks/useSimulation';
 import { usePortfolioData } from '@/hooks/usePortfolioData';
@@ -91,7 +90,7 @@ export const useDashboardState = () => {
 
   console.log('📊 DashboardState: Using central portfolio data:', {
     livePortfolio: !!livePortfolio,
-    totalValue: livePortfolio?.totalUSDValue,
+    totalValue: livePortfolio?.totalValue,
     isLoading: livePortfolioLoading,
     error: livePortfolioError
   });

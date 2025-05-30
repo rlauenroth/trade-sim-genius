@@ -45,7 +45,7 @@ export const useCentralPortfolioService = () => {
 
       setSnapshot(portfolioData);
       
-      loggingService.logEvent('PORTFOLIO', 'Portfolio fetched successfully', {
+      loggingService.logEvent('PORTFOLIO_UPDATE', 'Portfolio fetched successfully', {
         totalValue: portfolioData.totalValue,
         positionCount: portfolioData.positions.length
       });

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, RefreshCw, AlertCircle } from 'lucide-react';
@@ -25,7 +24,7 @@ const PortfolioOverviewWithStatus = ({
   const isPositive = totalPnL >= 0;
 
   // Use central portfolio value if available, otherwise fallback to passed props
-  const displayValue = snapshot?.totalUSDValue || currentValue;
+  const displayValue = snapshot?.totalValue || currentValue;
 
   console.log('📊 PortfolioOverview render:', {
     hasSnapshot: !!snapshot,
