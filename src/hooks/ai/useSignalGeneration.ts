@@ -2,9 +2,17 @@ import { useState, useCallback, useRef } from 'react';
 import { Signal } from '@/types/simulation';
 import { loggingService } from '@/services/loggingService';
 import { useAIValidation } from './useAIValidation';
-import { useCandidates } from '@/hooks/useCandidates';
+import { usePortfolioDataExtraction } from './usePortfolioDataExtraction';
 import { EnhancedAISignalService } from '@/services/aiSignal/enhancedAISignalService';
 import { useSettingsV2Store } from '@/stores/settingsV2';
+import { CandidateStatus } from '@/types/candidate';
+
+interface CandidateCallbacks {
+  addCandidate: (symbol: string, initialStatus?: CandidateStatus) => void;
+  updateCandidateStatus: (symbol: string, status: CandidateStatus, signalType?: 'BUY' | 'SELL' | 'HOLD', confidence?: number, additionalData?: any) => void;
+  clearCandidates: () => void;
+  advanceCandidateToNextStage: (symbol: string, nextStatus: CandidateStatus, meta?: any) => void;
+}
 
 export const useSignalGeneration = () => {
   const [currentSignal, setCurrentSignal] = useState<Signal | null>(null);
@@ -13,74 +21,8 @@ export const useSignalGeneration = () => {
   const lastGenerationTime = useRef<number>(0);
   
   const { validateAPIKeys } = useAIValidation();
-  const { 
-    addCandidate, 
-    updateCandidateStatus, 
-    clearCandidates,
-    advanceCandidateToNextStage 
-  } = useCandidates();
+  const { extractPortfolioData } = usePortfolioDataExtraction();
   const { settings } = useSettingsV2Store();
-
-  // Helper function to extract portfolio data from multiple sources
-  const extractPortfolioData = (simulationState: any, livePortfolioData?: any) => {
-    loggingService.logEvent('AI', 'Extracting portfolio data for AI analysis', {
-      hasSimulationState: !!simulationState,
-      hasLivePortfolio: !!livePortfolioData,
-      simulationStateKeys: simulationState ? Object.keys(simulationState) : [],
-      livePortfolioKeys: livePortfolioData ? Object.keys(livePortfolioData) : []
-    });
-
-    // Try to get portfolio value from simulation state first
-    let portfolioValue = simulationState?.currentPortfolioValue || simulationState?.startPortfolioValue;
-    
-    // Fallback to live portfolio data
-    if (!portfolioValue && livePortfolioData) {
-      portfolioValue = livePortfolioData.totalValue || livePortfolioData.totalUSDValue;
-    }
-
-    // Try to get available USDT from simulation state
-    let availableUSDT = simulationState?.paperAssets?.find((asset: any) => asset.symbol === 'USDT')?.quantity;
-    
-    // Fallback: if no paperAssets or USDT not found, use portfolio value as available USDT
-    if (!availableUSDT && portfolioValue) {
-      availableUSDT = portfolioValue;
-      loggingService.logEvent('AI', 'Using portfolio value as available USDT fallback', {
-        portfolioValue,
-        availableUSDT
-      });
-    }
-
-    // Fallback to live portfolio USDT position
-    if (!availableUSDT && livePortfolioData?.positions) {
-      const usdtPosition = livePortfolioData.positions.find((pos: any) => 
-        pos.currency === 'USDT' || pos.symbol === 'USDT'
-      );
-      if (usdtPosition) {
-        availableUSDT = usdtPosition.balance || usdtPosition.quantity;
-      }
-    }
-
-    loggingService.logEvent('AI', 'Portfolio data extraction completed', {
-      portfolioValue,
-      availableUSDT,
-      simulationStateStructure: {
-        currentPortfolioValue: simulationState?.currentPortfolioValue,
-        startPortfolioValue: simulationState?.startPortfolioValue,
-        paperAssetsCount: simulationState?.paperAssets?.length || 0,
-        paperAssets: simulationState?.paperAssets?.map((asset: any) => ({
-          symbol: asset.symbol,
-          quantity: asset.quantity
-        })) || []
-      }
-    });
-
-    return { portfolioValue, availableUSDT };
-  };
-
-  // Candidate status callback for real-time updates
-  const candidateStatusCallback = useCallback((symbol: string, status: string) => {
-    updateCandidateStatus(symbol, status as any);
-  }, [updateCandidateStatus]);
 
   const generateSignals = useCallback(async (
     isActive: boolean, 
@@ -88,7 +30,8 @@ export const useSignalGeneration = () => {
     addLogEntry: (type: any, message: string) => void,
     executeAutoTrade?: (signal: Signal, simulationState: any, updateSimulationState: any, addLogEntry: any) => Promise<boolean>,
     updateSimulationState?: (state: any) => void,
-    livePortfolioData?: any
+    livePortfolioData?: any,
+    candidateCallbacks?: CandidateCallbacks
   ) => {
     // Guard against multiple concurrent executions
     if (isFetchingSignals) {
@@ -113,15 +56,18 @@ export const useSignalGeneration = () => {
     lastGenerationTime.current = now;
     
     try {
-      // Clear candidates at start of new cycle
-      clearCandidates();
+      // Clear candidates at start of new cycle using callback
+      if (candidateCallbacks) {
+        candidateCallbacks.clearCandidates();
+      }
       
-      console.log('🚀 Starting comprehensive AI market analysis with enhanced candidate tracking:', {
+      console.log('🚀 Starting comprehensive AI market analysis with callback-based candidate tracking:', {
         portfolioValue: simulationState?.currentPortfolioValue,
         availableUSDT: simulationState?.paperAssets?.find((asset: any) => asset.symbol === 'USDT')?.quantity,
         openPositions: simulationState?.openPositions?.length || 0,
         hasAutoExecution: !!executeAutoTrade,
-        hasLivePortfolioFallback: !!livePortfolioData
+        hasLivePortfolioFallback: !!livePortfolioData,
+        hasCandidateCallbacks: !!candidateCallbacks
       });
       
       addLogEntry('AI', 'Starte erweiterte KI-Analyse mit Pipeline-Tracking...');
@@ -152,6 +98,14 @@ export const useSignalGeneration = () => {
         dataSource: simulationState?.currentPortfolioValue ? 'simulation' : 'live_portfolio'
       });
 
+      // Create candidate status callback for real-time updates
+      const candidateStatusCallback = (symbol: string, status: string) => {
+        if (candidateCallbacks) {
+          candidateCallbacks.updateCandidateStatus(symbol, status as CandidateStatus);
+        }
+        console.log('🔄 Callback: Updated candidate status:', { symbol, status });
+      };
+
       // Create enhanced AI service with candidate callback
       const selectedModelId = settings.model.id;
       const aiService = new EnhancedAISignalService({
@@ -171,9 +125,11 @@ export const useSignalGeneration = () => {
       addLogEntry('AI', 'Phase 1: Market-Screening startet...');
       const selectedPairs = await aiService.performMarketScreening();
       
-      // Add all selected pairs as candidates immediately
+      // Add all selected pairs as candidates immediately using callbacks
       selectedPairs.forEach(pair => {
-        addCandidate(pair, 'screening_stage1_pending');
+        if (candidateCallbacks) {
+          candidateCallbacks.addCandidate(pair, 'screening_stage1_pending');
+        }
         addLogEntry('AI', `Asset hinzugefügt: ${pair}`);
       });
       
@@ -185,13 +141,17 @@ export const useSignalGeneration = () => {
       for (let i = 0; i < selectedPairs.length; i++) {
         const pair = selectedPairs[i];
         
-        // Update to data loading phase
-        advanceCandidateToNextStage(pair, 'detail_analysis_pending');
+        // Update to data loading phase using callbacks
+        if (candidateCallbacks) {
+          candidateCallbacks.advanceCandidateToNextStage(pair, 'detail_analysis_pending');
+        }
         addLogEntry('AI', `Lade Daten für ${pair} (${i + 1}/${selectedPairs.length})...`);
         
         try {
-          // Update to analysis running phase
-          advanceCandidateToNextStage(pair, 'detail_analysis_running');
+          // Update to analysis running phase using callbacks
+          if (candidateCallbacks) {
+            candidateCallbacks.advanceCandidateToNextStage(pair, 'detail_analysis_running');
+          }
           addLogEntry('AI', `KI-Detailanalyse für ${pair}...`);
           
           // Generate signal with candidate status callback
@@ -200,13 +160,15 @@ export const useSignalGeneration = () => {
           if (signal) {
             signals.push(signal);
             
-            // Update candidate with signal information
-            updateCandidateStatus(
-              pair, 
-              'signal_generated', 
-              signal.signalType as 'BUY' | 'SELL' | 'HOLD',
-              signal.confidenceScore
-            );
+            // Update candidate with signal information using callbacks
+            if (candidateCallbacks) {
+              candidateCallbacks.updateCandidateStatus(
+                pair, 
+                'signal_generated', 
+                signal.signalType as 'BUY' | 'SELL' | 'HOLD',
+                signal.confidenceScore
+              );
+            }
             
             addLogEntry('AI', `Signal generiert: ${signal.signalType} ${pair} (${Math.round((signal.confidenceScore || 0) * 100)}%)`);
             
@@ -216,14 +178,18 @@ export const useSignalGeneration = () => {
               confidence: signal.confidenceScore
             });
           } else {
-            // Keep as analyzed if no signal generated
-            updateCandidateStatus(pair, 'analyzed');
+            // Keep as analyzed if no signal generated using callbacks
+            if (candidateCallbacks) {
+              candidateCallbacks.updateCandidateStatus(pair, 'analyzed');
+            }
             addLogEntry('AI', `Kein handelbares Signal für ${pair}`);
           }
         } catch (error) {
-          updateCandidateStatus(pair, 'error_analysis', undefined, undefined, {
-            errorReason: error instanceof Error ? error.message : 'Unknown error'
-          });
+          if (candidateCallbacks) {
+            candidateCallbacks.updateCandidateStatus(pair, 'error_analysis', undefined, undefined, {
+              errorReason: error instanceof Error ? error.message : 'Unknown error'
+            });
+          }
           addLogEntry('WARNING', `Analyse fehlgeschlagen für ${pair}: ${error instanceof Error ? error.message : 'Unbekannt'}`);
           loggingService.logError('Signal generation failed for pair', {
             pair,
@@ -237,10 +203,11 @@ export const useSignalGeneration = () => {
         }
       }
       
-      console.log('📊 Enhanced signal generation completed:', {
+      console.log('📊 Enhanced signal generation completed with callback integration:', {
         signalsGenerated: signals.length,
         actionableSignals: signals.filter(s => s.signalType === 'BUY' || s.signalType === 'SELL').length,
-        candidatesProcessed: selectedPairs.length
+        candidatesProcessed: selectedPairs.length,
+        hasCandidateCallbacks: !!candidateCallbacks
       });
       
       if (signals.length > 0) {
@@ -297,7 +264,7 @@ export const useSignalGeneration = () => {
     } finally {
       setIsFetchingSignals(false);
     }
-  }, [validateAPIKeys, clearCandidates, isFetchingSignals, addCandidate, updateCandidateStatus, advanceCandidateToNextStage, candidateStatusCallback, settings.model.id]);
+  }, [validateAPIKeys, isFetchingSignals, extractPortfolioData, settings.model.id]);
 
   return {
     currentSignal,

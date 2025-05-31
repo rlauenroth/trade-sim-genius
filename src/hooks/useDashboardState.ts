@@ -5,6 +5,7 @@ import { usePortfolioData } from '@/hooks/usePortfolioData';
 import { useTradingDashboardData } from '@/hooks/useTradingDashboardData';
 import { useCentralPortfolioService } from '@/hooks/useCentralPortfolioService';
 import { useAISignals } from '@/hooks/useAISignals';
+import { useCandidates } from '@/hooks/useCandidates';
 
 export const useDashboardState = () => {
   const { settings, isLoading: settingsLoading } = useSettingsV2Store();
@@ -38,19 +39,28 @@ export const useDashboardState = () => {
     autoModeError,
     portfolioHealthStatus,
     logPerformanceReport,
-    activityLog // Get activityLog from simulation hook instead of state
+    activityLog
   } = useSimulation();
 
-  // Integrate AI signals and candidates
+  // Central candidates management
+  const {
+    candidates,
+    updateCandidates,
+    updateCandidateStatus,
+    addCandidate,
+    clearCandidates,
+    advanceCandidateToNextStage
+  } = useCandidates();
+
+  // Integrate AI signals with central candidate management
   const {
     currentSignal,
     availableSignals,
     startAISignalGeneration,
-    candidates,
     isFetchingSignals
   } = useAISignals();
 
-  console.log('📊 useDashboardState: AI Signal data:', {
+  console.log('📊 useDashboardState: Centralized candidate management:', {
     currentSignal: !!currentSignal,
     availableSignalsCount: availableSignals.length,
     candidatesCount: candidates.length,
@@ -105,6 +115,33 @@ export const useDashboardState = () => {
     };
   };
 
+  // Enhanced AI signal generation with central candidate management
+  const startAISignalGenerationWithCandidates = async (
+    isActive: boolean,
+    addLogEntry: (type: any, message: string) => void,
+    executeAutoTrade?: (signal: any, simulationState: any, updateSimulationState: any, addLogEntry: any) => Promise<boolean>,
+    updateSimulationState?: (state: any) => void
+  ) => {
+    console.log('🚀 Dashboard: Starting AI signal generation with central candidate management');
+    
+    // Create candidate callbacks object
+    const candidateCallbacks = {
+      addCandidate,
+      updateCandidateStatus,
+      clearCandidates,
+      advanceCandidateToNextStage
+    };
+    
+    await startAISignalGeneration(
+      isActive,
+      simulationState,
+      addLogEntry,
+      executeAutoTrade,
+      updateSimulationState,
+      candidateCallbacks // Pass the candidate management functions
+    );
+  };
+
   console.log('📊 DashboardState: Using central portfolio data:', {
     livePortfolio: !!livePortfolio,
     totalValue: livePortfolio?.totalValue,
@@ -130,9 +167,15 @@ export const useDashboardState = () => {
     resumeSimulation,
     acceptSignal,
     ignoreSignal,
-    currentSignal, // From AI signals
-    activityLog, // From simulation hook
-    candidates, // From AI signals with useCandidates integration
+    currentSignal,
+    activityLog,
+    candidates, // Central candidates from useCandidates
+    // Candidate management functions
+    updateCandidates,
+    updateCandidateStatus,
+    addCandidate,
+    clearCandidates,
+    advanceCandidateToNextStage,
     timeElapsed,
     getProgressValue,
     getTotalPnL,
@@ -149,8 +192,8 @@ export const useDashboardState = () => {
     logPerformanceReport,
     // Add central portfolio refresh function
     refreshLivePortfolio,
-    // Add AI signal functionality
-    startAISignalGeneration,
+    // Add AI signal functionality with candidate integration
+    startAISignalGenerationWithCandidates,
     availableSignals,
     isFetchingSignals
   };

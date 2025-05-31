@@ -6,7 +6,6 @@ import ProgressTracker from '../ProgressTracker';
 import OpenPositions from '../OpenPositions';
 import PerformanceMetrics from '../PerformanceMetrics';
 import ActivityLog from '../ActivityLog';
-import AssetPipelineMonitor from '../AssetPipelineMonitor';
 
 interface DashboardGridsProps {
   displayPortfolioValue: number;
@@ -109,17 +108,6 @@ const DashboardGrids = ({
           
           <PerformanceMetrics portfolioHealthStatus={normalizeHealthStatus(portfolioHealthStatus)} />
         </div>
-      </div>
-
-      {/* Asset Pipeline Monitor in full width */}
-      <div className="w-full">
-        <AssetPipelineMonitor
-          candidates={candidates}
-          availableSignals={availableSignals}
-          currentSignal={currentSignal}
-          portfolioValue={displayPortfolioValue}
-          isSimulationActive={isSimulationActive}
-        />
       </div>
 
       {/* ActivityLog in full width below everything */}

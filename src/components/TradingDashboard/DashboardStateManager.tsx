@@ -4,7 +4,6 @@ import { useSimGuard } from '@/hooks/useSimGuard';
 import { useDashboardInitialization } from '@/hooks/useDashboardInitialization';
 import { useDashboardActions } from '@/hooks/useDashboardActions';
 import { useDashboardState } from '@/hooks/useDashboardState';
-import { useCandidates } from '@/hooks/useCandidates';
 
 export const useDashboardStateManager = () => {
   const {
@@ -27,6 +26,12 @@ export const useDashboardStateManager = () => {
     ignoreSignal,
     currentSignal,
     activityLog,
+    candidates, // Now from central useDashboardState
+    updateCandidates,
+    updateCandidateStatus,
+    addCandidate,
+    clearCandidates,
+    advanceCandidateToNextStage,
     timeElapsed,
     getProgressValue,
     getTotalPnL,
@@ -40,15 +45,16 @@ export const useDashboardStateManager = () => {
     settingsLoading,
     loadPortfolioData,
     loadPortfolioDataWithCredentials,
-    logPerformanceReport
+    logPerformanceReport,
+    startAISignalGenerationWithCandidates,
+    availableSignals
   } = useDashboardState();
 
-  // Integrate candidates management directly into dashboard state
-  const { candidates } = useCandidates();
-
-  console.log('🔄 DashboardStateManager: Candidates state:', {
+  console.log('🔄 DashboardStateManager: Central candidate management:', {
     candidatesCount: candidates.length,
-    candidates: candidates.map(c => ({ symbol: c.symbol, status: c.status }))
+    availableSignalsCount: availableSignals.length,
+    candidates: candidates.map(c => ({ symbol: c.symbol, status: c.status })),
+    availableSignals: availableSignals.map(s => ({ assetPair: s.assetPair, signalType: s.signalType }))
   });
 
   const {
@@ -107,7 +113,14 @@ export const useDashboardStateManager = () => {
     ignoreSignal,
     currentSignal,
     activityLog,
-    candidates, // Now available in dashboard state
+    candidates, // Central candidates management
+    availableSignals, // Available signals from central state
+    // Candidate management functions
+    updateCandidates,
+    updateCandidateStatus,
+    addCandidate,
+    clearCandidates,
+    advanceCandidateToNextStage,
     timeElapsed,
     getProgressValue,
     getTotalPnL,
@@ -126,6 +139,8 @@ export const useDashboardStateManager = () => {
     retryServiceInitialization,
     isRealTradingMode,
     realTradingInitialized,
-    realTradingError
+    realTradingError,
+    // AI signal generation with central candidate management
+    startAISignalGenerationWithCandidates
   };
 };
