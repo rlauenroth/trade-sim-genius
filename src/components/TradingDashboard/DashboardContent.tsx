@@ -17,6 +17,7 @@ interface DashboardContentProps {
   simulationState: any;
   isSimulationActive: boolean;
   currentSignal: any;
+  availableSignals?: any[];
   activityLog: any[];
   apiKeys: any;
   candidates: any[];
@@ -53,6 +54,7 @@ const DashboardContent = ({
   simulationState,
   isSimulationActive,
   currentSignal,
+  availableSignals = [],
   activityLog,
   apiKeys,
   candidates,
@@ -121,6 +123,7 @@ const DashboardContent = ({
         candidates={candidates}
         openPositions={simulationState?.openPositions || []}
         currentSignal={currentSignal}
+        availableSignals={availableSignals}
         onAcceptSignal={acceptSignal}
         onIgnoreSignal={ignoreSignal}
         activityLog={activityLog}

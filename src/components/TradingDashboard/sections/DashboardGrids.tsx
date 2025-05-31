@@ -3,11 +3,10 @@ import React from 'react';
 import PortfolioOverviewWithStatus from '../PortfolioOverviewWithStatus';
 import ControlCenter from '../ControlCenter';
 import ProgressTracker from '../ProgressTracker';
-import CandidateList from '../CandidateList';
-import SignalDisplay from '../SignalDisplay';
-import ActivityLog from '../ActivityLog';
 import OpenPositions from '../OpenPositions';
 import PerformanceMetrics from '../PerformanceMetrics';
+import ActivityLog from '../ActivityLog';
+import AssetPipelineMonitor from '../AssetPipelineMonitor';
 
 interface DashboardGridsProps {
   displayPortfolioValue: number;
@@ -33,6 +32,7 @@ interface DashboardGridsProps {
   simulationDataForLog: any;
   userSettings: any;
   apiKeys: any;
+  availableSignals?: any[];
 }
 
 const DashboardGrids = ({
@@ -58,7 +58,8 @@ const DashboardGrids = ({
   activityLog,
   simulationDataForLog,
   userSettings,
-  apiKeys
+  apiKeys,
+  availableSignals = []
 }: DashboardGridsProps) => {
   // Ensure portfolioHealthStatus matches the expected type
   const normalizeHealthStatus = (status: string): 'HEALTHY' | 'WARNING' | 'CRITICAL' => {
@@ -71,7 +72,7 @@ const DashboardGrids = ({
 
   return (
     <div className="space-y-6">
-      {/* Main 2-column grid for all components except ActivityLog */}
+      {/* Main 2-column grid for core components */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Column */}
         <div className="space-y-6">
@@ -98,30 +99,30 @@ const DashboardGrids = ({
             progressValue={progressValue}
             isSimulationActive={isSimulationActive}
           />
-          
-          <OpenPositions
-            positions={simulationState?.openPositions || []}
-          />
         </div>
 
         {/* Right Column */}
         <div className="space-y-6">
-          <CandidateList 
-            candidates={candidates} 
-            openPositions={openPositions}
-          />
-          
-          <SignalDisplay
-            currentSignal={currentSignal}
-            onAcceptSignal={onAcceptSignal}
-            onIgnoreSignal={onIgnoreSignal}
+          <OpenPositions
+            positions={simulationState?.openPositions || []}
           />
           
           <PerformanceMetrics portfolioHealthStatus={normalizeHealthStatus(portfolioHealthStatus)} />
         </div>
       </div>
 
-      {/* ActivityLog in full width below the main grid */}
+      {/* Asset Pipeline Monitor in full width */}
+      <div className="w-full">
+        <AssetPipelineMonitor
+          candidates={candidates}
+          availableSignals={availableSignals}
+          currentSignal={currentSignal}
+          portfolioValue={displayPortfolioValue}
+          isSimulationActive={isSimulationActive}
+        />
+      </div>
+
+      {/* ActivityLog in full width below everything */}
       <div className="w-full">
         <ActivityLog
           activityLog={activityLog}

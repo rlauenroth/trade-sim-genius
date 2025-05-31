@@ -102,7 +102,7 @@ export const useEnhancedSimulation = () => {
     simulationState,
     isSimulationActive,
     
-    // Signal state
+    // Signal state - export availableSignals for the new component
     currentSignal,
     signalState,
     availableSignals,
