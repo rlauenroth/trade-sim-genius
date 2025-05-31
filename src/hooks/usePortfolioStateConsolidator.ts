@@ -190,7 +190,9 @@ export const usePortfolioStateConsolidator = () => {
         paperAssets: Array.isArray(corruptedState.paperAssets) ? corruptedState.paperAssets : [],
         autoMode: corruptedState.autoMode,
         autoTradeCount: corruptedState.autoTradeCount || 0,
-        lastAutoTradeTime: corruptedState.lastAutoTradeTime
+        lastAutoTradeTime: corruptedState.lastAutoTradeTime,
+        // FIXED: Add missing availableUSDT property
+        availableUSDT: corruptedState.availableUSDT || currentPortfolioValue || 0
       };
       
       // Ensure USDT asset exists

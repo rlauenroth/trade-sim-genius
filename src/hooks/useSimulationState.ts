@@ -71,7 +71,6 @@ export const useSimulationState = () => {
     setIsSimulationActive(false);
   }, []);
 
-  // Add missing methods
   const initializeSimulation = useCallback((portfolioData: any): SimulationState => {
     // Enhanced portfolio data extraction for initialization
     const portfolioValue = portfolioData.totalValue || portfolioData.totalUSDValue || 0;
@@ -128,7 +127,8 @@ export const useSimulationState = () => {
       currentPortfolioValue: portfolioValue,
       realizedPnL: 0,
       openPositions: [],
-      paperAssets
+      paperAssets,
+      availableUSDT: portfolioValue
     };
     
     loggingService.logSuccess('Simulation state initialized successfully', {

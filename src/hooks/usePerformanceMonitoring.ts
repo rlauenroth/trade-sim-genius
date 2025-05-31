@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useRef } from 'react';
 import { loggingService } from '@/services/loggingService';
 
@@ -10,6 +11,12 @@ interface PerformanceMetrics {
   portfolioGrowth: number;
   lastCycleTime: number;
   healthScore: number;
+  // FIXED: Add missing performance metrics for UI
+  averageResponseTime: number;
+  portfolioGrowthPercent: number;
+  successRate: number;
+  totalRequests: number;
+  slowRequests: number;
 }
 
 export const usePerformanceMonitoring = () => {
@@ -21,7 +28,13 @@ export const usePerformanceMonitoring = () => {
     failedTrades: 0,
     portfolioGrowth: 0,
     lastCycleTime: 0,
-    healthScore: 100
+    healthScore: 100,
+    // FIXED: Initialize missing metrics
+    averageResponseTime: 0,
+    portfolioGrowthPercent: 0,
+    successRate: 100,
+    totalRequests: 0,
+    slowRequests: 0
   });
 
   const cycleStartTimes = useRef<number[]>([]);
@@ -55,6 +68,9 @@ export const usePerformanceMonitoring = () => {
       const growthScore = Math.min(100, Math.max(0, 50 + growth * 2)); // Neutral at 0% growth
       
       const healthScore = (avgCycleTimeScore + successRateScore + growthScore) / 3;
+      
+      const newTotalRequests = prev.totalRequests + 1;
+      const newSlowRequests = cycleTime > 200 ? prev.slowRequests + 1 : prev.slowRequests;
 
       const updatedMetrics = {
         cycleCount: newCycleCount,
@@ -64,7 +80,13 @@ export const usePerformanceMonitoring = () => {
         failedTrades: prev.failedTrades,
         portfolioGrowth: growth,
         lastCycleTime: cycleTime,
-        healthScore
+        healthScore,
+        // FIXED: Update additional metrics
+        averageResponseTime: newAverageCycleTime,
+        portfolioGrowthPercent: growth,
+        successRate: newTotalRequests > 0 ? (prev.successfulTrades / newTotalRequests) * 100 : 100,
+        totalRequests: newTotalRequests,
+        slowRequests: newSlowRequests
       };
 
       // Log performance data every 10 cycles
@@ -83,12 +105,17 @@ export const usePerformanceMonitoring = () => {
       failedTrades: success ? prev.failedTrades : prev.failedTrades + 1
     }));
 
-    loggingService.logEvent('TRADE', 'Trade execution tracked', {
+    loggingService.logEvent('SYSTEM', 'Trade execution tracked', {
       success,
       executionTime,
       timestamp: Date.now()
     });
   }, []);
+
+  // FIXED: Add the missing getPerformanceMetrics method
+  const getPerformanceMetrics = useCallback(() => {
+    return metrics;
+  }, [metrics]);
 
   const logPerformanceReport = useCallback(() => {
     const report = {
@@ -112,7 +139,13 @@ export const usePerformanceMonitoring = () => {
       failedTrades: 0,
       portfolioGrowth: 0,
       lastCycleTime: 0,
-      healthScore: 100
+      healthScore: 100,
+      // FIXED: Reset additional metrics
+      averageResponseTime: 0,
+      portfolioGrowthPercent: 0,
+      successRate: 100,
+      totalRequests: 0,
+      slowRequests: 0
     });
     initialPortfolioValue.current = null;
     cycleStartTimes.current = [];
@@ -124,6 +157,7 @@ export const usePerformanceMonitoring = () => {
     metrics,
     trackSimulationCycle,
     trackTradeExecution,
+    getPerformanceMetrics, // FIXED: Export the missing method
     logPerformanceReport,
     resetMetrics
   };
