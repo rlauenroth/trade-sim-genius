@@ -46,12 +46,19 @@ export const useDashboardStateManager = () => {
     loadPortfolioData,
     loadPortfolioDataWithCredentials,
     logPerformanceReport,
-    availableSignals
+    availableSignals,
+    // FIXED: Use consolidated states
+    isLoading,
+    hasError,
+    hasData
   } = useDashboardState();
 
-  console.log('🔄 DashboardStateManager: Central candidate management:', {
+  console.log('🔄 DashboardStateManager: FIXED - Central candidate and loading management:', {
     candidatesCount: candidates.length,
     availableSignalsCount: availableSignals.length,
+    isLoading,
+    hasError: !!hasError,
+    hasData: !!hasData,
     candidates: candidates.map(c => ({ symbol: c.symbol, status: c.status })),
     availableSignals: availableSignals.map(s => ({ assetPair: s.assetPair, signalType: s.signalType }))
   });
@@ -138,6 +145,10 @@ export const useDashboardStateManager = () => {
     retryServiceInitialization,
     isRealTradingMode,
     realTradingInitialized,
-    realTradingError
+    realTradingError,
+    // FIXED: Consolidated states to prevent loading loops
+    isLoading,
+    hasError,
+    hasData
   };
 };

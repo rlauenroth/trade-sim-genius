@@ -16,7 +16,7 @@ const AssetPipelineMonitor = ({
   isSimulationActive,
   openPositions = []
 }: AssetPipelineMonitorProps) => {
-  console.log('🔄 AssetPipelineMonitor: MAIN COMPONENT props received:', {
+  console.log('🔄 AssetPipelineMonitor: FIXED - MAIN COMPONENT props received:', {
     candidatesCount: candidates?.length || 0,
     availableSignalsCount: availableSignals?.length || 0,
     currentSignal: !!currentSignal,
@@ -35,7 +35,7 @@ const AssetPipelineMonitor = ({
     openPositions 
   });
 
-  console.log('🔄 AssetPipelineMonitor: Pipeline items processed for UI:', {
+  console.log('🔄 AssetPipelineMonitor: FIXED - Pipeline items processed for UI:', {
     itemCount: pipelineItems.length,
     items: pipelineItems.map(item => ({ 
       symbol: item.symbol, 
@@ -48,32 +48,64 @@ const AssetPipelineMonitor = ({
     renderTimestamp: Date.now()
   });
 
-  // Fallback mechanism: If we have no pipeline items but have a current signal, create a fallback item
+  // FIXED: Improved fallback mechanism with better signal detection
   const fallbackItems = [];
-  if (pipelineItems.length === 0 && currentSignal) {
-    console.log('🔄 AssetPipelineMonitor: FALLBACK - Creating item from current signal:', currentSignal);
-    fallbackItems.push({
-      symbol: currentSignal.assetPair,
-      status: 'signal_ready' as const,
-      signalType: currentSignal.signalType,
-      confidenceScore: currentSignal.confidenceScore,
-      entryPriceSuggestion: currentSignal.entryPriceSuggestion,
-      takeProfitPrice: currentSignal.takeProfitPrice,
-      stopLossPrice: currentSignal.stopLossPrice,
-      reasoning: currentSignal.reasoning,
-      suggestedPositionSizePercent: currentSignal.suggestedPositionSizePercent,
-      lastUpdated: Date.now(),
-      pipelineStep: 4,
-      statusDescription: `${currentSignal.signalType} Signal verfügbar`,
-      category: 'major',
-      isHealthy: true
+  if (pipelineItems.length === 0 && (currentSignal || (availableSignals && availableSignals.length > 0))) {
+    console.log('🔄 AssetPipelineMonitor: FIXED - FALLBACK - Creating items from signals:', {
+      currentSignal: !!currentSignal,
+      availableSignalsCount: availableSignals?.length || 0
     });
+    
+    // Add current signal if available
+    if (currentSignal) {
+      fallbackItems.push({
+        symbol: currentSignal.assetPair,
+        status: 'signal_ready' as const,
+        signalType: currentSignal.signalType,
+        confidenceScore: currentSignal.confidenceScore,
+        entryPriceSuggestion: currentSignal.entryPriceSuggestion,
+        takeProfitPrice: currentSignal.takeProfitPrice,
+        stopLossPrice: currentSignal.stopLossPrice,
+        reasoning: currentSignal.reasoning,
+        suggestedPositionSizePercent: currentSignal.suggestedPositionSizePercent,
+        lastUpdated: Date.now(),
+        pipelineStep: 4,
+        statusDescription: `${currentSignal.signalType} Signal verfügbar`,
+        category: 'major',
+        isHealthy: true
+      });
+    }
+    
+    // Add available signals if any
+    if (availableSignals && availableSignals.length > 0) {
+      availableSignals.forEach(signal => {
+        // Avoid duplicates with current signal
+        if (!currentSignal || signal.assetPair !== currentSignal.assetPair) {
+          fallbackItems.push({
+            symbol: signal.assetPair,
+            status: 'signal_ready' as const,
+            signalType: signal.signalType,
+            confidenceScore: signal.confidenceScore,
+            entryPriceSuggestion: signal.entryPriceSuggestion,
+            takeProfitPrice: signal.takeProfitPrice,
+            stopLossPrice: signal.stopLossPrice,
+            reasoning: signal.reasoning,
+            suggestedPositionSizePercent: signal.suggestedPositionSizePercent,
+            lastUpdated: Date.now(),
+            pipelineStep: 4,
+            statusDescription: `${signal.signalType} Signal verfügbar`,
+            category: 'major',
+            isHealthy: true
+          });
+        }
+      });
+    }
   }
 
   const finalItems = pipelineItems.length > 0 ? pipelineItems : fallbackItems;
 
   if (finalItems.length === 0) {
-    console.log('🔄 AssetPipelineMonitor: Showing empty state - no items available');
+    console.log('🔄 AssetPipelineMonitor: FIXED - Showing empty state - no items available');
     return (
       <Card className="bg-slate-800 border-slate-700">
         <CardHeader>
@@ -91,7 +123,7 @@ const AssetPipelineMonitor = ({
     );
   }
 
-  console.log('🔄 AssetPipelineMonitor: Rendering pipeline with items:', {
+  console.log('🔄 AssetPipelineMonitor: FIXED - Rendering pipeline with items:', {
     finalItemCount: finalItems.length,
     usedFallback: fallbackItems.length > 0,
     renderTimestamp: Date.now()

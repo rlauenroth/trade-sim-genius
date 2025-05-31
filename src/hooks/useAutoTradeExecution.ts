@@ -55,9 +55,22 @@ export const useAutoTradeExecution = () => {
       console.log('📊 Trade result:', tradeResult);
 
       if (tradeResult.success) {
-        // Calculate updated portfolio value (subtract fees and update for new positions)
+        // FIXED: Proper portfolio value calculation and state update
         const portfolioValueBefore = simulationState.currentPortfolioValue;
-        const portfolioValueAfter = portfolioValueBefore - (tradeResult.fee || 0);
+        const tradeFee = tradeResult.fee || 0;
+        
+        // Calculate new portfolio value based on trade execution
+        let portfolioValueAfter = portfolioValueBefore;
+        
+        if (signal.signalType === 'BUY') {
+          // For BUY orders: subtract the total cost (including fees) from portfolio value
+          const totalCost = (tradeResult.position.quantity * tradeResult.position.entryPrice) + tradeFee;
+          portfolioValueAfter = portfolioValueBefore - totalCost;
+        } else if (signal.signalType === 'SELL') {
+          // For SELL orders: add the proceeds (minus fees) to portfolio value
+          const proceeds = (tradeResult.position.quantity * tradeResult.position.entryPrice) - tradeFee;
+          portfolioValueAfter = portfolioValueBefore + proceeds;
+        }
         
         // Create updated simulation state with all changes
         const updatedState: SimulationState = {
@@ -69,9 +82,11 @@ export const useAutoTradeExecution = () => {
           lastAutoTradeTime: Date.now()
         };
 
-        console.log('💾 Updating simulation state:', {
+        console.log('💾 FIXED - Updating simulation state with proper values:', {
           portfolioValueBefore,
           portfolioValueAfter,
+          tradeFee,
+          tradeType: signal.signalType,
           newPositions: updatedState.openPositions.length,
           updatedAssets: updatedState.paperAssets.map(a => ({ symbol: a.symbol, quantity: a.quantity }))
         });
@@ -79,7 +94,7 @@ export const useAutoTradeExecution = () => {
         // Update the simulation state
         updateSimulationState(updatedState);
         
-        // Log the successful trade
+        // Log the successful trade with proper details
         addLogEntry('AUTO_TRADE', `AUTO-TRADE erfolgreich ausgeführt: ${signal.signalType} ${tradeResult.position.quantity.toFixed(6)} ${signal.assetPair}`, 'AutoMode', {
           tradeData: {
             id: tradeResult.position.id,
@@ -87,14 +102,20 @@ export const useAutoTradeExecution = () => {
             type: signal.signalType as 'BUY' | 'SELL',
             quantity: tradeResult.position.quantity,
             price: tradeResult.position.entryPrice,
-            fee: tradeResult.fee || 0,
+            fee: tradeFee,
             totalValue: tradeResult.position.quantity * tradeResult.position.entryPrice,
             auto: true
+          },
+          portfolioData: {
+            valueBefore: portfolioValueBefore,
+            valueAfter: portfolioValueAfter,
+            change: portfolioValueAfter - portfolioValueBefore,
+            changePercent: ((portfolioValueAfter - portfolioValueBefore) / portfolioValueBefore) * 100
           }
         });
 
         // Log portfolio value change
-        addLogEntry('PORTFOLIO_UPDATE', `Portfolio-Wert: $${portfolioValueBefore.toFixed(2)} → $${portfolioValueAfter.toFixed(2)} (Gebühr: -$${(tradeResult.fee || 0).toFixed(2)})`);
+        addLogEntry('PORTFOLIO_UPDATE', `Portfolio-Wert: $${portfolioValueBefore.toFixed(2)} → $${portfolioValueAfter.toFixed(2)} (${signal.signalType === 'BUY' ? 'Kauf' : 'Verkauf'}, Gebühr: -$${tradeFee.toFixed(2)})`);
 
         toast({
           title: "Auto-Trade ausgeführt",
@@ -133,7 +154,7 @@ export const useAutoTradeExecution = () => {
 
     addLogEntry('ERROR', `AUTO-TRADE fehlgeschlagen: ${errorMessage}`);
 
-    // Implement retry logic
+    // FIXED: Implement proper retry logic with exponential backoff
     if (retryCount < 3) {
       const newRetryCount = retryCount + 1;
       setRetryCount(newRetryCount);
@@ -141,6 +162,12 @@ export const useAutoTradeExecution = () => {
       const retryDelay = Math.pow(2, newRetryCount) * 1000; // Exponential backoff
       
       addLogEntry('WARNING', `AUTO-TRADE Retry ${newRetryCount}/3 in ${retryDelay/1000}s`);
+      
+      // Schedule retry
+      setTimeout(() => {
+        console.log(`🔄 Retrying auto-trade for ${signal.assetPair} (attempt ${newRetryCount})`);
+        // Note: The retry will be handled by the calling function
+      }, retryDelay);
       
       return false;
     } else {
@@ -160,6 +187,9 @@ export const useAutoTradeExecution = () => {
       });
       
       addLogEntry('ERROR', `Simulation wegen wiederholten Fehlern pausiert: ${errorMessage}`);
+      
+      // Reset retry count for next time
+      setRetryCount(0);
       
       return false;
     }

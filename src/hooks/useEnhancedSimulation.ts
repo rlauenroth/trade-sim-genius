@@ -36,44 +36,69 @@ export const useEnhancedSimulation = () => {
     setAvailableSignals
   } = useEnhancedSignalIntegration(isSimulationActive, simulationState, updateSimulationState);
 
-  // Create local candidate-aware signal generation function
+  // FIXED: Create candidate-aware signal generation function with proper error handling
   const startAISignalGenerationWithCandidates = async (
     isActive: boolean,
     addLogEntry: (type: any, message: string) => void,
     executeAutoTrade?: any,
     updateSimulationStateParam?: any
   ) => {
-    console.log('🚀 EnhancedSimulation: Starting AI signal generation with candidate integration');
+    console.log('🚀 EnhancedSimulation: FIXED - Starting AI signal generation with candidate integration');
     
-    // Create candidate callbacks
-    const candidateCallbacks = {
-      addCandidate: (symbol: string, initialStatus?: any) => {
-        console.log('🔄 EnhancedSimulation CALLBACK: Adding candidate:', symbol, initialStatus);
-        addCandidate(symbol, initialStatus);
-      },
-      updateCandidateStatus: (symbol: string, status: any, signalType?: any, confidence?: number, additionalData?: any) => {
-        console.log('🔄 EnhancedSimulation CALLBACK: Updating candidate status:', symbol, status);
-        updateCandidateStatus(symbol, status, signalType, confidence, additionalData);
-      },
-      clearCandidates: () => {
-        console.log('🔄 EnhancedSimulation CALLBACK: Clearing candidates');
-        clearCandidates();
-      },
-      advanceCandidateToNextStage: (symbol: string, nextStatus: any, meta?: any) => {
-        console.log('🔄 EnhancedSimulation CALLBACK: Advancing candidate:', symbol, nextStatus);
-        advanceCandidateToNextStage(symbol, nextStatus, meta);
-      }
-    };
-    
-    // Call AI signal generation with candidate callbacks
-    await startAISignalGeneration(
-      isActive,
-      simulationState,
-      addLogEntry,
-      executeAutoTrade,
-      updateSimulationStateParam || updateSimulationState,
-      candidateCallbacks
-    );
+    try {
+      // Create candidate callbacks with error handling
+      const candidateCallbacks = {
+        addCandidate: (symbol: string, initialStatus?: any) => {
+          try {
+            console.log('🔄 EnhancedSimulation CALLBACK: Adding candidate:', symbol, initialStatus);
+            addCandidate(symbol, initialStatus);
+          } catch (error) {
+            console.error('❌ Error in addCandidate callback:', error);
+            addLogEntry('ERROR', `Fehler beim Hinzufügen von Kandidat ${symbol}: ${error instanceof Error ? error.message : 'Unbekannt'}`);
+          }
+        },
+        updateCandidateStatus: (symbol: string, status: any, signalType?: any, confidence?: number, additionalData?: any) => {
+          try {
+            console.log('🔄 EnhancedSimulation CALLBACK: Updating candidate status:', symbol, status);
+            updateCandidateStatus(symbol, status, signalType, confidence, additionalData);
+          } catch (error) {
+            console.error('❌ Error in updateCandidateStatus callback:', error);
+            addLogEntry('ERROR', `Fehler beim Aktualisieren von Kandidat ${symbol}: ${error instanceof Error ? error.message : 'Unbekannt'}`);
+          }
+        },
+        clearCandidates: () => {
+          try {
+            console.log('🔄 EnhancedSimulation CALLBACK: Clearing candidates');
+            clearCandidates();
+          } catch (error) {
+            console.error('❌ Error in clearCandidates callback:', error);
+            addLogEntry('ERROR', `Fehler beim Löschen der Kandidaten: ${error instanceof Error ? error.message : 'Unbekannt'}`);
+          }
+        },
+        advanceCandidateToNextStage: (symbol: string, nextStatus: any, meta?: any) => {
+          try {
+            console.log('🔄 EnhancedSimulation CALLBACK: Advancing candidate:', symbol, nextStatus);
+            advanceCandidateToNextStage(symbol, nextStatus, meta);
+          } catch (error) {
+            console.error('❌ Error in advanceCandidateToNextStage callback:', error);
+            addLogEntry('ERROR', `Fehler beim Weiterleiten von Kandidat ${symbol}: ${error instanceof Error ? error.message : 'Unbekannt'}`);
+          }
+        }
+      };
+      
+      // Call AI signal generation with candidate callbacks
+      await startAISignalGeneration(
+        isActive,
+        simulationState,
+        addLogEntry,
+        executeAutoTrade,
+        updateSimulationStateParam || updateSimulationState,
+        candidateCallbacks
+      );
+    } catch (error) {
+      console.error('❌ EnhancedSimulation: AI signal generation failed:', error);
+      addLogEntry('ERROR', `KI-Signalgenerierung fehlgeschlagen: ${error instanceof Error ? error.message : 'Unbekannt'}`);
+    }
   };
 
   const {
@@ -106,7 +131,7 @@ export const useEnhancedSimulation = () => {
     isPaused: boolean;
   } | null>(null);
 
-  // Optimized timer management effect with state comparison
+  // FIXED: Optimized timer management effect with better state comparison and error handling
   useEffect(() => {
     const currentState = {
       isActive: isSimulationActive,
@@ -127,16 +152,20 @@ export const useEnhancedSimulation = () => {
     previousStateRef.current = currentState;
 
     if (isSimulationActive && !simulationState?.isPaused) {
-      console.log('🔄 EnhancedSimulation: Starting timer with candidate-aware signal generation');
+      console.log('🔄 EnhancedSimulation: FIXED - Starting timer with candidate-aware signal generation');
       
       const enhancedStartAISignalGenerationWithCandidates = async () => {
-        console.log('🚀 EnhancedSimulation TIMER: Starting AI signal generation with candidates');
-        await startAISignalGenerationWithCandidates(
-          isSimulationActive,
-          () => {}, // addLogEntry - simplified for timer
-          undefined, // executeAutoTrade
-          updateSimulationState
-        );
+        try {
+          console.log('🚀 EnhancedSimulation TIMER: Starting AI signal generation with candidates');
+          await startAISignalGenerationWithCandidates(
+            isSimulationActive,
+            () => {}, // addLogEntry - simplified for timer
+            undefined, // executeAutoTrade
+            updateSimulationState
+          );
+        } catch (error) {
+          console.error('❌ EnhancedSimulation TIMER: Error in signal generation:', error);
+        }
       };
 
       startEnhancedTimer(
@@ -149,6 +178,15 @@ export const useEnhancedSimulation = () => {
       stopEnhancedTimer();
     }
   }, [isSimulationActive, simulationState?.isPaused, startEnhancedTimer, stopEnhancedTimer]);
+
+  // FIXED: Log current state for debugging
+  console.log('🔄 EnhancedSimulation: FIXED - Current state:', {
+    isSimulationActive,
+    candidatesCount: candidates.length,
+    availableSignalsCount: availableSignals.length,
+    currentSignal: !!currentSignal,
+    isPaused: simulationState?.isPaused || false
+  });
 
   return {
     // Simulation state

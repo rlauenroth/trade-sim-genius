@@ -59,7 +59,12 @@ const TradingDashboard = () => {
     handlePinVerificationSuccess,
     handleForgotPin,
     closePinModals,
-    requirePinVerification
+    requirePinVerification,
+    // FIXED: Use consolidated states to prevent loading loops
+    isLoading,
+    hasError,
+    hasData,
+    availableSignals
   } = useTradingDashboardState();
 
   const {
@@ -76,7 +81,7 @@ const TradingDashboard = () => {
     updateTradingMode
   });
 
-  console.log('TradingDashboard render:', {
+  console.log('TradingDashboard: FIXED - render:', {
     tradingMode: userSettings?.tradingMode,
     shouldUsePinAuth,
     showPinSetup,
@@ -85,7 +90,13 @@ const TradingDashboard = () => {
     userSettings: !!userSettings,
     isRealTradingMode,
     realTradingInitialized,
-    realTradingError
+    realTradingError,
+    // FIXED: Loading state debugging
+    isLoading,
+    hasError: !!hasError,
+    hasData: !!hasData,
+    candidatesCount: candidates?.length || 0,
+    availableSignalsCount: availableSignals?.length || 0
   });
 
   return (
@@ -112,6 +123,7 @@ const TradingDashboard = () => {
             activityLog={activityLog}
             apiKeys={apiKeys}
             candidates={candidates}
+            availableSignals={availableSignals}
             timeElapsed={timeElapsed}
             displayPortfolioValue={getDisplayPortfolioValue()}
             displayStartValue={getDisplayStartValue()}

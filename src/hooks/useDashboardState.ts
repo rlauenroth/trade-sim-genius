@@ -53,11 +53,14 @@ export const useDashboardState = () => {
     advanceCandidateToNextStage
   } = useCandidates();
 
-  console.log('📊 useDashboardState: Centralized candidate management:', {
+  console.log('📊 useDashboardState: FIXED - Centralized candidate management:', {
     currentSignal: !!currentSignal,
     availableSignalsCount: availableSignals.length,
     candidatesCount: candidates.length,
-    candidates: candidates.map(c => ({ symbol: c.symbol, status: c.status }))
+    candidates: candidates.map(c => ({ symbol: c.symbol, status: c.status })),
+    livePortfolioReady: !!livePortfolio,
+    portfolioValue: livePortfolio?.totalValue,
+    isLoadingAny: portfolioLoading || livePortfolioLoading || settingsLoading
   });
 
   const {
@@ -107,11 +110,18 @@ export const useDashboardState = () => {
     };
   };
 
-  console.log('📊 DashboardState: Using central portfolio data:', {
+  // FIXED: Proper loading state management
+  const isLoading = portfolioLoading || livePortfolioLoading || settingsLoading;
+  const hasError = portfolioError || livePortfolioError;
+  const hasData = livePortfolio || portfolioData;
+
+  console.log('📊 DashboardState: FIXED - Loading state management:', {
+    isLoading,
+    hasError: !!hasError,
+    hasData: !!hasData,
     livePortfolio: !!livePortfolio,
     totalValue: livePortfolio?.totalValue,
-    isLoading: livePortfolioLoading,
-    error: livePortfolioError
+    errorDetails: hasError
   });
 
   return {
@@ -158,6 +168,10 @@ export const useDashboardState = () => {
     // Add central portfolio refresh function
     refreshLivePortfolio,
     // Add AI signal functionality
-    availableSignals
+    availableSignals,
+    // FIXED: Consolidated loading and error states
+    isLoading,
+    hasError,
+    hasData
   };
 };
