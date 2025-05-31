@@ -38,7 +38,7 @@ export const useSimulationActions = () => {
     portfolioData: any,
     userSettings: any,
     initializeSimulation: (data: any) => SimulationState,
-    startAISignalGeneration: (immediate: boolean, state: SimulationState, addLogEntry: any) => Promise<void>,
+    startAISignalGenerationWithCandidates: (isActive: boolean, addLogEntry: any, executeAutoTrade?: any, updateSimulationState?: any) => Promise<void>,
     addLogEntry: (type: any, message: string) => void,
     updateSimulationState: (state: SimulationState) => void
   ) => {
@@ -48,7 +48,7 @@ export const useSimulationActions = () => {
       const positionsCount = getPositionsCount(portfolioData);
 
       // Log detailed portfolio data structure for debugging
-      loggingService.logEvent('SIM', 'Starting automatic simulation with portfolio analysis', {
+      loggingService.logEvent('SIM', 'Starting automatic simulation with candidate tracking', {
         portfolioValue,
         positionsCount,
         portfolioDataStructure: {
@@ -71,20 +71,21 @@ export const useSimulationActions = () => {
         return;
       }
 
-      addLogEntry('SIM', `Automatische Simulation gestartet mit Portfolio-Wert: $${portfolioValue.toFixed(2)}`);
-      addLogEntry('SIM', 'Vollautomatischer Modus - Alle Signale werden automatisch ausgeführt');
+      addLogEntry('SIM', `Automatische Simulation mit Kandidaten-Verfolgung gestartet - Portfolio-Wert: $${portfolioValue.toFixed(2)}`);
+      addLogEntry('SIM', 'Vollautomatischer Modus mit Asset-Tracking - Alle Signale werden automatisch ausgeführt');
       
       // Initialize simulation state
       const initialState = initializeSimulation(portfolioData);
       updateSimulationState(initialState);
       
-      // Start AI signal generation immediately (timer will be handled by useSimulationTimers)
-      await startAISignalGeneration(true, initialState, addLogEntry);
+      // Start AI signal generation with candidate tracking immediately
+      console.log('🚀 SimulationActions: Starting AI signal generation with candidate tracking');
+      await startAISignalGenerationWithCandidates(true, addLogEntry, undefined, updateSimulationState);
       
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
-      loggingService.logError('Automatic simulation start failed', {
+      loggingService.logError('Automatic simulation with candidate tracking start failed', {
         error: errorMessage,
         portfolioData,
         portfolioValue: getPortfolioValue(portfolioData)
@@ -101,13 +102,13 @@ export const useSimulationActions = () => {
     stopSimulationState: () => void,
     addLogEntry: (type: any, message: string) => void
   ) => {
-    loggingService.logEvent('SIM', 'Stopping automatic simulation');
+    loggingService.logEvent('SIM', 'Stopping automatic simulation with candidate tracking');
     
     clearTimer();
     setCurrentSignal(null);
     setAvailableSignals([]);
     stopSimulationState();
-    addLogEntry('SIM', 'Automatische Simulation beendet');
+    addLogEntry('SIM', 'Automatische Simulation mit Kandidaten-Verfolgung beendet');
   }, []);
 
   const pauseSimulation = useCallback((
@@ -115,28 +116,29 @@ export const useSimulationActions = () => {
     pauseSimulationState: () => void,
     addLogEntry: (type: any, message: string) => void
   ) => {
-    loggingService.logEvent('SIM', 'Pausing automatic simulation');
+    loggingService.logEvent('SIM', 'Pausing automatic simulation with candidate tracking');
     
     clearTimer();
     pauseSimulationState();
-    addLogEntry('SIM', 'Automatische Simulation pausiert');
+    addLogEntry('SIM', 'Automatische Simulation mit Kandidaten-Verfolgung pausiert');
   }, []);
 
   const resumeSimulation = useCallback(async (
     resumeSimulationState: () => void,
     addLogEntry: (type: any, message: string) => void,
-    startAISignalGeneration: (immediate: boolean, state: SimulationState, addLogEntry: any) => Promise<void>,
+    startAISignalGenerationWithCandidates: (isActive: boolean, addLogEntry: any, executeAutoTrade?: any, updateSimulationState?: any) => Promise<void>,
     updateSimulationState: (state: SimulationState) => void
   ) => {
-    loggingService.logEvent('SIM', 'Resuming automatic simulation');
+    loggingService.logEvent('SIM', 'Resuming automatic simulation with candidate tracking');
     
     resumeSimulationState();
-    addLogEntry('SIM', 'Automatische Simulation fortgesetzt');
+    addLogEntry('SIM', 'Automatische Simulation mit Kandidaten-Verfolgung fortgesetzt');
     
-    // Get current simulation state and restart AI generation (timer will be handled by useSimulationTimers)
+    // Get current simulation state and restart AI generation with candidate tracking
     const currentState = JSON.parse(localStorage.getItem('kiTradingApp_simulationState') || '{}');
     if (currentState) {
-      await startAISignalGeneration(true, currentState, addLogEntry);
+      console.log('🚀 SimulationActions RESUME: Starting AI signal generation with candidate tracking');
+      await startAISignalGenerationWithCandidates(true, addLogEntry, undefined, updateSimulationState);
     }
   }, []);
 

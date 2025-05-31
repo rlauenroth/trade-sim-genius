@@ -13,7 +13,7 @@ export const useEnhancedSimulationLifecycle = (
   pauseSimulationState: () => void,
   resumeSimulationState: () => void,
   stopSimulationState: () => void,
-  enhancedStartAISignalGeneration: () => Promise<void>,
+  startAISignalGenerationWithCandidates: (isActive: boolean, addLogEntry: any, executeAutoTrade?: any, updateSimulationState?: any) => Promise<void>,
   forceClear: () => void,
   setAICurrentSignal: (signal: any) => void,
   setAvailableSignals: (signals: any[]) => void
@@ -31,9 +31,9 @@ export const useEnhancedSimulationLifecycle = (
 
   const { addLogEntry } = useActivityLog();
 
-  // Enhanced simulation startup with state consolidation
+  // Enhanced simulation startup with candidate-aware signal generation
   const startSimulation = useCallback(async (portfolioData: any) => {
-    console.log('🚀 Enhanced simulation startup...');
+    console.log('🚀 Enhanced simulation startup with candidate integration...');
     
     try {
       // Initialize with validation
@@ -54,22 +54,37 @@ export const useEnhancedSimulationLifecycle = (
         throw new Error(updateResult.error || 'State update failed');
       }
       
-      // Start enhanced timer
+      // Create candidate-aware signal generation function
+      const enhancedStartAISignalGenerationWithCandidates = async () => {
+        console.log('🚀 EnhancedLifecycle: Starting AI signal generation with candidates');
+        await startAISignalGenerationWithCandidates(
+          true,
+          addLogEntry,
+          undefined, // executeAutoTrade will be handled internally
+          updateSimulationState
+        );
+      };
+      
+      // Start enhanced timer with candidate integration
       startEnhancedTimer(
         true,
         updateResult.newState,
-        enhancedStartAISignalGeneration,
-        'Enhanced AI Signal Generation'
+        enhancedStartAISignalGenerationWithCandidates,
+        'Enhanced AI Signal Generation with Candidates'
       );
       
-      addLogEntry('SIM', 'Erweiterte Simulation erfolgreich gestartet');
-      console.log('✅ Enhanced simulation started successfully');
+      // Immediately start the first signal generation cycle with candidates
+      console.log('🚀 EnhancedLifecycle: Starting immediate signal generation with candidates');
+      await enhancedStartAISignalGenerationWithCandidates();
+      
+      addLogEntry('SIM', 'Erweiterte Simulation mit Kandidaten-Verfolgung gestartet');
+      console.log('✅ Enhanced simulation with candidate tracking started successfully');
       
     } catch (error) {
       console.error('❌ Enhanced simulation startup failed:', error);
       addLogEntry('ERROR', `Simulation-Start fehlgeschlagen: ${error instanceof Error ? error.message : 'Unbekannt'}`);
     }
-  }, [initializeSimulation, validateStateConsistency, atomicUpdate, startEnhancedTimer, enhancedStartAISignalGeneration, addLogEntry]);
+  }, [initializeSimulation, validateStateConsistency, atomicUpdate, startEnhancedTimer, startAISignalGenerationWithCandidates, addLogEntry, updateSimulationState]);
 
   // Enhanced stop simulation
   const stopSimulation = useCallback(() => {
@@ -88,7 +103,7 @@ export const useEnhancedSimulationLifecycle = (
     loggingService.logEvent('SIM', 'Simulation stopped with consistency report', report);
   }, [stopEnhancedTimer, forceClear, setAICurrentSignal, setAvailableSignals, stopSimulationState, addLogEntry, getConsistencyReport]);
 
-  // Enhanced pause/resume
+  // Enhanced pause/resume with candidate integration
   const pauseSimulation = useCallback(() => {
     stopEnhancedTimer();
     pauseSimulationState();
@@ -97,16 +112,27 @@ export const useEnhancedSimulationLifecycle = (
 
   const resumeSimulation = useCallback(async () => {
     if (simulationState) {
+      // Create candidate-aware signal generation function for resume
+      const enhancedStartAISignalGenerationWithCandidates = async () => {
+        console.log('🚀 EnhancedLifecycle RESUME: Starting AI signal generation with candidates');
+        await startAISignalGenerationWithCandidates(
+          true,
+          addLogEntry,
+          undefined, // executeAutoTrade will be handled internally
+          updateSimulationState
+        );
+      };
+      
       startEnhancedTimer(
         true,
         simulationState,
-        enhancedStartAISignalGeneration,
-        'Enhanced AI Signal Generation (Resumed)'
+        enhancedStartAISignalGenerationWithCandidates,
+        'Enhanced AI Signal Generation with Candidates (Resumed)'
       );
     }
     resumeSimulationState();
     addLogEntry('SIM', 'Erweiterte Simulation fortgesetzt');
-  }, [startEnhancedTimer, simulationState, enhancedStartAISignalGeneration, resumeSimulationState, addLogEntry]);
+  }, [startEnhancedTimer, simulationState, startAISignalGenerationWithCandidates, resumeSimulationState, addLogEntry, updateSimulationState]);
 
   return {
     startSimulation,
