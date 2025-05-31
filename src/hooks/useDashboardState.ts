@@ -124,14 +124,32 @@ export const useDashboardState = () => {
   ) => {
     console.log('🚀 Dashboard: Starting AI signal generation with central candidate management');
     
-    // Create candidate callbacks object
+    // Create candidate callbacks object with proper bindings
     const candidateCallbacks = {
-      addCandidate,
-      updateCandidateStatus,
-      clearCandidates,
-      advanceCandidateToNextStage
+      addCandidate: (symbol: string, initialStatus?: any) => {
+        console.log('🔄 Dashboard CALLBACK: Adding candidate:', symbol, initialStatus);
+        addCandidate(symbol, initialStatus);
+      },
+      updateCandidateStatus: (symbol: string, status: any, signalType?: any, confidence?: number, additionalData?: any) => {
+        console.log('🔄 Dashboard CALLBACK: Updating candidate status:', symbol, status);
+        updateCandidateStatus(symbol, status, signalType, confidence, additionalData);
+      },
+      clearCandidates: () => {
+        console.log('🔄 Dashboard CALLBACK: Clearing candidates');
+        clearCandidates();
+      },
+      advanceCandidateToNextStage: (symbol: string, nextStatus: any, meta?: any) => {
+        console.log('🔄 Dashboard CALLBACK: Advancing candidate:', symbol, nextStatus);
+        advanceCandidateToNextStage(symbol, nextStatus, meta);
+      }
     };
     
+    console.log('🔄 Dashboard: Candidate callbacks created:', {
+      hasCallbacks: !!candidateCallbacks,
+      callbackFunctions: Object.keys(candidateCallbacks)
+    });
+    
+    // Pass ALL required parameters to startAISignalGeneration
     await startAISignalGeneration(
       isActive,
       simulationState,

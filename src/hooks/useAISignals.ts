@@ -31,7 +31,8 @@ export const useAISignals = () => {
   ) => {
     console.log('🚀 useAISignals: Starting signal generation with candidate callbacks:', {
       hasCandidateCallbacks: !!candidateCallbacks,
-      hasLivePortfolio: !!livePortfolio
+      hasLivePortfolio: !!livePortfolio,
+      callbackFunctions: candidateCallbacks ? Object.keys(candidateCallbacks) : []
     });
 
     await generateSignals(

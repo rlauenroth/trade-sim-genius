@@ -12,11 +12,16 @@ export const useEnhancedPipelineData = ({
   openPositions = []
 }: Pick<AssetPipelineMonitorProps, 'candidates' | 'availableSignals' | 'isSimulationActive' | 'openPositions'>) => {
   return useMemo((): AssetPipelineItem[] => {
-    console.log('🔄 useEnhancedPipelineData: Processing pipeline data:', {
+    console.log('🔄 useEnhancedPipelineData: ENHANCED Processing pipeline data:', {
       candidatesInput: candidates?.length || 0,
       availableSignalsInput: availableSignals?.length || 0,
       openPositionsInput: openPositions?.length || 0,
-      candidatesData: candidates?.map(c => ({ symbol: c.symbol, status: c.status, lastUpdate: c.lastStatusUpdate })) || [],
+      candidatesData: candidates?.map(c => ({ 
+        symbol: c.symbol, 
+        status: c.status, 
+        lastUpdate: c.lastStatusUpdate,
+        pipelineStep: c.pipelineStep 
+      })) || [],
       availableSignalsData: availableSignals?.map(s => ({ assetPair: s.assetPair, signalType: s.signalType })) || [],
       timestamp: Date.now()
     });
@@ -40,7 +45,7 @@ export const useEnhancedPipelineData = ({
         
         items.push({
           symbol: signal.assetPair,
-          status: isBlacklisted ? 'blacklisted' : 'signal_generated',
+          status: isBlacklisted ? 'blacklisted' : 'signal_ready',
           signalType: signal.signalType,
           confidenceScore: signal.confidenceScore,
           entryPriceSuggestion: signal.entryPriceSuggestion,
@@ -51,7 +56,7 @@ export const useEnhancedPipelineData = ({
           lastUpdated: Date.now(),
           isAutoExecuting: isSimulationActive && (signal.signalType === 'BUY' || signal.signalType === 'SELL'),
           pipelineStep: isBlacklisted ? -1 : pipelineStep,
-          statusDescription: getStatusDescription(isBlacklisted ? 'blacklisted' : 'signal_generated', signal.signalType),
+          statusDescription: getStatusDescription(isBlacklisted ? 'blacklisted' : 'signal_ready', signal.signalType),
           errorDetails: errorState ? {
             type: errorState.lastErrorType || 'unknown',
             message: `${errorState.consecutiveErrors} consecutive errors`,
@@ -81,11 +86,11 @@ export const useEnhancedPipelineData = ({
           
           items.push({
             symbol: position.symbol,
-            status: isBlacklisted ? 'blacklisted' : 'position_monitoring',
+            status: isBlacklisted ? 'blacklisted' : 'monitoring_position',
             signalType: position.type,
             lastUpdated: position.timestamp || Date.now(),
             pipelineStep: isBlacklisted ? -1 : 6,
-            statusDescription: getStatusDescription(isBlacklisted ? 'blacklisted' : 'position_monitoring'),
+            statusDescription: getStatusDescription(isBlacklisted ? 'blacklisted' : 'monitoring_position'),
             positionInfo: {
               type: position.type,
               entryPrice: position.entryPrice,
@@ -108,26 +113,27 @@ export const useEnhancedPipelineData = ({
       });
     }
     
-    // Process remaining candidates with ENHANCED DEBUGGING
-    if (candidates) {
-      console.log('🔄 useEnhancedPipelineData: Processing candidates:', {
+    // Process ALL candidates - ENHANCED PROCESSING with detailed logging
+    if (candidates && candidates.length > 0) {
+      console.log('🔄 useEnhancedPipelineData: ENHANCED Processing candidates:', {
         totalCandidates: candidates.length,
         alreadyProcessedSymbols: Array.from(processedSymbols),
         candidateDetails: candidates.map(c => ({
           symbol: c.symbol,
           status: c.status,
           lastUpdate: c.lastStatusUpdate,
-          pipelineStep: c.pipelineStep
+          pipelineStep: c.pipelineStep,
+          signalType: c.signalType
         }))
       });
 
-      candidates.forEach(candidate => {
+      candidates.forEach((candidate, index) => {
         if (!processedSymbols.has(candidate.symbol)) {
           const errorState = candidateErrorManager.getErrorState(candidate.symbol);
           const isBlacklisted = candidateErrorManager.isBlacklisted(candidate.symbol);
           const effectiveStatus = isBlacklisted ? 'blacklisted' : candidate.status;
           
-          console.log('🔄 useEnhancedPipelineData: Processing candidate:', {
+          console.log(`🔄 useEnhancedPipelineData: Processing candidate ${index + 1}/${candidates.length}:`, {
             symbol: candidate.symbol,
             originalStatus: candidate.status,
             effectiveStatus,
@@ -136,7 +142,7 @@ export const useEnhancedPipelineData = ({
             lastUpdate: candidate.lastStatusUpdate
           });
           
-          items.push({
+          const pipelineItem: AssetPipelineItem = {
             symbol: candidate.symbol,
             status: effectiveStatus,
             signalType: candidate.signalType,
@@ -151,11 +157,23 @@ export const useEnhancedPipelineData = ({
               blacklistedUntil: errorState.blacklistedUntil
             } : undefined,
             category: getAssetCategory(candidate.symbol),
-            isHealthy: !isBlacklisted && !errorState && effectiveStatus !== 'error_analysis'
+            isHealthy: !isBlacklisted && !errorState && effectiveStatus !== 'error'
+          };
+
+          items.push(pipelineItem);
+          console.log(`🔄 useEnhancedPipelineData: Added candidate to pipeline items:`, {
+            symbol: candidate.symbol,
+            status: effectiveStatus,
+            pipelineStep: pipelineItem.pipelineStep
           });
         } else {
           console.log('🔄 useEnhancedPipelineData: Skipping already processed candidate:', candidate.symbol);
         }
+      });
+    } else {
+      console.log('🔄 useEnhancedPipelineData: NO CANDIDATES to process:', {
+        candidatesUndefined: !candidates,
+        candidatesEmpty: candidates?.length === 0
       });
     }
     
@@ -174,7 +192,7 @@ export const useEnhancedPipelineData = ({
       return b.lastUpdated - a.lastUpdated;
     });
 
-    console.log('🔄 useEnhancedPipelineData: FINAL RESULT:', {
+    console.log('🔄 useEnhancedPipelineData: ENHANCED FINAL RESULT:', {
       totalItems: sortedItems.length,
       items: sortedItems.map(item => ({
         symbol: item.symbol,

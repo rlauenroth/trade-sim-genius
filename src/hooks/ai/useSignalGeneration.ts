@@ -56,22 +56,23 @@ export const useSignalGeneration = () => {
     lastGenerationTime.current = now;
     
     try {
-      // Clear candidates at start of new cycle using callback
+      // IMMEDIATE CLEAR: Clear candidates at start of new cycle using callback
       if (candidateCallbacks) {
-        console.log('🚀 useSignalGeneration: CLEARING candidates via callback');
+        console.log('🚀 useSignalGeneration: CLEARING candidates via callback at cycle start');
         candidateCallbacks.clearCandidates();
       }
       
-      console.log('🚀 Starting SIMPLIFIED AI market analysis with centralized candidate tracking:', {
+      console.log('🚀 Starting AI market analysis with IMMEDIATE candidate tracking:', {
         portfolioValue: simulationState?.currentPortfolioValue,
         availableUSDT: simulationState?.paperAssets?.find((asset: any) => asset.symbol === 'USDT')?.quantity,
         openPositions: simulationState?.openPositions?.length || 0,
         hasAutoExecution: !!executeAutoTrade,
         hasLivePortfolioFallback: !!livePortfolioData,
-        hasCandidateCallbacks: !!candidateCallbacks
+        hasCandidateCallbacks: !!candidateCallbacks,
+        candidateCallbackKeys: candidateCallbacks ? Object.keys(candidateCallbacks) : []
       });
       
-      addLogEntry('AI', 'Starte KI-Analyse mit vereinfachtem Status-Tracking...');
+      addLogEntry('AI', 'Starte KI-Analyse mit sofortiger Kandidaten-Verfolgung...');
       
       // Validate API keys
       const validation = validateAPIKeys(addLogEntry);
@@ -99,35 +100,7 @@ export const useSignalGeneration = () => {
         dataSource: simulationState?.currentPortfolioValue ? 'simulation' : 'live_portfolio'
       });
 
-      // Create enhanced AI service with simplified candidate callbacks
-      const candidateStatusCallback = (symbol: string, status: string) => {
-        if (candidateCallbacks) {
-          // Map detailed statuses to simplified ones
-          let simplifiedStatus: CandidateStatus = 'analyzing';
-          if (status.includes('screening') || status.includes('scan')) {
-            simplifiedStatus = 'screening';
-          } else if (status.includes('analysis') || status.includes('detail')) {
-            simplifiedStatus = 'analyzing';
-          } else if (status.includes('signal') || status.includes('generated')) {
-            simplifiedStatus = 'signal_ready';
-          } else if (status.includes('error')) {
-            simplifiedStatus = 'error';
-          } else if (status.includes('position') || status.includes('monitoring')) {
-            simplifiedStatus = 'monitoring_position';
-          }
-          
-          console.log('🔄 useSignalGeneration: SIMPLIFIED callback status update:', { 
-            symbol, 
-            originalStatus: status, 
-            simplifiedStatus,
-            timestamp: Date.now()
-          });
-          
-          candidateCallbacks.updateCandidateStatus(symbol, simplifiedStatus);
-        }
-      };
-
-      // Create enhanced AI service with candidate callback
+      // Create enhanced AI service
       const selectedModelId = settings.model.id;
       const aiService = new EnhancedAISignalService({
         kucoinCredentials: {
@@ -144,17 +117,27 @@ export const useSignalGeneration = () => {
 
       // Stage 1: Enhanced Market Screening with IMMEDIATE candidate tracking
       addLogEntry('AI', 'Phase 1: Market-Screening startet...');
+      console.log('🔄 useSignalGeneration: PERFORMING market screening...');
+      
       const selectedPairs = await aiService.performMarketScreening();
       
-      // Add all selected pairs as candidates IMMEDIATELY using callbacks
-      console.log('🚀 useSignalGeneration: Adding ALL screened pairs as candidates IMMEDIATELY');
-      selectedPairs.forEach(pair => {
-        if (candidateCallbacks) {
-          console.log('🔄 useSignalGeneration: ADDING candidate via callback:', pair);
+      console.log('🔄 useSignalGeneration: Market screening completed, selected pairs:', selectedPairs);
+      
+      // CRITICAL: Add all selected pairs as candidates IMMEDIATELY using callbacks
+      if (candidateCallbacks && selectedPairs.length > 0) {
+        console.log('🚀 useSignalGeneration: IMMEDIATELY adding ALL screened pairs as candidates');
+        selectedPairs.forEach((pair, index) => {
+          console.log(`🔄 useSignalGeneration: ADDING candidate ${index + 1}/${selectedPairs.length} via callback:`, pair);
           candidateCallbacks.addCandidate(pair, 'screening');
-        }
-        addLogEntry('AI', `Asset hinzugefügt: ${pair}`);
-      });
+          addLogEntry('AI', `Asset hinzugefügt: ${pair}`);
+        });
+        console.log('🔄 useSignalGeneration: ALL candidates added to central store');
+      } else {
+        console.log('🚨 useSignalGeneration: NO CANDIDATES ADDED - missing callbacks or no pairs:', {
+          hasCallbacks: !!candidateCallbacks,
+          pairsCount: selectedPairs.length
+        });
+      }
       
       addLogEntry('AI', `${selectedPairs.length} Assets für Detailanalyse ausgewählt`);
       
@@ -164,25 +147,25 @@ export const useSignalGeneration = () => {
       for (let i = 0; i < selectedPairs.length; i++) {
         const pair = selectedPairs[i];
         
-        // Update to analyzing phase IMMEDIATELY
+        // IMMEDIATE UPDATE: Set to analyzing phase before starting analysis
         if (candidateCallbacks) {
-          console.log('🔄 useSignalGeneration: UPDATING to ANALYZING status via callback:', pair);
+          console.log(`🔄 useSignalGeneration: UPDATING ${pair} to ANALYZING status BEFORE analysis starts`);
           candidateCallbacks.updateCandidateStatus(pair, 'analyzing');
         }
         addLogEntry('AI', `Detailanalyse startet für ${pair} (${i + 1}/${selectedPairs.length})...`);
         
         try {
-          console.log('🔄 useSignalGeneration: STARTING AI analysis for:', pair);
+          console.log(`🔄 useSignalGeneration: STARTING AI analysis for: ${pair}`);
           
-          // Generate signal with simplified candidate status callback
-          const signal = await aiService.generateDetailedSignalWithCallback(pair, candidateStatusCallback);
+          // Generate signal for this specific pair
+          const signal = await aiService.generateDetailedSignal(pair);
           
           if (signal) {
             signals.push(signal);
             
-            // Update candidate with SIMPLIFIED signal information
+            // IMMEDIATE UPDATE: Update candidate with signal information
             if (candidateCallbacks) {
-              console.log('🔄 useSignalGeneration: UPDATING to SIGNAL_READY via callback:', pair);
+              console.log(`🔄 useSignalGeneration: UPDATING ${pair} to SIGNAL_READY with result:`, signal.signalType);
               candidateCallbacks.updateCandidateStatus(
                 pair, 
                 'signal_ready', 
@@ -193,7 +176,7 @@ export const useSignalGeneration = () => {
             
             addLogEntry('AI', `Signal generiert: ${signal.signalType} ${pair} (${Math.round((signal.confidenceScore || 0) * 100)}%)`);
             
-            loggingService.logEvent('AI', 'SIMPLIFIED signal generated for pair with centralized tracking', {
+            loggingService.logEvent('AI', 'Signal generated for pair with immediate candidate tracking', {
               pair,
               signalType: signal.signalType,
               confidence: signal.confidenceScore
@@ -201,14 +184,14 @@ export const useSignalGeneration = () => {
           } else {
             // Keep as analyzed if no signal generated
             if (candidateCallbacks) {
-              console.log('🔄 useSignalGeneration: NO SIGNAL, keeping as analyzed via callback:', pair);
+              console.log(`🔄 useSignalGeneration: NO SIGNAL for ${pair}, keeping as analyzed`);
               candidateCallbacks.updateCandidateStatus(pair, 'analyzing');
             }
             addLogEntry('AI', `Kein handelbares Signal für ${pair}`);
           }
         } catch (error) {
           if (candidateCallbacks) {
-            console.log('🔄 useSignalGeneration: ERROR, updating status via callback:', pair);
+            console.log(`🔄 useSignalGeneration: ERROR for ${pair}, updating status to error:`, error);
             candidateCallbacks.updateCandidateStatus(pair, 'error', undefined, undefined, {
               errorReason: error instanceof Error ? error.message : 'Unknown error'
             });
@@ -222,7 +205,7 @@ export const useSignalGeneration = () => {
         }
       }
       
-      console.log('📊 SIMPLIFIED signal generation completed with centralized callback integration:', {
+      console.log('📊 Signal generation completed with immediate candidate tracking:', {
         signalsGenerated: signals.length,
         actionableSignals: signals.filter(s => s.signalType === 'BUY' || s.signalType === 'SELL').length,
         candidatesProcessed: selectedPairs.length,
@@ -276,7 +259,7 @@ export const useSignalGeneration = () => {
       }
       
     } catch (error) {
-      console.error('❌ SIMPLIFIED AI signal generation error:', error);
+      console.error('❌ AI signal generation error:', error);
       addLogEntry('ERROR', `KI-Service Fehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
       setAvailableSignals([]);
       setCurrentSignal(null);
