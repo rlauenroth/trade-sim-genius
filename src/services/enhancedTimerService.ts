@@ -10,11 +10,13 @@ interface TimerInstance {
   lastExecution: number;
   executionCount: number;
   executionTimes: number[];
+  lastStartTime: number;
 }
 
 class EnhancedTimerService {
   private static instance: EnhancedTimerService;
   private timers: Map<string, TimerInstance> = new Map();
+  private debounceTimeouts: Map<string, NodeJS.Timeout> = new Map();
 
   static getInstance(): EnhancedTimerService {
     if (!EnhancedTimerService.instance) {
@@ -38,6 +40,15 @@ class EnhancedTimerService {
     return baseInterval;
   }
 
+  private shouldLogTimerOperation(timerId: string, operation: 'start' | 'stop'): boolean {
+    const timerInstance = this.timers.get(timerId);
+    if (!timerInstance) return true;
+
+    // Only log if there was a significant time gap since last operation
+    const timeSinceLastStart = Date.now() - timerInstance.lastStartTime;
+    return timeSinceLastStart > 5000; // 5 seconds threshold
+  }
+
   async executeWithProtection(
     timerId: string,
     executionFunction: () => Promise<void>
@@ -46,7 +57,6 @@ class EnhancedTimerService {
     if (!timerInstance) return;
 
     if (timerInstance.executionLock) {
-      console.log(`🔒 ${timerInstance.context} execution blocked - already running`);
       return;
     }
 
@@ -82,8 +92,21 @@ class EnhancedTimerService {
     executionFunction: () => Promise<void>,
     context: string = 'AI Signal Generation'
   ): boolean {
-    // Stop existing timer first
-    this.stopTimer(timerId);
+    // Check if timer is already running with same parameters
+    const existingTimer = this.timers.get(timerId);
+    if (existingTimer && existingTimer.isRunning) {
+      return false; // Already running, no need to restart
+    }
+
+    // Clear any existing debounce timeout
+    const existingDebounce = this.debounceTimeouts.get(timerId);
+    if (existingDebounce) {
+      clearTimeout(existingDebounce);
+      this.debounceTimeouts.delete(timerId);
+    }
+
+    // Stop existing timer first (silent)
+    this.stopTimer(timerId, true);
     
     if (!isActive || !simulationState?.isActive || simulationState?.isPaused) {
       return false;
@@ -97,7 +120,8 @@ class EnhancedTimerService {
       executionLock: false,
       lastExecution: 0,
       executionCount: 0,
-      executionTimes: []
+      executionTimes: [],
+      lastStartTime: Date.now()
     };
 
     const interval = this.calculateAdaptiveInterval(timerInstance.executionTimes);
@@ -106,7 +130,7 @@ class EnhancedTimerService {
       const currentState = JSON.parse(localStorage.getItem('kiTradingApp_simulationState') || '{}');
       
       if (!currentState?.isActive || currentState?.isPaused) {
-        this.stopTimer(timerId);
+        this.stopTimer(timerId, true);
         return;
       }
 
@@ -116,16 +140,19 @@ class EnhancedTimerService {
     timerInstance.timer = setInterval(intervalFunction, interval);
     this.timers.set(timerId, timerInstance);
     
-    console.log(`🔄 Enhanced timer started: ${context} (${timerId})`);
-    loggingService.logEvent('SYSTEM', `Enhanced timer started for ${context}`, {
-      timerId,
-      interval
-    });
+    // Only log if this is a significant operation
+    if (this.shouldLogTimerOperation(timerId, 'start')) {
+      console.log(`🔄 Enhanced timer started: ${context} (${timerId})`);
+      loggingService.logEvent('SYSTEM', `Enhanced timer started for ${context}`, {
+        timerId,
+        interval
+      });
+    }
     
     return true;
   }
 
-  stopTimer(timerId: string): void {
+  stopTimer(timerId: string, silent: boolean = false): void {
     const timerInstance = this.timers.get(timerId);
     if (!timerInstance) return;
 
@@ -134,12 +161,14 @@ class EnhancedTimerService {
       timerInstance.timer = null;
     }
 
-    if (timerInstance.isRunning) {
+    const wasRunning = timerInstance.isRunning;
+    this.timers.delete(timerId);
+
+    // Only log if this was actually running and not silent
+    if (wasRunning && !silent && this.shouldLogTimerOperation(timerId, 'stop')) {
       console.log(`🔄 Enhanced timer stopped: ${timerInstance.context} (${timerId})`);
       loggingService.logEvent('SYSTEM', `Enhanced timer stopped for ${timerInstance.context}`, { timerId });
     }
-
-    this.timers.delete(timerId);
   }
 
   getTimerState(timerId: string) {
@@ -169,7 +198,7 @@ class EnhancedTimerService {
 
   stopAllTimers(): void {
     for (const [timerId] of this.timers) {
-      this.stopTimer(timerId);
+      this.stopTimer(timerId, true);
     }
   }
 }

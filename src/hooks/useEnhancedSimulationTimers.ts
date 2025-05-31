@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { enhancedTimerService } from '@/services/enhancedTimerService';
 
 interface TimerState {
@@ -17,22 +17,64 @@ export const useEnhancedSimulationTimers = () => {
     averageExecutionTime: 0
   });
 
-  // Generate unique timer ID for this hook instance
-  const timerId = useMemo(() => `simulation-timer-${Math.random().toString(36).substr(2, 9)}`, []);
+  // Use stable timer ID across re-renders
+  const timerIdRef = useRef<string | null>(null);
+  const timerId = useMemo(() => {
+    if (!timerIdRef.current) {
+      timerIdRef.current = `simulation-timer-${Math.random().toString(36).substr(2, 9)}`;
+    }
+    return timerIdRef.current;
+  }, []);
+
+  // Track last parameters to prevent unnecessary restarts
+  const lastParamsRef = useRef<{
+    isActive: boolean;
+    isPaused: boolean;
+    context: string;
+  } | null>(null);
 
   // Update timer state from service
   const updateTimerState = useCallback(() => {
     const state = enhancedTimerService.getTimerState(timerId);
-    setTimerState(state);
+    setTimerState(prevState => {
+      // Only update if state actually changed
+      if (
+        prevState.isRunning !== state.isRunning ||
+        prevState.executionCount !== state.executionCount
+      ) {
+        return state;
+      }
+      return prevState;
+    });
   }, [timerId]);
 
-  // Start enhanced timer
+  // Debounced timer start to prevent spam
   const startEnhancedTimer = useCallback((
     isActive: boolean,
     simulationState: any,
     executionFunction: () => Promise<void>,
     context: string = 'AI Signal Generation'
   ) => {
+    const currentParams = {
+      isActive,
+      isPaused: simulationState?.isPaused || false,
+      context
+    };
+
+    // Check if parameters actually changed
+    if (lastParamsRef.current) {
+      const lastParams = lastParamsRef.current;
+      if (
+        lastParams.isActive === currentParams.isActive &&
+        lastParams.isPaused === currentParams.isPaused &&
+        lastParams.context === currentParams.context
+      ) {
+        return; // No change, skip restart
+      }
+    }
+
+    lastParamsRef.current = currentParams;
+
     const started = enhancedTimerService.startTimer(
       timerId,
       isActive,
@@ -49,6 +91,7 @@ export const useEnhancedSimulationTimers = () => {
   // Stop timer
   const stopEnhancedTimer = useCallback(() => {
     enhancedTimerService.stopTimer(timerId);
+    lastParamsRef.current = null;
     updateTimerState();
   }, [timerId, updateTimerState]);
 
@@ -64,13 +107,13 @@ export const useEnhancedSimulationTimers = () => {
   // Cleanup on unmount - silent cleanup
   useEffect(() => {
     return () => {
-      enhancedTimerService.stopTimer(timerId);
+      enhancedTimerService.stopTimer(timerId, true);
     };
   }, [timerId]);
 
-  // Periodic state updates
+  // Less frequent state updates to reduce re-renders
   useEffect(() => {
-    const interval = setInterval(updateTimerState, 1000);
+    const interval = setInterval(updateTimerState, 5000); // Reduced from 1s to 5s
     return () => clearInterval(interval);
   }, [updateTimerState]);
 

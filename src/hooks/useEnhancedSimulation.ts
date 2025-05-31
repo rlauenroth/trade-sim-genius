@@ -1,5 +1,5 @@
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useEnhancedSimulationState } from './useEnhancedSimulationState';
 import { useEnhancedSignalIntegration } from './useEnhancedSignalIntegration';
 import { useEnhancedSimulationLifecycle } from './useEnhancedSimulationLifecycle';
@@ -59,8 +59,32 @@ export const useEnhancedSimulation = () => {
 
   const { candidates } = useCandidates();
 
-  // Timer management effect
+  // Track previous state to prevent unnecessary timer operations
+  const previousStateRef = useRef<{
+    isActive: boolean;
+    isPaused: boolean;
+  } | null>(null);
+
+  // Optimized timer management effect with state comparison
   useEffect(() => {
+    const currentState = {
+      isActive: isSimulationActive,
+      isPaused: simulationState?.isPaused || false
+    };
+
+    // Only proceed if state actually changed
+    if (previousStateRef.current) {
+      const prevState = previousStateRef.current;
+      if (
+        prevState.isActive === currentState.isActive &&
+        prevState.isPaused === currentState.isPaused
+      ) {
+        return; // No change, skip timer operation
+      }
+    }
+
+    previousStateRef.current = currentState;
+
     if (isSimulationActive && !simulationState?.isPaused) {
       startEnhancedTimer(
         isSimulationActive,
