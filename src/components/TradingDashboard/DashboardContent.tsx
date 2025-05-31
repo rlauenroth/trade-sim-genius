@@ -1,10 +1,10 @@
-
 import React from 'react';
 import { Container } from '@/components/ui/container';
 import DashboardHeaderSection from './sections/DashboardHeader';
 import LoadingErrorStates from './sections/LoadingErrorStates';
 import DashboardGrids from './sections/DashboardGrids';
 import SettingsManagerV2 from '@/components/settingsV2/SettingsManagerV2';
+import AssetPipelineMonitor from '@/components/assetPipelineMonitor/AssetPipelineMonitor';
 
 interface DashboardContentProps {
   userSettings: any;
@@ -130,6 +130,15 @@ const DashboardContent = ({
         simulationDataForLog={simulationDataForLog}
         userSettings={userSettings}
         apiKeys={apiKeys}
+      />
+
+      <AssetPipelineMonitor
+        candidates={candidates}
+        availableSignals={availableSignals}
+        currentSignal={currentSignal}
+        portfolioValue={displayPortfolioValue}
+        isSimulationActive={isSimulationActive}
+        openPositions={simulationState?.openPositions || []}
       />
 
       <SettingsManagerV2

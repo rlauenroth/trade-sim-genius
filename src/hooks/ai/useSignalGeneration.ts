@@ -1,10 +1,10 @@
-
 import { useState, useCallback, useRef } from 'react';
 import { Signal } from '@/types/simulation';
 import { loggingService } from '@/services/loggingService';
 import { useAIValidation } from './useAIValidation';
-import { useMarketScreening } from './useMarketScreening';
 import { useCandidates } from '@/hooks/useCandidates';
+import { EnhancedAISignalService } from '@/services/aiSignal/enhancedAISignalService';
+import { useSettingsV2Store } from '@/stores/settingsV2';
 
 export const useSignalGeneration = () => {
   const [currentSignal, setCurrentSignal] = useState<Signal | null>(null);
@@ -13,8 +13,13 @@ export const useSignalGeneration = () => {
   const lastGenerationTime = useRef<number>(0);
   
   const { validateAPIKeys } = useAIValidation();
-  const { performScreeningAndAnalysis } = useMarketScreening();
-  const { clearCandidates } = useCandidates();
+  const { 
+    addCandidate, 
+    updateCandidateStatus, 
+    clearCandidates,
+    advanceCandidateToNextStage 
+  } = useCandidates();
+  const { settings } = useSettingsV2Store();
 
   // Helper function to extract portfolio data from multiple sources
   const extractPortfolioData = (simulationState: any, livePortfolioData?: any) => {
@@ -72,13 +77,18 @@ export const useSignalGeneration = () => {
     return { portfolioValue, availableUSDT };
   };
 
+  // Candidate status callback for real-time updates
+  const candidateStatusCallback = useCallback((symbol: string, status: string) => {
+    updateCandidateStatus(symbol, status as any);
+  }, [updateCandidateStatus]);
+
   const generateSignals = useCallback(async (
     isActive: boolean, 
     simulationState: any, 
     addLogEntry: (type: any, message: string) => void,
     executeAutoTrade?: (signal: Signal, simulationState: any, updateSimulationState: any, addLogEntry: any) => Promise<boolean>,
     updateSimulationState?: (state: any) => void,
-    livePortfolioData?: any  // Add optional live portfolio data parameter
+    livePortfolioData?: any
   ) => {
     // Guard against multiple concurrent executions
     if (isFetchingSignals) {
@@ -106,7 +116,7 @@ export const useSignalGeneration = () => {
       // Clear candidates at start of new cycle
       clearCandidates();
       
-      console.log('🚀 Starting comprehensive AI market analysis with auto-execution:', {
+      console.log('🚀 Starting comprehensive AI market analysis with enhanced candidate tracking:', {
         portfolioValue: simulationState?.currentPortfolioValue,
         availableUSDT: simulationState?.paperAssets?.find((asset: any) => asset.symbol === 'USDT')?.quantity,
         openPositions: simulationState?.openPositions?.length || 0,
@@ -114,7 +124,7 @@ export const useSignalGeneration = () => {
         hasLivePortfolioFallback: !!livePortfolioData
       });
       
-      addLogEntry('AI', 'Starte KI-Analyse mit automatischer Ausführung...');
+      addLogEntry('AI', 'Starte erweiterte KI-Analyse mit Pipeline-Tracking...');
       
       // Validate API keys
       const validation = validateAPIKeys(addLogEntry);
@@ -142,20 +152,95 @@ export const useSignalGeneration = () => {
         dataSource: simulationState?.currentPortfolioValue ? 'simulation' : 'live_portfolio'
       });
 
-      // Perform market screening and signal generation
-      const result = await performScreeningAndAnalysis({
-        portfolioValue,
-        availableUSDT,
-        strategy: validation.strategy!,
+      // Create enhanced AI service with candidate callback
+      const selectedModelId = settings.model.id;
+      const aiService = new EnhancedAISignalService({
+        kucoinCredentials: {
+          kucoinApiKey: validation.kucoinKeys!.key,
+          kucoinApiSecret: validation.kucoinKeys!.secret,
+          kucoinApiPassphrase: validation.kucoinKeys!.passphrase
+        },
         openRouterApiKey: validation.openRouterApiKey!,
-        kucoinKeys: validation.kucoinKeys!
-      }, addLogEntry);
+        strategy: validation.strategy!,
+        simulatedPortfolioValue: portfolioValue,
+        availableUSDT: availableUSDT,
+        selectedModelId: selectedModelId
+      });
 
-      const { signals } = result;
+      // Stage 1: Enhanced Market Screening with candidate tracking
+      addLogEntry('AI', 'Phase 1: Market-Screening startet...');
+      const selectedPairs = await aiService.performMarketScreening();
       
-      console.log('📊 Signal generation completed:', {
+      // Add all selected pairs as candidates immediately
+      selectedPairs.forEach(pair => {
+        addCandidate(pair, 'screening_stage1_pending');
+        addLogEntry('AI', `Asset hinzugefügt: ${pair}`);
+      });
+      
+      addLogEntry('AI', `${selectedPairs.length} Assets für Detailanalyse ausgewählt`);
+      
+      // Stage 2: Enhanced detailed signal generation with real-time status updates
+      const signals: any[] = [];
+      
+      for (let i = 0; i < selectedPairs.length; i++) {
+        const pair = selectedPairs[i];
+        
+        // Update to data loading phase
+        advanceCandidateToNextStage(pair, 'detail_analysis_pending');
+        addLogEntry('AI', `Lade Daten für ${pair} (${i + 1}/${selectedPairs.length})...`);
+        
+        try {
+          // Update to analysis running phase
+          advanceCandidateToNextStage(pair, 'detail_analysis_running');
+          addLogEntry('AI', `KI-Detailanalyse für ${pair}...`);
+          
+          // Generate signal with candidate status callback
+          const signal = await aiService.generateDetailedSignalWithCallback(pair, candidateStatusCallback);
+          
+          if (signal) {
+            signals.push(signal);
+            
+            // Update candidate with signal information
+            updateCandidateStatus(
+              pair, 
+              'signal_generated', 
+              signal.signalType as 'BUY' | 'SELL' | 'HOLD',
+              signal.confidenceScore
+            );
+            
+            addLogEntry('AI', `Signal generiert: ${signal.signalType} ${pair} (${Math.round((signal.confidenceScore || 0) * 100)}%)`);
+            
+            loggingService.logEvent('AI', 'Signal generated for pair with candidate tracking', {
+              pair,
+              signalType: signal.signalType,
+              confidence: signal.confidenceScore
+            });
+          } else {
+            // Keep as analyzed if no signal generated
+            updateCandidateStatus(pair, 'analyzed');
+            addLogEntry('AI', `Kein handelbares Signal für ${pair}`);
+          }
+        } catch (error) {
+          updateCandidateStatus(pair, 'error_analysis', undefined, undefined, {
+            errorReason: error instanceof Error ? error.message : 'Unknown error'
+          });
+          addLogEntry('WARNING', `Analyse fehlgeschlagen für ${pair}: ${error instanceof Error ? error.message : 'Unbekannt'}`);
+          loggingService.logError('Signal generation failed for pair', {
+            pair,
+            error: error instanceof Error ? error.message : 'unknown'
+          });
+        }
+        
+        // Rate limiting delay
+        if (i < selectedPairs.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+      
+      console.log('📊 Enhanced signal generation completed:', {
         signalsGenerated: signals.length,
-        actionableSignals: signals.filter(s => s.signalType === 'BUY' || s.signalType === 'SELL').length
+        actionableSignals: signals.filter(s => s.signalType === 'BUY' || s.signalType === 'SELL').length,
+        candidatesProcessed: selectedPairs.length
       });
       
       if (signals.length > 0) {
@@ -168,7 +253,7 @@ export const useSignalGeneration = () => {
           const primarySignal = actionableSignals[0];
           setCurrentSignal(primarySignal);
           
-          addLogEntry('AI', `${actionableSignals.length} handelbare Signale generiert`);
+          addLogEntry('AI', `${actionableSignals.length} handelbare Signale verfügbar`);
           addLogEntry('AI', `Primär-Signal: ${primarySignal.signalType} ${primarySignal.assetPair}`);
           
           // Auto-execute the primary signal if executeAutoTrade is provided
@@ -205,14 +290,14 @@ export const useSignalGeneration = () => {
       }
       
     } catch (error) {
-      console.error('❌ AI signal generation error:', error);
+      console.error('❌ Enhanced AI signal generation error:', error);
       addLogEntry('ERROR', `KI-Service Fehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
       setAvailableSignals([]);
       setCurrentSignal(null);
     } finally {
       setIsFetchingSignals(false);
     }
-  }, [validateAPIKeys, performScreeningAndAnalysis, clearCandidates, isFetchingSignals]);
+  }, [validateAPIKeys, clearCandidates, isFetchingSignals, addCandidate, updateCandidateStatus, advanceCandidateToNextStage, candidateStatusCallback, settings.model.id]);
 
   return {
     currentSignal,

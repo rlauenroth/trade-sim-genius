@@ -1,4 +1,3 @@
-
 import { testApiKey, OpenRouterError } from '@/utils/openRouter';
 import { SignalGenerationParams, GeneratedSignal } from '@/types/aiSignal';
 import { EnhancedMarketScreeningService } from './enhancedMarketScreeningService';
@@ -62,20 +61,15 @@ export class EnhancedAISignalService {
   }
   
   async generateDetailedSignal(assetPair: string): Promise<GeneratedSignal | null> {
-    const isValid = await this.isApiConfigurationValid();
-    if (!isValid) {
-      throw new Error('OpenRouter API configuration invalid - cannot perform real signal analysis');
-    }
-    
-    try {
-      return await this.signalAnalysisService.generateDetailedSignal(assetPair);
-    } catch (error) {
-      if (error instanceof OpenRouterError && error.status === 401) {
-        candidateErrorManager.recordError(assetPair, 'AUTH_FAIL');
-        throw new Error('OpenRouter API authentication failed');
-      }
-      return null;
-    }
+    return await this.signalAnalysisService.generateDetailedSignal(assetPair);
+  }
+
+  async generateDetailedSignalWithCallback(
+    assetPair: string, 
+    candidateStatusCallback: (symbol: string, status: string) => void
+  ): Promise<GeneratedSignal | null> {
+    const enhancedAnalysisService = new EnhancedSignalAnalysisService(this.params, candidateStatusCallback);
+    return await enhancedAnalysisService.generateDetailedSignal(assetPair);
   }
 
   private selectDiverseSignals(signals: GeneratedSignal[]): GeneratedSignal[] {
