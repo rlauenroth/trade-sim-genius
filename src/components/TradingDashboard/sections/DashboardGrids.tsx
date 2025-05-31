@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import PortfolioOverview from '../PortfolioOverview';
 import SignalDisplay from '../SignalDisplay';
@@ -122,13 +123,10 @@ const DashboardGrids = ({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
       <PortfolioOverview
-        portfolioValue={displayPortfolioValue}
+        currentValue={displayPortfolioValue}
         startValue={displayStartValue}
         totalPnL={totalPnL}
         totalPnLPercentage={totalPnLPercentage}
-        progressValue={progressValue}
-        healthStatus={portfolioHealthStatus}
-        openPositions={openPositions}
       />
 
       <SimulationControls
@@ -169,3 +167,4 @@ const DashboardGrids = ({
 };
 
 export default DashboardGrids;
+
