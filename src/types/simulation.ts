@@ -10,6 +10,8 @@ export interface SimulationState {
   autoMode?: boolean;
   autoTradeCount?: number;
   lastAutoTradeTime?: number;
+  availableUSDT: number;
+  lastUpdateTime?: number;
 }
 
 export interface Position {
@@ -22,6 +24,11 @@ export interface Position {
   stopLoss: number;
   unrealizedPnL: number;
   openTimestamp: number;
+  entryTime?: number;
+  stopLossPrice?: number;
+  takeProfitPrice?: number;
+  status?: 'open' | 'closed';
+  isAutoTrade?: boolean;
 }
 
 export interface PaperAsset {

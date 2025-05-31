@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useRef } from 'react';
 import { loggingService } from '@/services/loggingService';
 
@@ -70,7 +69,7 @@ export const usePerformanceMonitoring = () => {
 
       // Log performance data every 10 cycles
       if (newCycleCount % 10 === 0) {
-        loggingService.logEvent('PERFORMANCE', 'Cycle metrics report', updatedMetrics);
+        loggingService.logEvent('SYSTEM', 'Cycle metrics report', updatedMetrics);
       }
 
       return updatedMetrics;
@@ -98,7 +97,7 @@ export const usePerformanceMonitoring = () => {
       uptime: Date.now() - (cycleStartTimes.current[0] || Date.now())
     };
 
-    loggingService.logEvent('PERFORMANCE', 'Full performance report', report);
+    loggingService.logEvent('SYSTEM', 'Full performance report', report);
     console.log('📊 Performance Report:', report);
 
     return report;
@@ -118,7 +117,7 @@ export const usePerformanceMonitoring = () => {
     initialPortfolioValue.current = null;
     cycleStartTimes.current = [];
     
-    loggingService.logEvent('PERFORMANCE', 'Metrics reset');
+    loggingService.logEvent('SYSTEM', 'Metrics reset');
   }, []);
 
   return {

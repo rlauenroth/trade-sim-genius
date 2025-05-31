@@ -50,8 +50,10 @@ export const useAutoTradeExecution = () => {
         return false;
       }
 
-      // Execute the trade with enhanced validation
-      const entryPrice = signal.entryPriceSuggestion || 100; // Fallback price
+      // FIXED: Ensure entryPriceSuggestion is a number
+      const entryPrice = typeof signal.entryPriceSuggestion === 'number' 
+        ? signal.entryPriceSuggestion 
+        : parseFloat(signal.entryPriceSuggestion?.toString() || '100');
       const quantity = positionResult.size / entryPrice;
       const totalCost = quantity * entryPrice;
 
@@ -61,13 +63,18 @@ export const useAutoTradeExecution = () => {
         return false;
       }
 
-      // Create new position
+      // FIXED: Create position with correct interface
       const newPosition = {
         id: `auto-${Date.now()}`,
         assetPair: signal.assetPair,
-        type: signal.signalType,
+        type: signal.signalType as 'BUY' | 'SELL',
         quantity,
         entryPrice,
+        takeProfit: signal.takeProfitPrice,
+        stopLoss: signal.stopLossPrice,
+        unrealizedPnL: 0,
+        openTimestamp: Date.now(),
+        // Additional compatibility properties
         entryTime: Date.now(),
         stopLossPrice: signal.stopLossPrice,
         takeProfitPrice: signal.takeProfitPrice,
@@ -78,7 +85,7 @@ export const useAutoTradeExecution = () => {
       // Update simulation state with enhanced state management
       const updatedState: SimulationState = {
         ...simulationState,
-        currentPortfolioValue: simulationState.currentPortfolioValue, // Keep same for now
+        currentPortfolioValue: simulationState.currentPortfolioValue,
         availableUSDT: simulationState.availableUSDT - totalCost,
         openPositions: [...(simulationState.openPositions || []), newPosition],
         lastUpdateTime: Date.now(),

@@ -38,6 +38,10 @@ export interface Candidate {
   pipelineStep?: number; // 0-7 for visual progress
   errorReason?: string;
   retryCount?: number;
+  
+  // FIXED: Add missing properties for enhanced pipeline
+  entryPriceSuggestion?: number;
+  confidenceScore?: number;
 }
 
 // Simplified pipeline step mapping

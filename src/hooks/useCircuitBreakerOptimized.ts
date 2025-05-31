@@ -1,4 +1,3 @@
-
 import { useCallback } from 'react';
 import { SimulationState } from '@/types/simulation';
 import { loggingService } from '@/services/loggingService';
@@ -68,7 +67,8 @@ export const useCircuitBreakerOptimized = () => {
         timestamp: Date.now()
       });
 
-      addLogEntry('RISK', riskMessage);
+      // FIXED: Use valid log type
+      addLogEntry('SYSTEM', riskMessage);
       addLogEntry('SIM', '🛑 Simulation automatisch gestoppt (Risiko-Management)');
       
       emergencyStop();
@@ -77,7 +77,8 @@ export const useCircuitBreakerOptimized = () => {
 
     // Log periodic risk assessment in real-time mode
     if (realTime && Math.random() < 0.1) { // 10% chance to log
-      loggingService.logEvent('RISK', 'Risk assessment passed', {
+      // FIXED: Use valid log type
+      loggingService.logEvent('SYSTEM', 'Risk assessment passed', {
         drawdown: drawdown.toFixed(2),
         openPositions,
         portfolioValue: currentValue,
@@ -120,23 +121,46 @@ export const useCircuitBreakerOptimized = () => {
       currentPortfolioValue: simulationState.availableUSDT + totalLiquidationValue,
       availableUSDT: simulationState.availableUSDT + totalLiquidationValue,
       openPositions: [],
-      closedPositions: [...(simulationState.closedPositions || []), ...liquidatedPositions],
       lastUpdateTime: Date.now()
     };
 
-    loggingService.logEvent('RISK', 'Emergency liquidation completed', {
+    // FIXED: Use valid log type
+    loggingService.logEvent('SYSTEM', 'Emergency liquidation completed', {
       liquidatedPositions: liquidatedPositions.length,
       totalValue: totalLiquidationValue,
       newPortfolioValue: updatedState.currentPortfolioValue
     });
 
-    addLogEntry('RISK', `🔄 Alle ${liquidatedPositions.length} Positionen liquidiert - Wert: $${totalLiquidationValue.toFixed(2)}`);
+    addLogEntry('SYSTEM', `🔄 Alle ${liquidatedPositions.length} Positionen liquidiert - Wert: $${totalLiquidationValue.toFixed(2)}`);
 
     return updatedState;
   }, []);
 
+  // FIXED: Add missing getPortfolioHealthStatus method
+  const getPortfolioHealthStatus = useCallback((
+    simulationState: SimulationState, 
+    strategy: string
+  ): string => {
+    if (!simulationState) return 'UNKNOWN';
+    
+    const drawdown = ((simulationState.startPortfolioValue - simulationState.currentPortfolioValue) / simulationState.startPortfolioValue) * 100;
+    const riskLimits: RiskLimits = {
+      maxDrawdown: strategy === 'aggressive' ? 15 : strategy === 'conservative' ? 5 : 10,
+      maxOpenPositions: strategy === 'aggressive' ? 8 : strategy === 'conservative' ? 3 : 5,
+      maxDailyLoss: strategy === 'aggressive' ? 8 : strategy === 'conservative' ? 3 : 5,
+      minBalance: 50
+    };
+
+    if (drawdown > riskLimits.maxDrawdown * 0.8) return 'CRITICAL';
+    if (drawdown > riskLimits.maxDrawdown * 0.5) return 'WARNING';
+    if (simulationState.openPositions.length > riskLimits.maxOpenPositions * 0.8) return 'WARNING';
+    
+    return 'HEALTHY';
+  }, []);
+
   return {
     enforceRiskLimitsOptimized,
-    liquidateAllPositions
+    liquidateAllPositions,
+    getPortfolioHealthStatus
   };
 };
