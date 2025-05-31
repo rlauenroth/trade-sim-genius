@@ -5,7 +5,7 @@ import { useEnhancedSignalIntegration } from './useEnhancedSignalIntegration';
 import { useEnhancedSimulationLifecycle } from './useEnhancedSimulationLifecycle';
 import { useEnhancedSimulationTimers } from './useEnhancedSimulationTimers';
 import { useCandidates } from './useCandidates';
-import { useDashboardState } from './useDashboardState';
+import { useAISignals } from './useAISignals';
 
 export const useEnhancedSimulation = () => {
   const {
@@ -22,8 +22,8 @@ export const useEnhancedSimulation = () => {
     autoModeError
   } = useEnhancedSimulationState();
 
-  // Use the centralized dashboard state for candidate management
-  const { startAISignalGenerationWithCandidates } = useDashboardState();
+  const { candidates, updateCandidateStatus, addCandidate, clearCandidates, advanceCandidateToNextStage } = useCandidates();
+  const { startAISignalGeneration } = useAISignals();
 
   const {
     currentSignal,
@@ -35,6 +35,46 @@ export const useEnhancedSimulation = () => {
     setAICurrentSignal,
     setAvailableSignals
   } = useEnhancedSignalIntegration(isSimulationActive, simulationState, updateSimulationState);
+
+  // Create local candidate-aware signal generation function
+  const startAISignalGenerationWithCandidates = async (
+    isActive: boolean,
+    addLogEntry: (type: any, message: string) => void,
+    executeAutoTrade?: any,
+    updateSimulationStateParam?: any
+  ) => {
+    console.log('🚀 EnhancedSimulation: Starting AI signal generation with candidate integration');
+    
+    // Create candidate callbacks
+    const candidateCallbacks = {
+      addCandidate: (symbol: string, initialStatus?: any) => {
+        console.log('🔄 EnhancedSimulation CALLBACK: Adding candidate:', symbol, initialStatus);
+        addCandidate(symbol, initialStatus);
+      },
+      updateCandidateStatus: (symbol: string, status: any, signalType?: any, confidence?: number, additionalData?: any) => {
+        console.log('🔄 EnhancedSimulation CALLBACK: Updating candidate status:', symbol, status);
+        updateCandidateStatus(symbol, status, signalType, confidence, additionalData);
+      },
+      clearCandidates: () => {
+        console.log('🔄 EnhancedSimulation CALLBACK: Clearing candidates');
+        clearCandidates();
+      },
+      advanceCandidateToNextStage: (symbol: string, nextStatus: any, meta?: any) => {
+        console.log('🔄 EnhancedSimulation CALLBACK: Advancing candidate:', symbol, nextStatus);
+        advanceCandidateToNextStage(symbol, nextStatus, meta);
+      }
+    };
+    
+    // Call AI signal generation with candidate callbacks
+    await startAISignalGeneration(
+      isActive,
+      simulationState,
+      addLogEntry,
+      executeAutoTrade,
+      updateSimulationStateParam || updateSimulationState,
+      candidateCallbacks
+    );
+  };
 
   const {
     startSimulation,
@@ -48,7 +88,7 @@ export const useEnhancedSimulation = () => {
     pauseSimulationState,
     resumeSimulationState,
     stopSimulationState,
-    startAISignalGenerationWithCandidates, // Use the new function with candidate integration
+    startAISignalGenerationWithCandidates, // Use local function
     forceSignalReset,
     setAICurrentSignal,
     setAvailableSignals
@@ -60,25 +100,11 @@ export const useEnhancedSimulation = () => {
     forceExecution
   } = useEnhancedSimulationTimers();
 
-  const { candidates } = useCandidates();
-
   // Track previous state to prevent unnecessary timer operations
   const previousStateRef = useRef<{
     isActive: boolean;
     isPaused: boolean;
   } | null>(null);
-
-  // Enhanced timer with candidate-aware signal generation
-  const enhancedStartAISignalGenerationWithCandidates = async () => {
-    console.log('🚀 EnhancedSimulation: Starting AI signal generation with candidate integration');
-    // This will use the centralized function that properly handles candidates
-    await startAISignalGenerationWithCandidates(
-      isSimulationActive,
-      () => {}, // addLogEntry - will be handled internally
-      undefined, // executeAutoTrade - will be handled internally
-      updateSimulationState
-    );
-  };
 
   // Optimized timer management effect with state comparison
   useEffect(() => {
@@ -102,16 +128,27 @@ export const useEnhancedSimulation = () => {
 
     if (isSimulationActive && !simulationState?.isPaused) {
       console.log('🔄 EnhancedSimulation: Starting timer with candidate-aware signal generation');
+      
+      const enhancedStartAISignalGenerationWithCandidates = async () => {
+        console.log('🚀 EnhancedSimulation TIMER: Starting AI signal generation with candidates');
+        await startAISignalGenerationWithCandidates(
+          isSimulationActive,
+          () => {}, // addLogEntry - simplified for timer
+          undefined, // executeAutoTrade
+          updateSimulationState
+        );
+      };
+
       startEnhancedTimer(
         isSimulationActive,
         simulationState,
-        enhancedStartAISignalGenerationWithCandidates, // Use the candidate-aware function
+        enhancedStartAISignalGenerationWithCandidates,
         'Enhanced AI Generation with Candidates'
       );
     } else {
       stopEnhancedTimer();
     }
-  }, [isSimulationActive, simulationState?.isPaused, startEnhancedTimer, stopEnhancedTimer, startAISignalGenerationWithCandidates]);
+  }, [isSimulationActive, simulationState?.isPaused, startEnhancedTimer, stopEnhancedTimer]);
 
   return {
     // Simulation state
@@ -136,7 +173,14 @@ export const useEnhancedSimulation = () => {
     
     // Enhanced functionality
     forceSignalReset,
-    manualSignalGeneration: () => forceExecution(enhancedStartAISignalGenerationWithCandidates, 'Manual Trigger with Candidates'),
+    manualSignalGeneration: () => forceExecution(async () => {
+      await startAISignalGenerationWithCandidates(
+        isSimulationActive,
+        () => {},
+        undefined,
+        updateSimulationState
+      );
+    }, 'Manual Trigger with Candidates'),
     getStateReport,
     
     // Logs and monitoring
