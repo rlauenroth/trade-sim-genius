@@ -7,12 +7,13 @@ export const useCandidates = () => {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
 
   const updateCandidates = useCallback((newCandidates: Candidate[]) => {
-    console.log('🔄 useCandidates: Updating candidates list:', {
+    console.log('🔄 useCandidates: CENTRAL UPDATE - Updating candidates list:', {
       count: newCandidates.length,
-      candidates: newCandidates.map(c => ({ symbol: c.symbol, status: c.status }))
+      candidates: newCandidates.map(c => ({ symbol: c.symbol, status: c.status })),
+      timestamp: Date.now()
     });
     
-    loggingService.logEvent('AI', 'UPDATE_CANDIDATES', { 
+    loggingService.logEvent('AI', 'CENTRAL_CANDIDATES_UPDATE', { 
       count: newCandidates.length,
       candidates: newCandidates.map(c => ({ symbol: c.symbol, status: c.status }))
     });
@@ -27,17 +28,39 @@ export const useCandidates = () => {
     confidence?: number,
     additionalData?: Partial<Candidate>
   ) => {
-    console.log('🔄 useCandidates: Updating candidate status:', {
+    console.log('🔄 useCandidates: CENTRAL STATUS UPDATE - Updating candidate status:', {
       symbol,
-      status,
+      oldStatus: candidates.find(c => c.symbol === symbol)?.status || 'not_found',
+      newStatus: status,
       signalType,
       confidence,
-      pipelineStep: PIPELINE_STEPS[status]
+      pipelineStep: PIPELINE_STEPS[status],
+      timestamp: Date.now(),
+      callStack: new Error().stack?.split('\n').slice(1, 4).map(line => line.trim())
     });
 
     setCandidates(prev => {
-      const updated = prev.map(candidate => 
-        candidate.symbol === symbol 
+      const existingIndex = prev.findIndex(c => c.symbol === symbol);
+      
+      if (existingIndex === -1) {
+        console.log('🚨 useCandidates: Candidate not found for status update, adding new one:', symbol);
+        const newCandidate: Candidate = {
+          symbol,
+          status,
+          signalType,
+          confidence,
+          timestamp: Date.now(),
+          lastStatusUpdate: Date.now(),
+          pipelineStep: PIPELINE_STEPS[status] ?? 0,
+          ...additionalData
+        };
+        const updated = [...prev, newCandidate];
+        console.log('🔄 useCandidates: Added new candidate, total count:', updated.length);
+        return updated;
+      }
+      
+      const updated = prev.map((candidate, index) => 
+        index === existingIndex 
           ? { 
               ...candidate,
               ...additionalData,
@@ -51,14 +74,13 @@ export const useCandidates = () => {
           : candidate
       );
       
-      console.log('🔄 useCandidates: Updated candidates after status change:', {
+      console.log('🔄 useCandidates: Updated existing candidate, current state:', {
         totalCandidates: updated.length,
-        updatedSymbol: symbol,
-        newStatus: status,
+        updatedCandidate: updated[existingIndex],
         allCandidates: updated.map(c => ({ symbol: c.symbol, status: c.status }))
       });
       
-      loggingService.logEvent('AI', 'CANDIDATE_STATUS_UPDATE', {
+      loggingService.logEvent('AI', 'CENTRAL_CANDIDATE_STATUS_UPDATE', {
         symbol,
         status,
         signalType,
@@ -68,13 +90,15 @@ export const useCandidates = () => {
       
       return updated;
     });
-  }, []);
+  }, [candidates]);
 
-  const addCandidate = useCallback((symbol: string, initialStatus: CandidateStatus = 'detected_market_scan') => {
-    console.log('🔄 useCandidates: Adding new candidate:', {
+  const addCandidate = useCallback((symbol: string, initialStatus: CandidateStatus = 'screening') => {
+    console.log('🔄 useCandidates: CENTRAL ADD - Adding new candidate:', {
       symbol,
       initialStatus,
-      pipelineStep: PIPELINE_STEPS[initialStatus]
+      pipelineStep: PIPELINE_STEPS[initialStatus],
+      timestamp: Date.now(),
+      callStack: new Error().stack?.split('\n').slice(1, 4).map(line => line.trim())
     });
 
     const newCandidate: Candidate = {
@@ -88,8 +112,12 @@ export const useCandidates = () => {
     setCandidates(prev => {
       // Avoid duplicates
       if (prev.some(c => c.symbol === symbol)) {
-        console.log('🔄 useCandidates: Candidate already exists, skipping:', symbol);
-        return prev;
+        console.log('🔄 useCandidates: Candidate already exists, updating status instead:', symbol);
+        return prev.map(c => 
+          c.symbol === symbol 
+            ? { ...c, status: initialStatus, lastStatusUpdate: Date.now(), pipelineStep: PIPELINE_STEPS[initialStatus] ?? 0 }
+            : c
+        );
       }
       const updated = [...prev, newCandidate];
       console.log('🔄 useCandidates: Added candidate, new total:', {
@@ -100,7 +128,7 @@ export const useCandidates = () => {
       return updated;
     });
     
-    loggingService.logEvent('AI', 'CANDIDATE_ADDED', { 
+    loggingService.logEvent('AI', 'CENTRAL_CANDIDATE_ADDED', { 
       symbol, 
       initialStatus,
       pipelineStep: PIPELINE_STEPS[initialStatus]
@@ -108,23 +136,23 @@ export const useCandidates = () => {
   }, []);
 
   const clearCandidates = useCallback(() => {
-    console.log('🔄 useCandidates: Clearing all candidates');
+    console.log('🔄 useCandidates: CENTRAL CLEAR - Clearing all candidates');
     setCandidates([]);
-    loggingService.logEvent('AI', 'CANDIDATES_CLEARED', {});
+    loggingService.logEvent('AI', 'CENTRAL_CANDIDATES_CLEARED', {});
   }, []);
 
-  // Enhanced function for pipeline progress tracking
   const advanceCandidateToNextStage = useCallback((symbol: string, nextStatus: CandidateStatus, meta?: any) => {
-    console.log('🔄 useCandidates: Advancing candidate to next stage:', {
+    console.log('🔄 useCandidates: CENTRAL ADVANCE - Advancing candidate to next stage:', {
       symbol,
       nextStatus,
       pipelineStep: PIPELINE_STEPS[nextStatus],
-      meta
+      meta,
+      timestamp: Date.now()
     });
 
     updateCandidateStatus(symbol, nextStatus, undefined, undefined, meta);
     
-    loggingService.logEvent('AI', 'CANDIDATE_PIPELINE_ADVANCE', {
+    loggingService.logEvent('AI', 'CENTRAL_CANDIDATE_PIPELINE_ADVANCE', {
       symbol,
       nextStatus,
       pipelineStep: PIPELINE_STEPS[nextStatus],
@@ -132,15 +160,17 @@ export const useCandidates = () => {
     });
   }, [updateCandidateStatus]);
 
-  // Debug current state
-  console.log('🔄 useCandidates current state:', {
+  // Enhanced debug current state
+  console.log('🔄 useCandidates CENTRAL STATE:', {
     candidatesCount: candidates.length,
     candidates: candidates.map(c => ({ 
       symbol: c.symbol, 
       status: c.status, 
       pipelineStep: c.pipelineStep,
-      lastUpdate: c.lastStatusUpdate 
-    }))
+      lastUpdate: c.lastStatusUpdate,
+      age: c.lastStatusUpdate ? Date.now() - c.lastStatusUpdate : 'unknown'
+    })),
+    timestamp: Date.now()
   });
 
   return {
