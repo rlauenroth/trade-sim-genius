@@ -46,7 +46,6 @@ export const useDashboardStateManager = () => {
     loadPortfolioData,
     loadPortfolioDataWithCredentials,
     logPerformanceReport,
-    startAISignalGenerationWithCandidates,
     availableSignals
   } = useDashboardState();
 
@@ -139,8 +138,6 @@ export const useDashboardStateManager = () => {
     retryServiceInitialization,
     isRealTradingMode,
     realTradingInitialized,
-    realTradingError,
-    // AI signal generation with central candidate management
-    startAISignalGenerationWithCandidates
+    realTradingError
   };
 };
