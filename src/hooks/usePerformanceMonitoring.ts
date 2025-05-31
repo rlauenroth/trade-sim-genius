@@ -1,64 +1,32 @@
 
-import { useCallback, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { loggingService } from '@/services/loggingService';
 
 interface PerformanceMetrics {
-  apiResponseTimes: number[];
-  averageResponseTime: number;
-  slowRequests: number;
-  totalRequests: number;
-  simulationCycleTime: number;
-  portfolioGrowthPercent: number;
-  successRate: number;
+  cycleCount: number;
+  averageCycleTime: number;
+  totalExecutionTime: number;
+  successfulTrades: number;
+  failedTrades: number;
+  portfolioGrowth: number;
+  lastCycleTime: number;
+  healthScore: number;
 }
 
 export const usePerformanceMonitoring = () => {
-  const performanceData = useRef<{
-    apiCalls: Array<{ timestamp: number; duration: number; endpoint: string; success: boolean }>;
-    simulationCycles: Array<{ timestamp: number; duration: number; portfolioChange: number }>;
-  }>({
-    apiCalls: [],
-    simulationCycles: []
+  const [metrics, setMetrics] = useState<PerformanceMetrics>({
+    cycleCount: 0,
+    averageCycleTime: 0,
+    totalExecutionTime: 0,
+    successfulTrades: 0,
+    failedTrades: 0,
+    portfolioGrowth: 0,
+    lastCycleTime: 0,
+    healthScore: 100
   });
 
-  const trackApiCall = useCallback((
-    endpoint: string,
-    startTime: number,
-    endTime: number,
-    success: boolean
-  ) => {
-    const duration = endTime - startTime;
-    
-    performanceData.current.apiCalls.push({
-      timestamp: endTime,
-      duration,
-      endpoint,
-      success
-    });
-
-    // Keep only last 100 API calls
-    if (performanceData.current.apiCalls.length > 100) {
-      performanceData.current.apiCalls = performanceData.current.apiCalls.slice(-100);
-    }
-
-    // Log slow requests (> 200ms as per concept)
-    if (duration > 200) {
-      loggingService.logEvent('API', 'Slow API request detected', {
-        endpoint,
-        duration,
-        threshold: 200
-      });
-    }
-
-    // Log very slow requests (> 1000ms)
-    if (duration > 1000) {
-      loggingService.logEvent('API', 'Very slow API request', {
-        endpoint,
-        duration,
-        severity: 'WARNING'
-      });
-    }
-  }, []);
+  const cycleStartTimes = useRef<number[]>([]);
+  const initialPortfolioValue = useRef<number | null>(null);
 
   const trackSimulationCycle = useCallback((
     startTime: number,
@@ -66,125 +34,98 @@ export const usePerformanceMonitoring = () => {
     portfolioValueBefore: number,
     portfolioValueAfter: number
   ) => {
-    const duration = endTime - startTime;
-    const portfolioChange = ((portfolioValueAfter - portfolioValueBefore) / portfolioValueBefore) * 100;
+    const cycleTime = endTime - startTime;
     
-    performanceData.current.simulationCycles.push({
-      timestamp: endTime,
-      duration,
-      portfolioChange
+    setMetrics(prev => {
+      const newCycleCount = prev.cycleCount + 1;
+      const newTotalExecutionTime = prev.totalExecutionTime + cycleTime;
+      const newAverageCycleTime = newTotalExecutionTime / newCycleCount;
+      
+      // Track portfolio growth
+      if (initialPortfolioValue.current === null) {
+        initialPortfolioValue.current = portfolioValueBefore;
+      }
+      
+      const growth = initialPortfolioValue.current > 0 
+        ? ((portfolioValueAfter - initialPortfolioValue.current) / initialPortfolioValue.current) * 100 
+        : 0;
+
+      // Calculate health score based on performance metrics
+      const avgCycleTimeScore = Math.max(0, 100 - (newAverageCycleTime / 1000) * 10); // Penalize slow cycles
+      const successRateScore = newCycleCount > 0 ? (prev.successfulTrades / newCycleCount) * 100 : 100;
+      const growthScore = Math.min(100, Math.max(0, 50 + growth * 2)); // Neutral at 0% growth
+      
+      const healthScore = (avgCycleTimeScore + successRateScore + growthScore) / 3;
+
+      const updatedMetrics = {
+        cycleCount: newCycleCount,
+        averageCycleTime: newAverageCycleTime,
+        totalExecutionTime: newTotalExecutionTime,
+        successfulTrades: prev.successfulTrades,
+        failedTrades: prev.failedTrades,
+        portfolioGrowth: growth,
+        lastCycleTime: cycleTime,
+        healthScore
+      };
+
+      // Log performance data every 10 cycles
+      if (newCycleCount % 10 === 0) {
+        loggingService.logEvent('PERFORMANCE', 'Cycle metrics report', updatedMetrics);
+      }
+
+      return updatedMetrics;
     });
-
-    // Keep only last 50 simulation cycles
-    if (performanceData.current.simulationCycles.length > 50) {
-      performanceData.current.simulationCycles = performanceData.current.simulationCycles.slice(-50);
-    }
-
-    loggingService.logEvent('SIM', 'Simulation cycle completed', {
-      duration,
-      portfolioChange,
-      portfolioValueBefore,
-      portfolioValueAfter,
-      targetGrowth: 1.0 // 1% target per cycle as per concept
-    });
-
-    // Check if we're meeting the 1% growth target
-    if (portfolioChange >= 1.0) {
-      loggingService.logSuccess('Performance target achieved', {
-        portfolioChange,
-        target: 1.0,
-        exceeded: portfolioChange - 1.0
-      });
-    } else if (portfolioChange < 0) {
-      loggingService.logEvent('SIM', 'Negative cycle performance', {
-        portfolioChange,
-        severity: 'WARNING'
-      });
-    }
   }, []);
 
-  const getPerformanceMetrics = useCallback((): PerformanceMetrics => {
-    const now = Date.now();
-    const recentApiCalls = performanceData.current.apiCalls.filter(
-      call => now - call.timestamp < 10 * 60 * 1000 // Last 10 minutes
-    );
+  const trackTradeExecution = useCallback((success: boolean, executionTime: number) => {
+    setMetrics(prev => ({
+      ...prev,
+      successfulTrades: success ? prev.successfulTrades + 1 : prev.successfulTrades,
+      failedTrades: success ? prev.failedTrades : prev.failedTrades + 1
+    }));
 
-    const responseTimes = recentApiCalls.map(call => call.duration);
-    const averageResponseTime = responseTimes.length > 0 
-      ? responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length 
-      : 0;
-
-    const slowRequests = recentApiCalls.filter(call => call.duration > 200).length;
-    const successfulCalls = recentApiCalls.filter(call => call.success).length;
-    const successRate = recentApiCalls.length > 0 
-      ? (successfulCalls / recentApiCalls.length) * 100 
-      : 100;
-
-    const recentCycles = performanceData.current.simulationCycles.filter(
-      cycle => now - cycle.timestamp < 60 * 60 * 1000 // Last hour
-    );
-
-    const averageCycleTime = recentCycles.length > 0
-      ? recentCycles.reduce((sum, cycle) => sum + cycle.duration, 0) / recentCycles.length
-      : 0;
-
-    const totalPortfolioGrowth = recentCycles.reduce((sum, cycle) => sum + cycle.portfolioChange, 0);
-    const averagePortfolioGrowth = recentCycles.length > 0 ? totalPortfolioGrowth / recentCycles.length : 0;
-
-    return {
-      apiResponseTimes: responseTimes,
-      averageResponseTime,
-      slowRequests,
-      totalRequests: recentApiCalls.length,
-      simulationCycleTime: averageCycleTime,
-      portfolioGrowthPercent: averagePortfolioGrowth,
-      successRate
-    };
+    loggingService.logEvent('TRADE', 'Trade execution tracked', {
+      success,
+      executionTime,
+      timestamp: Date.now()
+    });
   }, []);
 
   const logPerformanceReport = useCallback(() => {
-    const metrics = getPerformanceMetrics();
-    
-    loggingService.logEvent('SIM', 'Performance report', {
-      metrics,
+    const report = {
+      ...metrics,
       timestamp: Date.now(),
-      reportType: 'periodic'
-    });
-
-    // Check for performance issues
-    if (metrics.averageResponseTime > 200) {
-      loggingService.logEvent('API', 'Average response time exceeds target', {
-        current: metrics.averageResponseTime,
-        target: 200,
-        severity: 'WARNING'
-      });
-    }
-
-    if (metrics.successRate < 95) {
-      loggingService.logEvent('API', 'Success rate below target', {
-        current: metrics.successRate,
-        target: 95,
-        severity: 'WARNING'
-      });
-    }
-
-    return metrics;
-  }, [getPerformanceMetrics]);
-
-  const clearPerformanceData = useCallback(() => {
-    performanceData.current = {
-      apiCalls: [],
-      simulationCycles: []
+      uptime: Date.now() - (cycleStartTimes.current[0] || Date.now())
     };
+
+    loggingService.logEvent('PERFORMANCE', 'Full performance report', report);
+    console.log('📊 Performance Report:', report);
+
+    return report;
+  }, [metrics]);
+
+  const resetMetrics = useCallback(() => {
+    setMetrics({
+      cycleCount: 0,
+      averageCycleTime: 0,
+      totalExecutionTime: 0,
+      successfulTrades: 0,
+      failedTrades: 0,
+      portfolioGrowth: 0,
+      lastCycleTime: 0,
+      healthScore: 100
+    });
+    initialPortfolioValue.current = null;
+    cycleStartTimes.current = [];
     
-    loggingService.logEvent('SIM', 'Performance data cleared');
+    loggingService.logEvent('PERFORMANCE', 'Metrics reset');
   }, []);
 
   return {
-    trackApiCall,
+    metrics,
     trackSimulationCycle,
-    getPerformanceMetrics,
+    trackTradeExecution,
     logPerformanceReport,
-    clearPerformanceData
+    resetMetrics
   };
 };

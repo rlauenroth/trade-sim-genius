@@ -1,174 +1,79 @@
 
 import { useMemo } from 'react';
-import { AssetPipelineItem, AssetPipelineMonitorProps } from './types';
-import { candidateErrorManager } from '@/services/aiErrorHandling/candidateErrorManager';
-import { PIPELINE_STEPS, PIPELINE_STEP_LABELS } from '@/types/candidate';
-import { getAssetCategory } from '@/config/aiSignalConfig';
+import { Candidate } from '@/types/candidate';
+
+interface PipelineItem {
+  symbol: string;
+  status: string;
+  signalType?: string;
+  confidenceScore?: number;
+  entryPriceSuggestion?: number;
+  pipelineStep: number;
+  statusDescription: string;
+  category: string;
+  isHealthy: boolean;
+  lastUpdated: number;
+}
+
+interface UseEnhancedPipelineDataProps {
+  candidates: Candidate[];
+  availableSignals: any[];
+  isSimulationActive: boolean;
+  openPositions: any[];
+}
 
 export const useEnhancedPipelineData = ({ 
   candidates, 
   availableSignals, 
   isSimulationActive,
-  openPositions = []
-}: Pick<AssetPipelineMonitorProps, 'candidates' | 'availableSignals' | 'isSimulationActive' | 'openPositions'>) => {
-  return useMemo((): AssetPipelineItem[] => {
-    console.log('🔄 useEnhancedPipelineData: ENHANCED Processing pipeline data:', {
-      candidatesInput: candidates?.length || 0,
-      availableSignalsInput: availableSignals?.length || 0,
-      openPositionsInput: openPositions?.length || 0,
-      candidatesData: candidates?.map(c => ({ 
-        symbol: c.symbol, 
-        status: c.status, 
-        lastUpdate: c.lastStatusUpdate,
-        pipelineStep: c.pipelineStep 
-      })) || [],
-      availableSignalsData: availableSignals?.map(s => ({ assetPair: s.assetPair, signalType: s.signalType })) || [],
-      timestamp: Date.now()
-    });
+  openPositions 
+}: UseEnhancedPipelineDataProps): PipelineItem[] => {
+  
+  console.log('🔄 useEnhancedPipelineData: ENHANCED Processing pipeline data:', {
+    candidatesInput: candidates?.length || 0,
+    availableSignalsInput: availableSignals?.length || 0,
+    openPositionsInput: openPositions?.length || 0,
+    candidatesData: candidates?.map(c => ({ symbol: c.symbol, status: c.status })) || [],
+    availableSignalsData: availableSignals?.map(s => ({ assetPair: s.assetPair, signalType: s.signalType })) || [],
+    timestamp: Date.now()
+  });
 
-    const items: AssetPipelineItem[] = [];
-    const processedSymbols = new Set<string>();
-    
-    // Process available signals first (highest priority)
-    if (availableSignals) {
-      availableSignals.forEach(signal => {
-        const pipelineStep = signal.signalType === 'NO_TRADE' ? 7 : 4;
-        const errorState = candidateErrorManager.getErrorState(signal.assetPair);
-        const isBlacklisted = candidateErrorManager.isBlacklisted(signal.assetPair);
-        
-        console.log('🔄 useEnhancedPipelineData: Processing available signal:', {
-          assetPair: signal.assetPair,
-          signalType: signal.signalType,
-          isBlacklisted,
-          pipelineStep
-        });
-        
-        items.push({
-          symbol: signal.assetPair,
-          status: isBlacklisted ? 'blacklisted' : 'signal_ready',
-          signalType: signal.signalType,
-          confidenceScore: signal.confidenceScore,
-          entryPriceSuggestion: signal.entryPriceSuggestion,
-          takeProfitPrice: signal.takeProfitPrice,
-          stopLossPrice: signal.stopLossPrice,
-          reasoning: signal.reasoning,
-          suggestedPositionSizePercent: signal.suggestedPositionSizePercent,
-          lastUpdated: Date.now(),
-          isAutoExecuting: isSimulationActive && (signal.signalType === 'BUY' || signal.signalType === 'SELL'),
-          pipelineStep: isBlacklisted ? -1 : pipelineStep,
-          statusDescription: getStatusDescription(isBlacklisted ? 'blacklisted' : 'signal_ready', signal.signalType),
-          errorDetails: errorState ? {
-            type: errorState.lastErrorType || 'unknown',
-            message: `${errorState.consecutiveErrors} consecutive errors`,
-            retryCount: errorState.consecutiveErrors,
-            blacklistedUntil: errorState.blacklistedUntil
-          } : undefined,
-          category: getAssetCategory(signal.assetPair),
-          isHealthy: !isBlacklisted && !errorState
-        });
-        
-        processedSymbols.add(signal.assetPair);
-      });
-    }
-    
-    // Process open positions
-    if (openPositions) {
-      openPositions.forEach(position => {
-        if (!processedSymbols.has(position.symbol)) {
-          const errorState = candidateErrorManager.getErrorState(position.symbol);
-          const isBlacklisted = candidateErrorManager.isBlacklisted(position.symbol);
-          
-          console.log('🔄 useEnhancedPipelineData: Processing open position:', {
-            symbol: position.symbol,
-            type: position.type,
-            isBlacklisted
-          });
-          
-          items.push({
-            symbol: position.symbol,
-            status: isBlacklisted ? 'blacklisted' : 'monitoring_position',
-            signalType: position.type,
-            lastUpdated: position.timestamp || Date.now(),
-            pipelineStep: isBlacklisted ? -1 : 6,
-            statusDescription: getStatusDescription(isBlacklisted ? 'blacklisted' : 'monitoring_position'),
-            positionInfo: {
-              type: position.type,
-              entryPrice: position.entryPrice,
-              currentPrice: position.currentPrice,
-              pnl: position.pnl,
-              pnlPercentage: position.pnlPercentage
-            },
-            errorDetails: errorState ? {
-              type: errorState.lastErrorType || 'unknown',
-              message: `${errorState.consecutiveErrors} consecutive errors`,
-              retryCount: errorState.consecutiveErrors,
-              blacklistedUntil: errorState.blacklistedUntil
-            } : undefined,
-            category: getAssetCategory(position.symbol),
-            isHealthy: !isBlacklisted && !errorState
-          });
-          
-          processedSymbols.add(position.symbol);
-        }
-      });
-    }
-    
-    // Process ALL candidates - ENHANCED PROCESSING with detailed logging
+  return useMemo(() => {
+    const items: PipelineItem[] = [];
+
+    // Process candidates first
     if (candidates && candidates.length > 0) {
-      console.log('🔄 useEnhancedPipelineData: ENHANCED Processing candidates:', {
-        totalCandidates: candidates.length,
-        alreadyProcessedSymbols: Array.from(processedSymbols),
-        candidateDetails: candidates.map(c => ({
-          symbol: c.symbol,
-          status: c.status,
-          lastUpdate: c.lastStatusUpdate,
-          pipelineStep: c.pipelineStep,
-          signalType: c.signalType
-        }))
-      });
+      console.log('🔄 useEnhancedPipelineData: Processing candidates:', candidates.length);
+      
+      candidates.forEach(candidate => {
+        const getStatusDescription = (status: string) => {
+          switch (status) {
+            case 'screening': return 'Markt-Screening läuft';
+            case 'analyzing': return 'KI-Analyse aktiv';
+            case 'signal_ready': return 'Signal bereit';
+            case 'executed': return 'Trade ausgeführt';
+            case 'error': return 'Fehler aufgetreten';
+            default: return 'Verarbeitung läuft';
+          }
+        };
 
-      candidates.forEach((candidate, index) => {
-        if (!processedSymbols.has(candidate.symbol)) {
-          const errorState = candidateErrorManager.getErrorState(candidate.symbol);
-          const isBlacklisted = candidateErrorManager.isBlacklisted(candidate.symbol);
-          const effectiveStatus = isBlacklisted ? 'blacklisted' : candidate.status;
-          
-          console.log(`🔄 useEnhancedPipelineData: Processing candidate ${index + 1}/${candidates.length}:`, {
-            symbol: candidate.symbol,
-            originalStatus: candidate.status,
-            effectiveStatus,
-            isBlacklisted,
-            pipelineStep: PIPELINE_STEPS[candidate.status] ?? 0,
-            lastUpdate: candidate.lastStatusUpdate
-          });
-          
-          const pipelineItem: AssetPipelineItem = {
-            symbol: candidate.symbol,
-            status: effectiveStatus,
-            signalType: candidate.signalType,
-            confidenceScore: candidate.confidence,
-            lastUpdated: candidate.lastStatusUpdate || candidate.timestamp,
-            pipelineStep: isBlacklisted ? -1 : (PIPELINE_STEPS[candidate.status] ?? 0),
-            statusDescription: getStatusDescription(effectiveStatus, candidate.signalType),
-            errorDetails: errorState ? {
-              type: errorState.lastErrorType || 'unknown',
-              message: `${errorState.consecutiveErrors} consecutive errors`,
-              retryCount: errorState.consecutiveErrors,
-              blacklistedUntil: errorState.blacklistedUntil
-            } : undefined,
-            category: getAssetCategory(candidate.symbol),
-            isHealthy: !isBlacklisted && !errorState && effectiveStatus !== 'error'
-          };
+        const getCategory = (symbol: string) => {
+          if (symbol.includes('BTC') || symbol.includes('ETH')) return 'major';
+          return 'alt';
+        };
 
-          items.push(pipelineItem);
-          console.log(`🔄 useEnhancedPipelineData: Added candidate to pipeline items:`, {
-            symbol: candidate.symbol,
-            status: effectiveStatus,
-            pipelineStep: pipelineItem.pipelineStep
-          });
-        } else {
-          console.log('🔄 useEnhancedPipelineData: Skipping already processed candidate:', candidate.symbol);
-        }
+        items.push({
+          symbol: candidate.symbol,
+          status: candidate.status,
+          signalType: candidate.signalType,
+          confidenceScore: candidate.confidence,
+          entryPriceSuggestion: candidate.entryPriceSuggestion,
+          pipelineStep: candidate.pipelineStep || 0,
+          statusDescription: getStatusDescription(candidate.status),
+          category: getCategory(candidate.symbol),
+          isHealthy: candidate.status !== 'error',
+          lastUpdated: candidate.lastStatusUpdate || Date.now()
+        });
       });
     } else {
       console.log('🔄 useEnhancedPipelineData: NO CANDIDATES to process:', {
@@ -176,81 +81,63 @@ export const useEnhancedPipelineData = ({
         candidatesEmpty: candidates?.length === 0
       });
     }
-    
-    // Sort by priority: errors first, then by pipeline step (desc), then by last updated (desc)
-    const sortedItems = items.sort((a, b) => {
-      // Errors and blacklisted first
-      if (a.pipelineStep === -1 && b.pipelineStep !== -1) return -1;
-      if (b.pipelineStep === -1 && a.pipelineStep !== -1) return 1;
+
+    // Process available signals if no candidates
+    if (items.length === 0 && availableSignals && availableSignals.length > 0) {
+      console.log('🔄 useEnhancedPipelineData: Processing available signals as fallback:', availableSignals.length);
       
-      // Then by pipeline step (more advanced first)
+      availableSignals.forEach(signal => {
+        items.push({
+          symbol: signal.assetPair,
+          status: 'signal_ready',
+          signalType: signal.signalType,
+          confidenceScore: signal.confidenceScore,
+          entryPriceSuggestion: signal.entryPriceSuggestion,
+          pipelineStep: 4,
+          statusDescription: `${signal.signalType} Signal verfügbar`,
+          category: signal.assetPair.includes('BTC') || signal.assetPair.includes('ETH') ? 'major' : 'alt',
+          isHealthy: true,
+          lastUpdated: Date.now()
+        });
+      });
+    }
+
+    // Process open positions
+    if (openPositions && openPositions.length > 0) {
+      console.log('🔄 useEnhancedPipelineData: Processing open positions:', openPositions.length);
+      
+      openPositions.forEach(position => {
+        items.push({
+          symbol: position.assetPair,
+          status: 'executed',
+          signalType: position.type,
+          pipelineStep: 5,
+          statusDescription: 'Position aktiv',
+          category: position.assetPair.includes('BTC') || position.assetPair.includes('ETH') ? 'major' : 'alt',
+          isHealthy: true,
+          lastUpdated: position.timestamp || Date.now()
+        });
+      });
+    }
+
+    // Sort by pipeline step and last updated
+    items.sort((a, b) => {
       if (a.pipelineStep !== b.pipelineStep) {
         return b.pipelineStep - a.pipelineStep;
       }
-      
-      // Finally by last updated
       return b.lastUpdated - a.lastUpdated;
     });
 
     console.log('🔄 useEnhancedPipelineData: ENHANCED FINAL RESULT:', {
-      totalItems: sortedItems.length,
-      items: sortedItems.map(item => ({
-        symbol: item.symbol,
-        status: item.status,
-        pipelineStep: item.pipelineStep,
-        lastUpdated: item.lastUpdated
+      totalItems: items.length,
+      items: items.map(item => ({ 
+        symbol: item.symbol, 
+        status: item.status, 
+        pipelineStep: item.pipelineStep 
       })),
-      emptyReason: sortedItems.length === 0 ? 'No candidates, signals, or positions to display' : null
+      emptyReason: items.length === 0 ? 'No candidates, signals, or positions to display' : null
     });
 
-    return sortedItems;
-  }, [candidates, availableSignals, isSimulationActive, openPositions]);
+    return items;
+  }, [candidates, availableSignals, openPositions, isSimulationActive]);
 };
-
-function getStatusDescription(status: string, signalType?: string): string {
-  switch (status) {
-    // Simplified statuses
-    case 'screening':
-      return 'Wird gescreent...';
-    case 'analyzing':
-      return 'KI-Analyse läuft...';
-    case 'signal_ready':
-      return `${signalType || 'Signal'} bereit`;
-    case 'error':
-      return 'Fehler bei der Analyse';
-    case 'monitoring_position':
-      return 'Position wird überwacht';
-    
-    // Legacy statuses
-    case 'detected_market_scan':
-      return 'Im Market-Scan erkannt';
-    case 'screening_stage1_pending':
-      return 'Wartet auf Stage 1 Screening...';
-    case 'screening_stage1_running':
-      return 'Stage 1 KI-Screening läuft...';
-    case 'detail_analysis_pending':
-      return 'Lade Kerzendaten für Detailanalyse...';
-    case 'detail_analysis_running':
-      return 'Stage 2 KI-Detailanalyse läuft...';
-    case 'signal_generated':
-      return `${signalType || 'Signal'} generiert`;
-    case 'trade_execution_pending':
-      return 'Trade wird ausgeführt...';
-    case 'position_monitoring':
-      return 'Position wird überwacht';
-    case 'error_analysis':
-      return 'Fehler bei der Analyse';
-    case 'blacklisted':
-      return 'Temporär ausgeschlossen';
-    case 'completed':
-      return 'Abgeschlossen';
-    case 'analyzed':
-      return 'Analysiert';
-    case 'signal':
-      return `${signalType || 'Signal'} verfügbar`;
-    case 'exit-screening':
-      return 'Exit-Screening';
-    default:
-      return 'Unbekannter Status';
-  }
-}

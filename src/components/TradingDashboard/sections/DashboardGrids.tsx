@@ -1,11 +1,11 @@
 
 import React from 'react';
-import PortfolioOverviewWithStatus from '../PortfolioOverviewWithStatus';
-import ControlCenter from '../ControlCenter';
-import ProgressTracker from '../ProgressTracker';
-import OpenPositions from '../OpenPositions';
-import PerformanceMetrics from '../PerformanceMetrics';
+import PortfolioOverview from '../PortfolioOverview';
+import SimulationControls from '../SimulationControls';
+import SignalDisplay from '../SignalDisplay';
 import ActivityLog from '../ActivityLog';
+import PerformanceMonitoringSection from './PerformanceMonitoringSection';
+import { usePerformanceMonitoring } from '@/hooks/usePerformanceMonitoring';
 
 interface DashboardGridsProps {
   displayPortfolioValue: number;
@@ -16,7 +16,7 @@ interface DashboardGridsProps {
   portfolioHealthStatus: string;
   simulationState: any;
   isSimulationActive: boolean;
-  isPaused?: boolean;
+  isPaused: boolean;
   onStartSimulation: () => void;
   onPauseSimulation: () => void;
   onResumeSimulation: () => void;
@@ -25,13 +25,13 @@ interface DashboardGridsProps {
   candidates: any[];
   openPositions: any[];
   currentSignal: any;
+  availableSignals: any[];
   onAcceptSignal: () => void;
   onIgnoreSignal: () => void;
   activityLog: any[];
   simulationDataForLog: any;
   userSettings: any;
   apiKeys: any;
-  availableSignals?: any[];
 }
 
 const DashboardGrids = ({
@@ -52,69 +52,60 @@ const DashboardGrids = ({
   candidates,
   openPositions,
   currentSignal,
+  availableSignals,
   onAcceptSignal,
   onIgnoreSignal,
   activityLog,
   simulationDataForLog,
   userSettings,
-  apiKeys,
-  availableSignals = []
+  apiKeys
 }: DashboardGridsProps) => {
-  // Ensure portfolioHealthStatus matches the expected type
-  const normalizeHealthStatus = (status: string): 'HEALTHY' | 'WARNING' | 'CRITICAL' => {
-    const upperStatus = status.toUpperCase();
-    if (upperStatus === 'HEALTHY' || upperStatus === 'WARNING' || upperStatus === 'CRITICAL') {
-      return upperStatus as 'HEALTHY' | 'WARNING' | 'CRITICAL';
-    }
-    return 'HEALTHY'; // Default fallback
-  };
+  const { metrics } = usePerformanceMonitoring();
 
   return (
-    <div className="space-y-6">
-      {/* Main 2-column grid for core components */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left Column */}
-        <div className="space-y-6">
-          <PortfolioOverviewWithStatus
-            currentValue={displayPortfolioValue}
-            startValue={displayStartValue}
-            totalPnL={totalPnL}
-            totalPnLPercentage={totalPnLPercentage}
-          />
-          
-          <ControlCenter
-            isSimulationActive={isSimulationActive}
-            isPaused={isPaused}
-            onStartSimulation={onStartSimulation}
-            onPauseSimulation={onPauseSimulation}
-            onResumeSimulation={onResumeSimulation}
-            onStopSimulation={onStopSimulation}
-            autoTradeCount={autoTradeCount}
-          />
-          
-          <ProgressTracker
-            startValue={displayStartValue}
-            currentValue={displayPortfolioValue}
-            progressValue={progressValue}
-            isSimulationActive={isSimulationActive}
-          />
-        </div>
+    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+      <PortfolioOverview
+        portfolioValue={displayPortfolioValue}
+        startValue={displayStartValue}
+        totalPnL={totalPnL}
+        totalPnLPercentage={totalPnLPercentage}
+        progressValue={progressValue}
+        healthStatus={portfolioHealthStatus}
+        openPositions={openPositions}
+      />
 
-        {/* Right Column */}
-        <div className="space-y-6">
-          <OpenPositions
-            positions={simulationState?.openPositions || []}
-          />
-          
-          <PerformanceMetrics portfolioHealthStatus={normalizeHealthStatus(portfolioHealthStatus)} />
-        </div>
-      </div>
+      <SimulationControls
+        simulationState={simulationState}
+        isSimulationActive={isSimulationActive}
+        isPaused={isPaused}
+        onStartSimulation={onStartSimulation}
+        onPauseSimulation={onPauseSimulation}
+        onResumeSimulation={onResumeSimulation}
+        onStopSimulation={onStopSimulation}
+        autoTradeCount={autoTradeCount}
+        candidates={candidates}
+        userSettings={userSettings}
+        apiKeys={apiKeys}
+      />
 
-      {/* ActivityLog in full width below everything */}
-      <div className="w-full">
+      <PerformanceMonitoringSection
+        metrics={metrics}
+        isSimulationActive={isSimulationActive}
+      />
+
+      <SignalDisplay
+        currentSignal={currentSignal}
+        availableSignals={availableSignals}
+        onAcceptSignal={onAcceptSignal}
+        onIgnoreSignal={onIgnoreSignal}
+        isSimulationActive={isSimulationActive}
+        candidates={candidates}
+      />
+
+      <div className="lg:col-span-2">
         <ActivityLog
           activityLog={activityLog}
-          simulationData={simulationDataForLog}
+          simulationDataForLog={simulationDataForLog}
         />
       </div>
     </div>
