@@ -22,6 +22,7 @@ interface TradingDashboardLayoutProps {
   activityLog: any[];
   apiKeys: any;
   candidates: any[];
+  availableSignals: any[]; // FIXED: Added missing prop
   timeElapsed: string;
   displayPortfolioValue: number;
   displayStartValue: number | null;
@@ -70,6 +71,7 @@ const TradingDashboardLayout = ({
   activityLog,
   apiKeys,
   candidates,
+  availableSignals, // FIXED: Accept the new prop
   timeElapsed,
   displayPortfolioValue,
   displayStartValue,
@@ -123,6 +125,7 @@ const TradingDashboardLayout = ({
             activityLog={activityLog}
             apiKeys={apiKeys}
             candidates={candidates}
+            availableSignals={availableSignals} // FIXED: Pass through to DashboardContent
             timeElapsed={timeElapsed}
             displayPortfolioValue={displayPortfolioValue}
             displayStartValue={displayStartValue}
