@@ -42,7 +42,7 @@ interface TradingDashboardLayoutProps {
   retryLoadPortfolioData: () => void;
   showSettings: boolean;
   setShowSettings: (show: boolean) => void;
-  retryServiceInitialization: () => void;
+  retryServiceInitialization: (serviceName: string) => void;
   isRealTradingMode: boolean;
   realTradingError: any;
   shouldUsePinAuth: boolean;

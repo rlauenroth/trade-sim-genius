@@ -65,7 +65,7 @@ export const useTradingDashboardHandlers = ({
     }
   }, [currentSignal, ignoreSignal]);
 
-  // Handle reset to simulation mode
+  // Handle reset to simulation mode - now properly async
   const handleResetToSimulation = useCallback(async () => {
     try {
       await updateTradingMode('simulation');
