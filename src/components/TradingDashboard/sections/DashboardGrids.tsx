@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import PortfolioOverviewWithStatus from '../PortfolioOverviewWithStatus';
 import ControlCenter from '../ControlCenter';
@@ -71,59 +70,62 @@ const DashboardGrids = ({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-      {/* Left Column */}
-      <div className="space-y-6">
-        <PortfolioOverviewWithStatus
-          currentValue={displayPortfolioValue}
-          startValue={displayStartValue}
-          totalPnL={totalPnL}
-          totalPnLPercentage={totalPnLPercentage}
-        />
-        
-        <ControlCenter
-          isSimulationActive={isSimulationActive}
-          isPaused={isPaused}
-          onStartSimulation={onStartSimulation}
-          onPauseSimulation={onPauseSimulation}
-          onResumeSimulation={onResumeSimulation}
-          onStopSimulation={onStopSimulation}
-          autoTradeCount={autoTradeCount}
-        />
-        
-        <ProgressTracker
-          startValue={displayStartValue}
-          currentValue={displayPortfolioValue}
-          progressValue={progressValue}
-          isSimulationActive={isSimulationActive}
-        />
+    <div className="space-y-6">
+      {/* Main 2-column grid for all components except ActivityLog */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left Column */}
+        <div className="space-y-6">
+          <PortfolioOverviewWithStatus
+            currentValue={displayPortfolioValue}
+            startValue={displayStartValue}
+            totalPnL={totalPnL}
+            totalPnLPercentage={totalPnLPercentage}
+          />
+          
+          <ControlCenter
+            isSimulationActive={isSimulationActive}
+            isPaused={isPaused}
+            onStartSimulation={onStartSimulation}
+            onPauseSimulation={onPauseSimulation}
+            onResumeSimulation={onResumeSimulation}
+            onStopSimulation={onStopSimulation}
+            autoTradeCount={autoTradeCount}
+          />
+          
+          <ProgressTracker
+            startValue={displayStartValue}
+            currentValue={displayPortfolioValue}
+            progressValue={progressValue}
+            isSimulationActive={isSimulationActive}
+          />
+          
+          <OpenPositions
+            positions={simulationState?.openPositions || []}
+          />
+        </div>
+
+        {/* Right Column */}
+        <div className="space-y-6">
+          <CandidateList 
+            candidates={candidates} 
+            openPositions={openPositions}
+          />
+          
+          <SignalDisplay
+            currentSignal={currentSignal}
+            onAcceptSignal={onAcceptSignal}
+            onIgnoreSignal={onIgnoreSignal}
+          />
+          
+          <PerformanceMetrics portfolioHealthStatus={normalizeHealthStatus(portfolioHealthStatus)} />
+        </div>
       </div>
 
-      {/* Middle Column */}
-      <div className="space-y-6">
-        <CandidateList 
-          candidates={candidates} 
-          openPositions={openPositions}
-        />
-        
-        <SignalDisplay
-          currentSignal={currentSignal}
-          onAcceptSignal={onAcceptSignal}
-          onIgnoreSignal={onIgnoreSignal}
-        />
-        
-        <PerformanceMetrics portfolioHealthStatus={normalizeHealthStatus(portfolioHealthStatus)} />
-      </div>
-
-      {/* Right Column */}
-      <div className="lg:col-span-2 xl:col-span-1 space-y-6">
+      {/* ActivityLog in full width below the main grid */}
+      <div className="w-full">
         <ActivityLog
           activityLog={activityLog}
           simulationData={simulationDataForLog}
-        />
-        
-        <OpenPositions
-          positions={simulationState?.openPositions || []}
         />
       </div>
     </div>
