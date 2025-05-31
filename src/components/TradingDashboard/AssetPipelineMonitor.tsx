@@ -16,6 +16,17 @@ const AssetPipelineMonitor = ({
   isSimulationActive,
   openPositions = []
 }: AssetPipelineMonitorProps) => {
+  console.log('🔄 AssetPipelineMonitor props received:', {
+    candidatesCount: candidates?.length || 0,
+    availableSignalsCount: availableSignals?.length || 0,
+    currentSignal: !!currentSignal,
+    portfolioValue,
+    isSimulationActive,
+    openPositionsCount: openPositions?.length || 0,
+    candidates: candidates?.map(c => ({ symbol: c.symbol, status: c.status })) || [],
+    availableSignals: availableSignals?.map(s => ({ assetPair: s.assetPair, signalType: s.signalType })) || []
+  });
+
   const pipelineItems = useEnhancedPipelineData({ 
     candidates, 
     availableSignals, 
@@ -23,7 +34,18 @@ const AssetPipelineMonitor = ({
     openPositions 
   });
 
+  console.log('🔄 AssetPipelineMonitor pipeline items processed:', {
+    itemCount: pipelineItems.length,
+    items: pipelineItems.map(item => ({ 
+      symbol: item.symbol, 
+      status: item.status,
+      pipelineStep: item.pipelineStep,
+      signalType: item.signalType
+    }))
+  });
+
   if (pipelineItems.length === 0) {
+    console.log('🔄 AssetPipelineMonitor: Showing empty state');
     return (
       <Card className="bg-slate-800 border-slate-700">
         <CardHeader>
@@ -41,6 +63,7 @@ const AssetPipelineMonitor = ({
     );
   }
 
+  console.log('🔄 AssetPipelineMonitor: Rendering pipeline with items');
   return (
     <TooltipProvider>
       <Card className="bg-slate-800 border-slate-700">

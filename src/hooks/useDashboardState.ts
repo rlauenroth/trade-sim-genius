@@ -1,8 +1,10 @@
+
 import { useSettingsV2Store } from '@/stores/settingsV2';
 import { useSimulation } from '@/hooks/useSimulation';
 import { usePortfolioData } from '@/hooks/usePortfolioData';
 import { useTradingDashboardData } from '@/hooks/useTradingDashboardData';
 import { useCentralPortfolioService } from '@/hooks/useCentralPortfolioService';
+import { useAISignals } from '@/hooks/useAISignals';
 
 export const useDashboardState = () => {
   const { settings, isLoading: settingsLoading } = useSettingsV2Store();
@@ -33,13 +35,27 @@ export const useDashboardState = () => {
     resumeSimulation,
     acceptSignal,
     ignoreSignal,
-    currentSignal,
-    activityLog,
-    candidates,
     autoModeError,
     portfolioHealthStatus,
     logPerformanceReport
   } = useSimulation();
+
+  // Integrate AI signals and candidates
+  const {
+    currentSignal,
+    availableSignals,
+    startAISignalGeneration,
+    candidates,
+    isFetchingSignals
+  } = useAISignals();
+
+  console.log('📊 useDashboardState: AI Signal data:', {
+    currentSignal: !!currentSignal,
+    availableSignalsCount: availableSignals.length,
+    candidatesCount: candidates.length,
+    isFetchingSignals,
+    candidates: candidates.map(c => ({ symbol: c.symbol, status: c.status }))
+  });
 
   const {
     timeElapsed,
@@ -50,6 +66,9 @@ export const useDashboardState = () => {
     getDisplayStartValue,
     hasValidSimulation
   } = useTradingDashboardData(simulationState, portfolioData, isSimulationActive);
+
+  // Get activity log from simulation state
+  const activityLog = simulationState?.activityLog || [];
 
   // Create consolidated API keys object from V2 settings (centralized)
   const apiKeys = {
@@ -113,9 +132,9 @@ export const useDashboardState = () => {
     resumeSimulation,
     acceptSignal,
     ignoreSignal,
-    currentSignal,
+    currentSignal, // From AI signals
     activityLog,
-    candidates,
+    candidates, // From AI signals with useCandidates integration
     timeElapsed,
     getProgressValue,
     getTotalPnL,
@@ -131,6 +150,10 @@ export const useDashboardState = () => {
     loadPortfolioDataWithCredentials,
     logPerformanceReport,
     // Add central portfolio refresh function
-    refreshLivePortfolio
+    refreshLivePortfolio,
+    // Add AI signal functionality
+    startAISignalGeneration,
+    availableSignals,
+    isFetchingSignals
   };
 };

@@ -4,6 +4,7 @@ import { useSimGuard } from '@/hooks/useSimGuard';
 import { useDashboardInitialization } from '@/hooks/useDashboardInitialization';
 import { useDashboardActions } from '@/hooks/useDashboardActions';
 import { useDashboardState } from '@/hooks/useDashboardState';
+import { useCandidates } from '@/hooks/useCandidates';
 
 export const useDashboardStateManager = () => {
   const {
@@ -26,7 +27,6 @@ export const useDashboardStateManager = () => {
     ignoreSignal,
     currentSignal,
     activityLog,
-    candidates,
     timeElapsed,
     getProgressValue,
     getTotalPnL,
@@ -42,6 +42,14 @@ export const useDashboardStateManager = () => {
     loadPortfolioDataWithCredentials,
     logPerformanceReport
   } = useDashboardState();
+
+  // Integrate candidates management directly into dashboard state
+  const { candidates } = useCandidates();
+
+  console.log('🔄 DashboardStateManager: Candidates state:', {
+    candidatesCount: candidates.length,
+    candidates: candidates.map(c => ({ symbol: c.symbol, status: c.status }))
+  });
 
   const {
     isInitialized,
@@ -99,7 +107,7 @@ export const useDashboardStateManager = () => {
     ignoreSignal,
     currentSignal,
     activityLog,
-    candidates,
+    candidates, // Now available in dashboard state
     timeElapsed,
     getProgressValue,
     getTotalPnL,
