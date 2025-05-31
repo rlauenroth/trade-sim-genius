@@ -101,7 +101,7 @@ export const usePortfolioStateConsolidator = () => {
           checksum: newChecksum
         };
         
-        loggingService.logEvent('PORTFOLIO_STATE', `Atomic update completed: ${description}`, {
+        loggingService.logEvent('PORTFOLIO_UPDATE', `Atomic update completed: ${description}`, {
           portfolioValueBefore: currentState.currentPortfolioValue,
           portfolioValueAfter: newState.currentPortfolioValue,
           positionsBefore: currentState.openPositions.length,
@@ -148,7 +148,7 @@ export const usePortfolioStateConsolidator = () => {
         const repairedState = autoRepairState(state, currentPortfolioValue);
         if (repairedState && validateStateConsistency(repairedState)) {
           localStorage.setItem('kiTradingApp_simulationState', JSON.stringify(repairedState));
-          loggingService.logEvent('PORTFOLIO_STATE', 'State auto-repaired successfully');
+          loggingService.logEvent('PORTFOLIO_UPDATE', 'State auto-repaired successfully');
           return repairedState;
         } else {
           console.log('🗑️ Cannot repair state, clearing invalid data');

@@ -39,7 +39,7 @@ export const useSimulation = () => {
       console.log('🔄 Processing signal via enhanced simulation');
       await enhancedSimulation.acceptSignal(signal);
     },
-    portfolioHealthStatus: { status: 'healthy', lastCheck: Date.now() }, // Simplified
+    portfolioHealthStatus: 'healthy', // Simplified to string
     trackApiCall: () => {}, // Handled by enhanced timer
     logPerformanceReport: () => {
       console.log('📊 Enhanced simulation performance:', enhancedSimulation.timerState);

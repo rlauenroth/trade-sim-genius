@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { loggingService } from '@/services/loggingService';
 
@@ -46,7 +47,7 @@ export const useEnhancedSimulationTimers = () => {
     // Check execution lock
     if (executionLockRef.current) {
       console.log(`🔒 ${context} execution blocked - already running`);
-      loggingService.logEvent('TIMER', `${context} execution blocked - overlap protection`);
+      loggingService.logEvent('SYSTEM', `${context} execution blocked - overlap protection`);
       return;
     }
 
@@ -55,7 +56,7 @@ export const useEnhancedSimulationTimers = () => {
 
     try {
       console.log(`🚀 ${context} execution started`);
-      loggingService.logEvent('TIMER', `${context} execution started`);
+      loggingService.logEvent('SYSTEM', `${context} execution started`);
       
       await executionFunction();
       
@@ -75,7 +76,7 @@ export const useEnhancedSimulationTimers = () => {
       }));
       
       console.log(`✅ ${context} execution completed in ${executionTime}ms`);
-      loggingService.logEvent('TIMER', `${context} execution completed`, {
+      loggingService.logEvent('SYSTEM', `${context} execution completed`, {
         executionTime,
         averageTime: timerState.averageExecutionTime
       });
@@ -116,7 +117,7 @@ export const useEnhancedSimulationTimers = () => {
     setTimerState(prev => ({ ...prev, isRunning: true }));
     
     // Start timer with adaptive interval
-    timerRef.current = setInterval(async () => {
+    const intervalFunction = async () => {
       // Double-check conditions before execution
       const currentState = JSON.parse(localStorage.getItem('kiTradingApp_simulationState') || '{}');
       
@@ -137,11 +138,13 @@ export const useEnhancedSimulationTimers = () => {
       if (newInterval !== interval && timerRef.current) {
         console.log(`🔄 Adjusting timer interval: ${interval}ms -> ${newInterval}ms`);
         clearInterval(timerRef.current);
-        timerRef.current = setInterval(arguments.callee, newInterval);
+        timerRef.current = setInterval(intervalFunction, newInterval);
       }
-    }, interval);
+    };
     
-    loggingService.logEvent('TIMER', `Enhanced timer started for ${context}`, {
+    timerRef.current = setInterval(intervalFunction, interval);
+    
+    loggingService.logEvent('SYSTEM', `Enhanced timer started for ${context}`, {
       interval,
       adaptiveIntervals: true
     });
@@ -159,7 +162,7 @@ export const useEnhancedSimulationTimers = () => {
     setTimerState(prev => ({ ...prev, isRunning: false }));
     
     console.log('🔄 Enhanced timer stopped and cleaned up');
-    loggingService.logEvent('TIMER', 'Enhanced timer stopped');
+    loggingService.logEvent('SYSTEM', 'Enhanced timer stopped');
   }, []);
 
   // Cleanup on unmount

@@ -23,7 +23,7 @@ export const useSignalStateMachine = () => {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Clear any existing timeout
-  const clearTimeout = useCallback(() => {
+  const clearTimeoutRef = useCallback(() => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
@@ -32,7 +32,7 @@ export const useSignalStateMachine = () => {
 
   // Set timeout for state transitions
   const setStateTimeout = useCallback((newState: SignalState, timeoutMs: number = 30000) => {
-    clearTimeout();
+    clearTimeoutRef();
     timeoutRef.current = setTimeout(() => {
       console.log(`⚠️ Signal state timeout reached: ${state.signalState} -> FAILED`);
       loggingService.logError('Signal state machine timeout', {
@@ -48,7 +48,7 @@ export const useSignalStateMachine = () => {
         lastStateChange: Date.now()
       }));
     }, timeoutMs);
-  }, [state.signalState, clearTimeout]);
+  }, [state.signalState, clearTimeoutRef]);
 
   // Transition to new state with validation
   const transitionTo = useCallback((newState: SignalState, signal?: Signal | null) => {
@@ -56,7 +56,7 @@ export const useSignalStateMachine = () => {
     
     console.log(`🔄 Signal state transition: ${state.signalState} -> ${newState}`);
     
-    loggingService.logEvent('SIGNAL_STATE', `Signal state transition: ${state.signalState} -> ${newState}`, {
+    loggingService.logEvent('SYSTEM', `Signal state transition: ${state.signalState} -> ${newState}`, {
       signal: signal?.assetPair,
       signalType: signal?.signalType,
       previousState: state.signalState,
@@ -80,10 +80,10 @@ export const useSignalStateMachine = () => {
         setStateTimeout('FAILED', 60000); // 60s timeout for signal to be picked up
         break;
       default:
-        clearTimeout();
+        clearTimeoutRef();
         break;
     }
-  }, [state.signalState, setStateTimeout, clearTimeout]);
+  }, [state.signalState, setStateTimeout, clearTimeoutRef]);
 
   // Generate new signal (from AI)
   const generateSignal = useCallback((signal: Signal) => {
@@ -152,9 +152,9 @@ export const useSignalStateMachine = () => {
   // Force clear (emergency reset)
   const forceClear = useCallback(() => {
     console.log('🔧 Force clearing signal state machine');
-    clearTimeout();
+    clearTimeoutRef();
     transitionTo('IDLE', null);
-  }, [clearTimeout, transitionTo]);
+  }, [clearTimeoutRef, transitionTo]);
 
   // Check if new signal generation is allowed
   const canGenerateNewSignal = useCallback(() => {
