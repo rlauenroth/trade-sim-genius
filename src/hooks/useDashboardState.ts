@@ -37,7 +37,8 @@ export const useDashboardState = () => {
     ignoreSignal,
     autoModeError,
     portfolioHealthStatus,
-    logPerformanceReport
+    logPerformanceReport,
+    activityLog // Get activityLog from simulation hook instead of state
   } = useSimulation();
 
   // Integrate AI signals and candidates
@@ -66,9 +67,6 @@ export const useDashboardState = () => {
     getDisplayStartValue,
     hasValidSimulation
   } = useTradingDashboardData(simulationState, portfolioData, isSimulationActive);
-
-  // Get activity log from simulation state
-  const activityLog = simulationState?.activityLog || [];
 
   // Create consolidated API keys object from V2 settings (centralized)
   const apiKeys = {
@@ -133,7 +131,7 @@ export const useDashboardState = () => {
     acceptSignal,
     ignoreSignal,
     currentSignal, // From AI signals
-    activityLog,
+    activityLog, // From simulation hook
     candidates, // From AI signals with useCandidates integration
     timeElapsed,
     getProgressValue,
