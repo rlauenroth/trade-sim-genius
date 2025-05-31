@@ -4,7 +4,7 @@ import DashboardHeaderSection from './sections/DashboardHeader';
 import LoadingErrorStates from './sections/LoadingErrorStates';
 import DashboardGrids from './sections/DashboardGrids';
 import SettingsManagerV2 from '@/components/settingsV2/SettingsManagerV2';
-import AssetPipelineMonitor from '@/components/assetPipelineMonitor/AssetPipelineMonitor';
+import AssetPipelineMonitor from './AssetPipelineMonitor';
 
 interface DashboardContentProps {
   userSettings: any;
