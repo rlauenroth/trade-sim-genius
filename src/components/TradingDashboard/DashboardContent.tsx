@@ -1,9 +1,9 @@
+
 import React from 'react';
 import { Container } from '@/components/ui/container';
 import DashboardHeaderSection from './sections/DashboardHeader';
 import LoadingErrorStates from './sections/LoadingErrorStates';
 import DashboardGrids from './sections/DashboardGrids';
-import DashboardTrading from './sections/DashboardTrading';
 import SettingsManagerV2 from '@/components/settingsV2/SettingsManagerV2';
 
 interface DashboardContentProps {
@@ -127,14 +127,6 @@ const DashboardContent = ({
         simulationDataForLog={simulationDataForLog}
         userSettings={userSettings}
         apiKeys={apiKeys}
-      />
-
-      <DashboardTrading
-        currentSignal={currentSignal}
-        candidates={candidates}
-        simulationState={simulationState}
-        onAcceptSignal={acceptSignal}
-        onIgnoreSignal={ignoreSignal}
       />
 
       <SettingsManagerV2
