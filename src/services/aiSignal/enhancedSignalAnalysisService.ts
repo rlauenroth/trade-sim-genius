@@ -1,4 +1,3 @@
-
 import { sendAIRequest, createAnalysisPrompt } from '@/utils/openRouter';
 import { getHistoricalCandles, getCurrentPrice } from '@/utils/kucoinApi';
 import { calculateAllIndicators } from '@/utils/technicalIndicators';
@@ -15,9 +14,17 @@ export class EnhancedSignalAnalysisService {
   private params: SignalGenerationParams;
   private maxRetries = 3;
   private timeoutMs = 30000;
+  private candidateStatusCallback?: (symbol: string, status: string) => void;
 
-  constructor(params: SignalGenerationParams) {
+  constructor(params: SignalGenerationParams, candidateStatusCallback?: (symbol: string, status: string) => void) {
     this.params = params;
+    this.candidateStatusCallback = candidateStatusCallback;
+  }
+
+  private updateCandidateStatus(symbol: string, status: string) {
+    if (this.candidateStatusCallback) {
+      this.candidateStatusCallback(symbol, status);
+    }
   }
 
   async generateDetailedSignal(assetPair: string): Promise<GeneratedSignal | null> {
@@ -25,6 +32,7 @@ export class EnhancedSignalAnalysisService {
     
     // Check if symbol is blacklisted
     if (candidateErrorManager.isBlacklisted(assetPair)) {
+      this.updateCandidateStatus(assetPair, 'blacklisted');
       loggingService.logEvent('AI', 'Symbol is blacklisted, skipping', {
         assetPair,
         requestId
@@ -41,6 +49,8 @@ export class EnhancedSignalAnalysisService {
       return null;
     }
 
+    this.updateCandidateStatus(assetPair, 'detail_analysis_pending');
+    
     loggingService.logEvent('AI', 'Starting enhanced signal analysis', {
       assetPair,
       requestId,
@@ -50,8 +60,12 @@ export class EnhancedSignalAnalysisService {
     });
     
     try {
-      // Get market data
+      // Get market data with status update
+      this.updateCandidateStatus(assetPair, 'detail_analysis_pending');
       const { candleData, currentPrice, technicalIndicators } = await this.getMarketData(assetPair);
+      
+      // Update to analysis running
+      this.updateCandidateStatus(assetPair, 'detail_analysis_running');
       
       // Try AI analysis with retry logic
       for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
@@ -73,9 +87,11 @@ export class EnhancedSignalAnalysisService {
           
           if (validation.isValid) {
             candidateErrorManager.recordSuccess(assetPair);
+            this.updateCandidateStatus(assetPair, 'signal_generated');
             return this.convertToGeneratedSignal(validation.data, false);
           } else if (validation.usedFallback) {
             candidateErrorManager.recordFallbackUsed();
+            this.updateCandidateStatus(assetPair, 'signal_generated');
             return this.convertToGeneratedSignal(validation.data, true);
           }
         } catch (error) {
@@ -94,6 +110,7 @@ export class EnhancedSignalAnalysisService {
       });
       
       candidateErrorManager.recordFallbackUsed();
+      this.updateCandidateStatus(assetPair, 'signal_generated');
       const technicalSignal = technicalRulesFallback.generateTechnicalSignal(assetPair, candleData, currentPrice);
       return this.convertToGeneratedSignal(technicalSignal, true);
       
@@ -105,6 +122,7 @@ export class EnhancedSignalAnalysisService {
       });
       
       candidateErrorManager.recordError(assetPair, 'SERVER_ERROR');
+      this.updateCandidateStatus(assetPair, 'error_analysis');
       return null;
     }
   }
@@ -219,6 +237,7 @@ export class EnhancedSignalAnalysisService {
     }
 
     candidateErrorManager.recordError(assetPair, errorType);
+    this.updateCandidateStatus(assetPair, 'error_analysis');
     
     loggingService.logError(`Signal analysis attempt ${attempt} failed`, {
       assetPair,

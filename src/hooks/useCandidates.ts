@@ -1,6 +1,6 @@
 
 import { useState, useCallback } from 'react';
-import { Candidate } from '@/types/candidate';
+import { Candidate, CandidateStatus, PIPELINE_STEPS } from '@/types/candidate';
 import { loggingService } from '@/services/loggingService';
 
 export const useCandidates = () => {
@@ -15,16 +15,25 @@ export const useCandidates = () => {
     setCandidates(newCandidates);
   }, []);
 
-  const updateCandidateStatus = useCallback((symbol: string, status: Candidate['status'], signalType?: Candidate['signalType'], confidence?: number) => {
+  const updateCandidateStatus = useCallback((
+    symbol: string, 
+    status: CandidateStatus, 
+    signalType?: Candidate['signalType'], 
+    confidence?: number,
+    additionalData?: Partial<Candidate>
+  ) => {
     setCandidates(prev => {
       const updated = prev.map(candidate => 
         candidate.symbol === symbol 
           ? { 
-              ...candidate, 
+              ...candidate,
+              ...additionalData,
               status, 
               signalType, 
               confidence,
-              timestamp: Date.now()
+              timestamp: Date.now(),
+              lastStatusUpdate: Date.now(),
+              pipelineStep: PIPELINE_STEPS[status] ?? 0
             }
           : candidate
       );
@@ -33,18 +42,21 @@ export const useCandidates = () => {
         symbol,
         status,
         signalType,
-        confidence
+        confidence,
+        pipelineStep: PIPELINE_STEPS[status]
       });
       
       return updated;
     });
   }, []);
 
-  const addCandidate = useCallback((symbol: string) => {
+  const addCandidate = useCallback((symbol: string, initialStatus: CandidateStatus = 'detected_market_scan') => {
     const newCandidate: Candidate = {
       symbol,
-      status: 'screening',
-      timestamp: Date.now()
+      status: initialStatus,
+      timestamp: Date.now(),
+      lastStatusUpdate: Date.now(),
+      pipelineStep: PIPELINE_STEPS[initialStatus] ?? 0
     };
     
     setCandidates(prev => {
@@ -55,7 +67,11 @@ export const useCandidates = () => {
       return [...prev, newCandidate];
     });
     
-    loggingService.logEvent('AI', 'CANDIDATE_ADDED', { symbol });
+    loggingService.logEvent('AI', 'CANDIDATE_ADDED', { 
+      symbol, 
+      initialStatus,
+      pipelineStep: PIPELINE_STEPS[initialStatus]
+    });
   }, []);
 
   const clearCandidates = useCallback(() => {
@@ -63,11 +79,24 @@ export const useCandidates = () => {
     loggingService.logEvent('AI', 'CANDIDATES_CLEARED', {});
   }, []);
 
+  // Enhanced function for pipeline progress tracking
+  const advanceCandidateToNextStage = useCallback((symbol: string, nextStatus: CandidateStatus, meta?: any) => {
+    updateCandidateStatus(symbol, nextStatus, undefined, undefined, meta);
+    
+    loggingService.logEvent('AI', 'CANDIDATE_PIPELINE_ADVANCE', {
+      symbol,
+      nextStatus,
+      pipelineStep: PIPELINE_STEPS[nextStatus],
+      meta
+    });
+  }, [updateCandidateStatus]);
+
   return {
     candidates,
     updateCandidates,
     updateCandidateStatus,
     addCandidate,
-    clearCandidates
+    clearCandidates,
+    advanceCandidateToNextStage
   };
 };

@@ -4,7 +4,7 @@ import { Signal } from '@/types/simulation';
 
 export interface AssetPipelineItem {
   symbol: string;
-  status: 'screening' | 'analyzed' | 'signal' | 'exit-screening' | 'error';
+  status: Candidate['status'];
   signalType?: 'BUY' | 'SELL' | 'HOLD' | 'NO_TRADE';
   confidenceScore?: number;
   entryPriceSuggestion?: string | number;
@@ -14,6 +14,25 @@ export interface AssetPipelineItem {
   suggestedPositionSizePercent?: number;
   lastUpdated: number;
   isAutoExecuting?: boolean;
+  
+  // Enhanced pipeline tracking
+  pipelineStep: number;
+  statusDescription: string;
+  errorDetails?: {
+    type: string;
+    message: string;
+    retryCount: number;
+    blacklistedUntil?: number;
+  };
+  positionInfo?: {
+    type: 'BUY' | 'SELL';
+    entryPrice: number;
+    currentPrice?: number;
+    pnl?: number;
+    pnlPercentage?: number;
+  };
+  category?: string;
+  isHealthy: boolean;
 }
 
 export interface AssetPipelineMonitorProps {
@@ -22,4 +41,13 @@ export interface AssetPipelineMonitorProps {
   currentSignal: Signal | null;
   portfolioValue?: number;
   isSimulationActive: boolean;
+  openPositions?: any[];
+}
+
+export interface PipelineProgress {
+  currentStep: number;
+  totalSteps: number;
+  stepLabel: string;
+  isError: boolean;
+  isComplete: boolean;
 }

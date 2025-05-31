@@ -1,3 +1,4 @@
+
 import { useCallback } from 'react';
 import { AISignalService } from '@/services/aiSignal';
 import { loggingService } from '@/services/loggingService';
@@ -6,7 +7,7 @@ import { useCandidates } from '@/hooks/useCandidates';
 import { useSettingsV2Store } from '@/stores/settingsV2';
 
 export const useMarketScreening = () => {
-  const { addCandidate, updateCandidateStatus } = useCandidates();
+  const { addCandidate, updateCandidateStatus, advanceCandidateToNextStage } = useCandidates();
   const { settings } = useSettingsV2Store();
 
   const performScreeningAndAnalysis = useCallback(async (
@@ -43,7 +44,7 @@ export const useMarketScreening = () => {
     
     // Add candidates immediately with screening status
     selectedPairs.forEach(pair => {
-      addCandidate(pair);
+      addCandidate(pair, 'screening_stage1_pending');
       addLogEntry('AI', `Asset hinzugefügt: ${pair}`);
     });
     
@@ -55,11 +56,15 @@ export const useMarketScreening = () => {
     for (let i = 0; i < selectedPairs.length; i++) {
       const pair = selectedPairs[i];
       
-      // Update candidate status to analyzing
-      updateCandidateStatus(pair, 'analyzed');
-      addLogEntry('AI', `Analysiere ${pair} (${i + 1}/${selectedPairs.length})...`);
+      // Update candidate status to detail analysis pending (data loading phase)
+      advanceCandidateToNextStage(pair, 'detail_analysis_pending');
+      addLogEntry('AI', `Lade Daten für ${pair} (${i + 1}/${selectedPairs.length})...`);
       
       try {
+        // Update to analysis running
+        advanceCandidateToNextStage(pair, 'detail_analysis_running');
+        addLogEntry('AI', `Analysiere ${pair} mit KI...`);
+        
         const signal = await aiService.generateDetailedSignal(pair);
         if (signal) {
           signals.push(signal);
@@ -67,7 +72,7 @@ export const useMarketScreening = () => {
           // Update candidate with signal information
           updateCandidateStatus(
             pair, 
-            'signal', 
+            'signal_generated', 
             signal.signalType as 'BUY' | 'SELL' | 'HOLD',
             signal.confidenceScore
           );
@@ -85,7 +90,9 @@ export const useMarketScreening = () => {
           addLogEntry('AI', `Kein Signal für ${pair}`);
         }
       } catch (error) {
-        updateCandidateStatus(pair, 'analyzed');
+        updateCandidateStatus(pair, 'error_analysis', undefined, undefined, {
+          errorReason: error instanceof Error ? error.message : 'Unknown error'
+        });
         addLogEntry('WARNING', `Analyse fehlgeschlagen für ${pair}`);
         loggingService.logError('Signal generation failed for pair', {
           pair,
@@ -102,7 +109,7 @@ export const useMarketScreening = () => {
     addLogEntry('SUCCESS', `Analyse abgeschlossen: ${signals.length} Signale generiert`);
 
     return { selectedPairs, signals };
-  }, [addCandidate, updateCandidateStatus, settings.model.id]);
+  }, [addCandidate, updateCandidateStatus, advanceCandidateToNextStage, settings.model.id]);
 
   return { performScreeningAndAnalysis };
 };
