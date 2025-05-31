@@ -11,7 +11,7 @@ import { Signal } from '@/types/simulation';
 interface AssetPipelineItem {
   symbol: string;
   status: 'screening' | 'analyzed' | 'signal' | 'exit-screening' | 'error';
-  signalType?: 'BUY' | 'SELL' | 'HOLD';
+  signalType?: 'BUY' | 'SELL' | 'HOLD' | 'NO_TRADE';
   confidenceScore?: number;
   entryPriceSuggestion?: string | number;
   takeProfitPrice?: number;
@@ -104,13 +104,14 @@ const AssetPipelineMonitor = ({
     }
   };
 
-  const getSignalBadge = (signalType?: 'BUY' | 'SELL' | 'HOLD') => {
+  const getSignalBadge = (signalType?: 'BUY' | 'SELL' | 'HOLD' | 'NO_TRADE') => {
     if (!signalType) return null;
     
     const colors = {
       BUY: 'bg-green-600 text-white',
       SELL: 'bg-red-600 text-white', 
-      HOLD: 'bg-gray-600 text-white'
+      HOLD: 'bg-gray-600 text-white',
+      NO_TRADE: 'bg-slate-600 text-white'
     };
     
     return (
@@ -208,7 +209,7 @@ const AssetPipelineMonitor = ({
                   </div>
 
                   {/* Signal Details Row */}
-                  {item.status === 'signal' && (
+                  {item.status === 'signal' && item.signalType && item.signalType !== 'NO_TRADE' && item.signalType !== 'HOLD' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-2 border-t border-slate-600">
                       {item.entryPriceSuggestion && (
                         <div>
